@@ -1,0 +1,82 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+/cypress/videos/
+/cypress/screenshots/
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+desktop.ini
+.directory
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE / editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# OS generated files
+.directory
+.Trash-*
+
+# Logs
+logs
+*.log
+
+# Cache directories
+.eslintcache
+.stylelintcache
+.npm
+.cache
+
+# Project specific
+/public/sitemap*.xml
+/public/robots.txt
+/public/sw.js
+/public/workbox-*.js
