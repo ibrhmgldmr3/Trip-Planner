@@ -192,10 +192,10 @@ const sampleItinerary = [
 
 // Aktivite tiplerine göre renkler
 const typeColors = {
-  morning: "bg-yellow-100 border-yellow-300 text-yellow-800",
-  noon: "bg-blue-100 border-blue-300 text-blue-800",
-  afternoon: "bg-green-100 border-green-300 text-green-800",
-  evening: "bg-purple-100 border-purple-300 text-purple-800"
+  morning: "bg-yellow-900 border-yellow-700 text-yellow-300",
+  noon: "bg-blue-900 border-blue-700 text-blue-300",
+  afternoon: "bg-green-900 border-green-700 text-green-300",
+  evening: "bg-purple-900 border-purple-700 text-purple-300"
 };
 
 // Kategori ikonları
@@ -219,14 +219,14 @@ export default function DailyPlannerPage() {
   ) || [];
   
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50">
-      <div className="max-w-6xl mx-auto text-gray-800">
+    <main className="min-h-screen p-4 md:p-8 bg-gray-900">
+      <div className="max-w-6xl mx-auto text-gray-300">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
               Günlük Plan
             </h1>
-            <p className="text-gray-600 mt-2 max-w-2xl">
+            <p className="text-gray-300 mt-2 max-w-2xl">
               İstanbul seyahatinizin günlük aktivite planını görüntüleyin ve düzenleyin.
             </p>
           </div>
@@ -239,7 +239,7 @@ export default function DailyPlannerPage() {
         </div>
 
         {/* Day Selection */}
-        <div className="bg-white p-4 rounded-xl shadow-md mb-6 overflow-x-auto">
+        <div className="bg-gray-800 p-4 rounded-xl shadow-md mb-6 overflow-x-auto">
           <div className="flex space-x-2">
             {sampleItinerary.map(day => (
               <button
@@ -247,7 +247,7 @@ export default function DailyPlannerPage() {
                 className={`px-4 py-2 rounded-lg flex-shrink-0 transition-colors ${
                   activeDay === day.day 
                     ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
                 onClick={() => setActiveDay(day.day)}
               >
@@ -260,15 +260,15 @@ export default function DailyPlannerPage() {
 
         {/* Daily Overview */}
         {currentDay && (
-          <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-            <h2 className="text-xl font-bold mb-4">
+          <div className="bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+            <h2 className="text-xl font-bold mb-4 text-white">
               {currentDay.day}. Gün - {currentDay.date}
             </h2>
             
             <div className="flex flex-wrap gap-2 mb-6">
               <button 
                 className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700'
+                  filterType === 'all' ? 'bg-gray-600 text-white' : 'bg-gray-700 text-gray-300'
                 }`}
                 onClick={() => setFilterType('all')}
               >
@@ -276,7 +276,7 @@ export default function DailyPlannerPage() {
               </button>
               <button 
                 className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'morning' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'
+                  filterType === 'morning' ? 'bg-yellow-600 text-white' : 'bg-yellow-900 text-yellow-300'
                 }`}
                 onClick={() => setFilterType('morning')}
               >
@@ -284,7 +284,7 @@ export default function DailyPlannerPage() {
               </button>
               <button 
                 className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'noon' ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-700'
+                  filterType === 'noon' ? 'bg-blue-600 text-white' : 'bg-blue-900 text-blue-300'
                 }`}
                 onClick={() => setFilterType('noon')}
               >
@@ -292,7 +292,7 @@ export default function DailyPlannerPage() {
               </button>
               <button 
                 className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'afternoon' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'
+                  filterType === 'afternoon' ? 'bg-green-600 text-white' : 'bg-green-900 text-green-300'
                 }`}
                 onClick={() => setFilterType('afternoon')}
               >
@@ -300,7 +300,7 @@ export default function DailyPlannerPage() {
               </button>
               <button 
                 className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'evening' ? 'bg-purple-500 text-white' : 'bg-purple-100 text-purple-700'
+                  filterType === 'evening' ? 'bg-purple-600 text-white' : 'bg-purple-900 text-purple-300'
                 }`}
                 onClick={() => setFilterType('evening')}
               >
@@ -311,17 +311,17 @@ export default function DailyPlannerPage() {
             {/* Timeline */}
             <div className="relative">
               {/* Vertical line */}
-              <div className="absolute top-0 bottom-0 left-[15px] md:left-[23px] w-0.5 bg-gray-200"></div>
+              <div className="absolute top-0 bottom-0 left-[15px] md:left-[23px] w-0.5 bg-gray-600"></div>
               
               <div className="space-y-6">
                 {filteredActivities.map(activity => (
                   <div key={activity.id} className="relative pl-10 md:pl-16">
                     {/* Timeline dot */}
                     <div className={`absolute left-0 top-2 w-[30px] h-[30px] rounded-full border-4 flex items-center justify-center
-                      ${activity.type === 'morning' ? 'bg-yellow-50 border-yellow-400' : 
-                        activity.type === 'noon' ? 'bg-blue-50 border-blue-400' : 
-                        activity.type === 'afternoon' ? 'bg-green-50 border-green-400' : 
-                        'bg-purple-50 border-purple-400'
+                      ${activity.type === 'morning' ? 'bg-yellow-900 border-yellow-600' : 
+                        activity.type === 'noon' ? 'bg-blue-900 border-blue-600' : 
+                        activity.type === 'afternoon' ? 'bg-green-900 border-green-600' : 
+                        'bg-purple-900 border-purple-600'
                       }`}>
                       {categoryIcons[activity.category as keyof typeof categoryIcons]}
                     </div>
@@ -331,10 +331,10 @@ export default function DailyPlannerPage() {
                       className={`border rounded-lg overflow-hidden shadow-sm transition-all ${
                         showDetails === activity.id ? 'shadow-md' : ''
                       } ${
-                        activity.type === 'morning' ? 'border-yellow-200' : 
-                        activity.type === 'noon' ? 'border-blue-200' : 
-                        activity.type === 'afternoon' ? 'border-green-200' : 
-                        'border-purple-200'
+                        activity.type === 'morning' ? 'border-yellow-700 bg-gray-700' : 
+                        activity.type === 'noon' ? 'border-blue-700 bg-gray-700' : 
+                        activity.type === 'afternoon' ? 'border-green-700 bg-gray-700' : 
+                        'border-purple-700 bg-gray-700'
                       }`}
                     >
                       <div 
@@ -343,11 +343,11 @@ export default function DailyPlannerPage() {
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-medium text-lg">{activity.title}</h3>
-                            <div className="text-sm text-gray-500 mt-1">{activity.time} • {activity.location}</div>
+                            <h3 className="font-medium text-lg text-white">{activity.title}</h3>
+                            <div className="text-sm text-gray-400 mt-1">{activity.time} • {activity.location}</div>
                           </div>
                           <div className="flex flex-col items-end">
-                            <div className="text-sm font-medium text-blue-600">{activity.cost > 0 ? `${activity.cost} TL` : 'Ücretsiz'}</div>
+                            <div className="text-sm font-medium text-blue-300">{activity.cost > 0 ? `${activity.cost} TL` : 'Ücretsiz'}</div>
                             <div className={`mt-1 text-xs px-2 py-0.5 rounded-full ${
                               typeColors[activity.type as keyof typeof typeColors]
                             }`}>
@@ -363,11 +363,11 @@ export default function DailyPlannerPage() {
                       {/* Details section */}
                       {showDetails === activity.id && (
                         <div className="px-4 pb-4">
-                          <div className="mt-2 pt-2 border-t border-gray-100">
-                            <p className="text-sm text-gray-700 mb-3">{activity.description}</p>
+                          <div className="mt-2 pt-2 border-t border-gray-600">
+                            <p className="text-sm text-gray-300 mb-3">{activity.description}</p>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
-                                <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
+                                <span className="bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded-full">
                                   {categoryIcons[activity.category as keyof typeof categoryIcons]} {activity.category}
                                 </span>
                               </div>
@@ -375,7 +375,7 @@ export default function DailyPlannerPage() {
                                 <button className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors">
                                   Düzenle
                                 </button>
-                                <button className="px-3 py-1 bg-red-100 text-red-700 text-xs rounded-md hover:bg-red-200 transition-colors">
+                                <button className="px-3 py-1 bg-red-900 text-red-300 text-xs rounded-md hover:bg-red-800 transition-colors">
                                   Kaldır
                                 </button>
                               </div>
@@ -395,32 +395,32 @@ export default function DailyPlannerPage() {
         {currentDay && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Cost Summary */}
-            <div className="bg-white p-4 rounded-xl shadow-md">
-              <h3 className="font-medium text-lg mb-3">Günlük Maliyet</h3>
-              <div className="text-2xl font-bold text-blue-600 mb-2">
+            <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+              <h3 className="font-medium text-lg mb-3 text-white">Günlük Maliyet</h3>
+              <div className="text-2xl font-bold text-blue-400 mb-2">
                 {currentDay.activities.reduce((sum, act) => sum + act.cost, 0)} TL
               </div>
               
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Yemek</span>
-                  <span className="font-medium">
+                  <span className="text-gray-300">Yemek</span>
+                  <span className="font-medium text-gray-300">
                     {currentDay.activities
                       .filter(a => a.category === 'yemek')
                       .reduce((sum, a) => sum + a.cost, 0)} TL
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Kültür</span>
-                  <span className="font-medium">
+                  <span className="text-gray-300">Kültür</span>
+                  <span className="font-medium text-gray-300">
                     {currentDay.activities
                       .filter(a => a.category === 'kültür')
                       .reduce((sum, a) => sum + a.cost, 0)} TL
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Diğer</span>
-                  <span className="font-medium">
+                  <span className="text-gray-300">Diğer</span>
+                  <span className="font-medium text-gray-300">
                     {currentDay.activities
                       .filter(a => !['yemek', 'kültür'].includes(a.category))
                       .reduce((sum, a) => sum + a.cost, 0)} TL
@@ -430,15 +430,15 @@ export default function DailyPlannerPage() {
             </div>
             
             {/* Activity Stats */}
-            <div className="bg-white p-4 rounded-xl shadow-md">
-              <h3 className="font-medium text-lg mb-3">Aktivite Özeti</h3>
+            <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+              <h3 className="font-medium text-lg mb-3 text-white">Aktivite Özeti</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-2 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-800">{currentDay.activities.length}</div>
-                  <div className="text-xs text-gray-500">Toplam Aktivite</div>
+                <div className="text-center p-2 bg-gray-700 rounded-lg">
+                  <div className="text-2xl font-bold text-white">{currentDay.activities.length}</div>
+                  <div className="text-xs text-gray-400">Toplam Aktivite</div>
                 </div>
-                <div className="text-center p-2 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-800">
+                <div className="text-center p-2 bg-gray-700 rounded-lg">
+                  <div className="text-2xl font-bold text-white">
                     {Math.round(currentDay.activities.reduce((sum, a) => {
                       const [start, end] = a.time.split(' - ');
                       const startTime = start.split(':').map(Number);
@@ -446,27 +446,27 @@ export default function DailyPlannerPage() {
                       return sum + (endTime[0] - startTime[0]) + (endTime[1] - startTime[1])/60;
                     }, 0))}
                   </div>
-                  <div className="text-xs text-gray-500">Toplam Saat</div>
+                  <div className="text-xs text-gray-400">Toplam Saat</div>
                 </div>
-                <div className="text-center p-2 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-600">
+                <div className="text-center p-2 bg-gray-700 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-300">
                     {currentDay.activities.filter(a => a.type === 'morning').length}
                   </div>
-                  <div className="text-xs text-gray-500">Sabah</div>
+                  <div className="text-xs text-gray-400">Sabah</div>
                 </div>
-                <div className="text-center p-2 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
+                <div className="text-center p-2 bg-gray-700 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-300">
                     {currentDay.activities.filter(a => a.type === 'evening').length}
                   </div>
-                  <div className="text-xs text-gray-500">Akşam</div>
+                  <div className="text-xs text-gray-400">Akşam</div>
                 </div>
               </div>
             </div>
             
             {/* Add New Activity */}
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col justify-center items-center">
-              <h3 className="font-medium text-lg text-blue-800 mb-3">Yeni Aktivite Ekle</h3>
-              <p className="text-sm text-blue-600 text-center mb-4">
+            <div className="bg-blue-900 p-4 rounded-xl border border-blue-700 flex flex-col justify-center items-center">
+              <h3 className="font-medium text-lg text-blue-300 mb-3">Yeni Aktivite Ekle</h3>
+              <p className="text-sm text-blue-300 text-center mb-4">
                 Bu güne yeni bir aktivite ekleyerek seyahat planınızı kişiselleştirin.
               </p>
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -478,9 +478,9 @@ export default function DailyPlannerPage() {
         
         {/* Tips for the day */}
         {currentDay && (
-          <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-            <h3 className="font-medium text-lg mb-4">Bugün İçin İpuçları</h3>
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+          <div className="bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+            <h3 className="font-medium text-lg mb-4 text-white">Bugün İçin İpuçları</h3>
+            <div className="bg-yellow-900 border-l-4 border-yellow-600 p-4 rounded-r-lg">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
@@ -488,7 +488,7 @@ export default function DailyPlannerPage() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
+                  <p className="text-sm text-yellow-300">
                     {currentDay.day === 1 && "Sultanahmet bölgesindeki müzeler genellikle kalabalık olur. Ayasofya ziyaretiniz için sabah erken saatleri tercih edin."}
                     {currentDay.day === 2 && "Boğaz turu için hava durumunu kontrol etmeyi unutmayın. Hafif bir yağmur ihtimali var."}
                     {currentDay.day === 3 && "Dolmabahçe Sarayı Pazartesi günleri kapalıdır. Önceden bilet alırsanız sıra beklemezsiniz."}
@@ -500,13 +500,13 @@ export default function DailyPlannerPage() {
         )}
         
         {/* Coming Soon Message */}
-        <div className="mt-8 bg-yellow-50 border border-yellow-200 p-4 rounded-lg text-center">
-          <p className="text-yellow-800">
+        <div className="mt-8 bg-gray-800 border border-gray-700 p-4 rounded-lg text-center">
+          <p className="text-yellow-300">
             <strong>Bilgilendirme:</strong> Bu özellik şu an demo amaçlıdır. Tam işlevsellik yakında eklenecektir.
           </p>
         </div>
         
-        <div className="mt-8 text-sm text-gray-500 text-center">
+        <div className="mt-8 text-sm text-gray-400 text-center">
           &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
         </div>
       </div>

@@ -5,7 +5,7 @@ module.exports = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  darkMode: 'class',
+  darkMode: 'media', // Bu değeri 'media' olarak değiştirdik, böylece sistem her zaman karanlık modu tercih edecek
   theme: { extend: {} },
   plugins: [],
 };

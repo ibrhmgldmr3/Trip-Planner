@@ -94,14 +94,14 @@ export default function TransportationPage() {
     });
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50">
-      <div className="max-w-6xl mx-auto text-gray-800">
+    <main className="min-h-screen p-4 md:p-8 bg-gray-900">
+      <div className="max-w-6xl mx-auto text-gray-300">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-400">
               Ulaşım Seçenekleri
             </h1>
-            <p className="text-gray-800 mt-2 max-w-2xl">
+            <p className="text-gray-300 mt-2 max-w-2xl">
               Seyahatiniz için en uygun ulaşım seçeneklerini bulun ve karşılaştırın.
             </p>
           </div>
@@ -114,63 +114,63 @@ export default function TransportationPage() {
         </div>
 
         {/* Search Form */}
-        <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700">Ulaşım Ara</h2>
+        <div className="bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-blue-400">Ulaşım Ara</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="from" className="block text-sm font-medium text-blue-700 mb-1">Nereden</label>
+              <label htmlFor="from" className="block text-sm font-medium text-blue-300 mb-1">Nereden</label>
               <select 
                 id="from" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               >
-                <option value="Ankara" className="text-gray-800 font-medium">Ankara</option>
-                <option value="İstanbul" className="text-gray-800 font-medium">İstanbul</option>
-                <option value="İzmir" className="text-gray-800 font-medium">İzmir</option>
-                <option value="Antalya" className="text-gray-800 font-medium">Antalya</option>
+                <option value="Ankara" className="text-white">Ankara</option>
+                <option value="İstanbul" className="text-white">İstanbul</option>
+                <option value="İzmir" className="text-white">İzmir</option>
+                <option value="Antalya" className="text-white">Antalya</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="to" className="block text-sm font-medium text-blue-700 mb-1">Nereye</label>
+              <label htmlFor="to" className="block text-sm font-medium text-blue-300 mb-1">Nereye</label>
               <select 
                 id="to" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               >
-                <option value="İstanbul" className="text-gray-800 font-medium">İstanbul</option>
-                <option value="Ankara" className="text-gray-800 font-medium">Ankara</option>
-                <option value="İzmir" className="text-gray-800 font-medium">İzmir</option>
-                <option value="Antalya" className="text-gray-800 font-medium">Antalya</option>
+                <option value="İstanbul" className="text-white">İstanbul</option>
+                <option value="Ankara" className="text-white">Ankara</option>
+                <option value="İzmir" className="text-white">İzmir</option>
+                <option value="Antalya" className="text-white">Antalya</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="date" className="block text-sm font-medium text-blue-700 mb-1">Tarih</label>
+              <label htmlFor="date" className="block text-sm font-medium text-blue-300 mb-1">Tarih</label>
               <input 
                 type="date" 
                 id="date" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
             
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-blue-700 mb-1">Ulaşım Tipi</label>
+              <label htmlFor="type" className="block text-sm font-medium text-blue-300 mb-1">Ulaşım Tipi</label>
               <select 
                 id="type" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
               >
-                <option value="all" className="text-gray-800 font-medium">Tümü</option>
-                <option value="Uçak" className="text-gray-800 font-medium">Uçak</option>
-                <option value="Otobüs" className="text-gray-800 font-medium">Otobüs</option>
-                <option value="Tren" className="text-gray-800 font-medium">Tren</option>
+                <option value="all" className="text-white">Tümü</option>
+                <option value="Uçak" className="text-white">Uçak</option>
+                <option value="Otobüs" className="text-white">Otobüs</option>
+                <option value="Tren" className="text-white">Tren</option>
               </select>
             </div>
           </div>
@@ -186,20 +186,20 @@ export default function TransportationPage() {
         </div>
 
         {/* Results */}
-        <div className="bg-white p-6 rounded-xl shadow-md">
+        <div className="bg-gray-800 p-6 rounded-xl shadow-md">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-blue-700">Sonuçlar ({filteredTransportations.length})</h2>
+            <h2 className="text-xl font-semibold text-blue-400">Sonuçlar ({filteredTransportations.length})</h2>
             
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-800 font-medium">Sırala:</span>
+              <span className="text-sm text-gray-300 font-medium">Sırala:</span>
               <select 
-                className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+                className="px-2 py-1 border border-gray-600 bg-gray-700 text-white rounded-md text-sm"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
-                <option value="price" className="text-gray-800 font-medium">Fiyat</option>
-                <option value="duration" className="text-gray-800 font-medium">Süre</option>
-                <option value="departureTime" className="text-gray-800 font-medium">Kalkış Zamanı</option>
+                <option value="price" className="text-white">Fiyat</option>
+                <option value="duration" className="text-white">Süre</option>
+                <option value="departureTime" className="text-white">Kalkış Zamanı</option>
               </select>
             </div>
           </div>
@@ -208,14 +208,14 @@ export default function TransportationPage() {
             {filteredTransportations.map(transport => (
               <div 
                 key={transport.id} 
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                className="border border-gray-700 bg-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center">
                   <div className="flex items-center mb-4 md:mb-0">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-3 ${
-                      transport.type === "Uçak" ? "bg-blue-100 text-blue-600" : 
-                      transport.type === "Otobüs" ? "bg-green-100 text-green-600" : 
-                      "bg-purple-100 text-purple-600"
+                      transport.type === "Uçak" ? "bg-blue-900 text-blue-300" : 
+                      transport.type === "Otobüs" ? "bg-green-900 text-green-300" : 
+                      "bg-purple-900 text-purple-300"
                     }`}>
                       {transport.type === "Uçak" ? (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -232,33 +232,33 @@ export default function TransportationPage() {
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-blue-800">{transport.company}</div>
-                      <div className="text-sm text-gray-800 font-medium">{transport.type}</div>
+                      <div className="font-medium text-blue-300">{transport.company}</div>
+                      <div className="text-sm text-gray-300 font-medium">{transport.type}</div>
                     </div>
                   </div>
                   
                   <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
                     <div className="text-center">
-                      <div className="font-bold text-blue-700">{transport.departureTime}</div>
-                      <div className="text-sm text-gray-800 font-medium">{transport.from}</div>
+                      <div className="font-bold text-blue-300">{transport.departureTime}</div>
+                      <div className="text-sm text-gray-300 font-medium">{transport.from}</div>
                     </div>
                     
                     <div className="hidden md:block">
-                      <div className="w-24 h-[2px] bg-gray-300 relative">
-                        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-800 font-medium">
+                      <div className="w-24 h-[2px] bg-gray-600 relative">
+                        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-300 font-medium">
                           {transport.duration}
                         </div>
                       </div>
                     </div>
                     
                     <div className="text-center">
-                      <div className="font-bold text-blue-700">{transport.arrivalTime}</div>
-                      <div className="text-sm text-gray-800 font-medium">{transport.to}</div>
+                      <div className="font-bold text-blue-300">{transport.arrivalTime}</div>
+                      <div className="text-sm text-gray-300 font-medium">{transport.to}</div>
                     </div>
                     
                     <div className="md:ml-4">
-                      <div className="font-bold text-blue-600">{transport.price} TL</div>
-                      <div className="text-xs text-gray-800 font-medium">{transport.seats} koltuk kaldı</div>
+                      <div className="font-bold text-blue-300">{transport.price} TL</div>
+                      <div className="text-xs text-gray-300 font-medium">{transport.seats} koltuk kaldı</div>
                     </div>
                     
                     <button 
@@ -274,13 +274,13 @@ export default function TransportationPage() {
         </div>
         
         {/* Coming Soon Message */}
-        <div className="mt-8 bg-yellow-50 border border-yellow-200 p-4 rounded-lg text-center">
-          <p className="text-yellow-800">
+        <div className="mt-8 bg-gray-800 border border-gray-700 p-4 rounded-lg text-center">
+          <p className="text-yellow-300">
             <strong>Bilgilendirme:</strong> Bu özellik şu an demo amaçlıdır. Gerçek rezervasyon yakında aktif olacaktır.
           </p>
         </div>
         
-        <div className="mt-8 text-sm text-gray-800 font-medium text-center">
+        <div className="mt-8 text-sm text-gray-300 font-medium text-center">
           &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
         </div>
       </div>

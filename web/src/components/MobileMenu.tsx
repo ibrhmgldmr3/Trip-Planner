@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import UserNav from "./UserNav";
 import { useSession } from "next-auth/react";
-import DarkModeToggle from "./DarkModeToggle";
 
 export default function MobileMenu() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -27,34 +26,32 @@ export default function MobileMenu() {
   }, []);
 
   return (
-    <header className={`sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-shadow ${
+    <header className={`sticky top-0 z-50 bg-gray-900 border-b border-gray-800 transition-shadow ${
       scrolled ? 'shadow-md' : ''
     }`}>
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-blue-600 hover:text-blue-700 transition-colors">
+            <Link href="/" className="text-xl font-bold text-blue-500 hover:text-blue-400 transition-colors">
               Trip Planner
             </Link>
           </div>
           <nav className="hidden md:block">
             <ul className="flex items-center space-x-6">
-              <li><Link href="/map" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Rota Planlayıcı</Link></li>
-              <li><Link href="/transportation" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Ulaşım</Link></li>
-              <li><Link href="/accommodation" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Konaklama</Link></li>
-              <li><Link href="/daily-planner" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Günlük Plan</Link></li>
-              <li><Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Bütçe</Link></li>
+              <li><Link href="/map" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Rota Planlayıcı</Link></li>
+              <li><Link href="/transportation" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Ulaşım</Link></li>
+              <li><Link href="/accommodation" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Konaklama</Link></li>
+              <li><Link href="/daily-planner" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Günlük Plan</Link></li>
+              <li><Link href="/budget" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Bütçe</Link></li>
             </ul>
           </nav>
           <div className="hidden md:flex items-center space-x-4">
-            <DarkModeToggle />
             <Link href="/planner" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors hover-lift">Planlamaya Başla</Link>
             <UserNav />
           </div>
           <div className="md:hidden flex items-center">
-            <DarkModeToggle />
             <button 
-              className="ml-2 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none"
+              className="p-2 rounded-md text-gray-300 hover:text-blue-400 focus:outline-none"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Ana menüyü aç/kapat"
             >
@@ -74,39 +71,39 @@ export default function MobileMenu() {
       
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
+        <div className="md:hidden bg-gray-900 border-t border-gray-800">
           <div className="px-4 pt-2 pb-3 space-y-1 fade-in">
             <Link 
               href="/map" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800"
               onClick={() => setIsMenuOpen(false)}
             >
               Rota Planlayıcı
             </Link>
             <Link 
               href="/transportation" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800"
               onClick={() => setIsMenuOpen(false)}
             >
               Ulaşım
             </Link>
             <Link 
               href="/accommodation" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800"
               onClick={() => setIsMenuOpen(false)}
             >
               Konaklama
             </Link>
             <Link 
               href="/daily-planner" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800"
               onClick={() => setIsMenuOpen(false)}
             >
               Günlük Plan
             </Link>
             <Link 
               href="/budget" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800"
               onClick={() => setIsMenuOpen(false)}
             >
               Bütçe
@@ -120,12 +117,12 @@ export default function MobileMenu() {
                 Planlamaya Başla
               </Link>
               
-              <div className="flex justify-center mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+              <div className="flex justify-center mt-3 border-t border-gray-800 pt-3">
                 {!session ? (
                   <>
                     <Link 
                       href="/login"
-                      className="px-4 py-2 text-blue-600 dark:text-blue-400 font-medium text-sm text-center hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition-colors mr-2"
+                      className="px-4 py-2 text-blue-400 font-medium text-sm text-center hover:bg-gray-800 rounded-lg transition-colors mr-2"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Giriş Yap
@@ -141,7 +138,7 @@ export default function MobileMenu() {
                 ) : (
                   <Link 
                     href="/profile"
-                    className="px-4 py-2 text-blue-600 dark:text-blue-400 font-medium text-sm text-center hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    className="px-4 py-2 text-blue-400 font-medium text-sm text-center hover:bg-gray-800 rounded-lg transition-colors"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Profilim

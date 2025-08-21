@@ -3,8 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileMenu from "@/components/MobileMenu";
 import AuthProvider from "@/providers/AuthProvider";
-import { ThemeProvider } from "@/context/ThemeContext";
-import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,26 +27,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="tr" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
-      <head>
-        <Script id="theme-script" strategy="beforeInteractive">
-          {`
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-              document.documentElement.classList.add('dark')
-            } else {
-              document.documentElement.classList.remove('dark')
-            }
-          `}
-        </Script>
-      </head>
-      <body>
+    <html lang="tr" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
+      <body className="bg-gray-900 text-white">
         <AuthProvider>
-          <ThemeProvider>
-            <MobileMenu />
-            {children}
-          </ThemeProvider>
+          <MobileMenu />
+          {children}
         </AuthProvider>
       </body>
     </html>
-  )
+  );
 }

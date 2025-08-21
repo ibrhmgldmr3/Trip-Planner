@@ -76,6 +76,11 @@ model Trip {
   activities  Activity[]
   notes       String?
   status      TripStatus  @default(PLANNED)
+  conversations AiConversation[]
+  accommodations Accommodation[]
+  transportations Transportation[]
+  dailyPlans DailyPlan[]
+  budgetItems BudgetItem[]
 }
 
 model Activity {
@@ -99,4 +104,86 @@ enum TripStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+model AiConversation {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  messages  Json     // Array of message objects with role, content, timestamp
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  summary   String?  // Brief summary of conversation outcomes
+  tags      String?  // JSON array of topics covered in conversation
+}
+
+model Accommodation {
+  id          String   @id @default(cuid())
+  tripId      String
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  name        String
+  location    String?
+  checkIn     DateTime
+  checkOut    DateTime
+  price       Float
+  priceUnit   String   @default("total") // total, perNight, etc.
+  bookingUrl  String?
+  type        String?  // hotel, hostel, apartment, etc.
+  amenities   String?  // JSON array of amenities
+  address     String?
+  coordinates Json?    // { lat: number, lng: number }
+  rating      Float?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  status      String   @default("pending") // pending, booked, cancelled
+  confirmation String? // Booking confirmation code
+}
+
+model Transportation {
+  id              String   @id @default(cuid())
+  tripId          String
+  trip            Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type            String   // flight, train, bus, etc.
+  provider        String?  // airline, train company, etc.
+  departureTime   DateTime
+  arrivalTime     DateTime
+  departureLocation String
+  arrivalLocation String
+  price           Float
+  bookingReference String?
+  bookingUrl     String?
+  seats          String?  // seat numbers
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  status         String   @default("pending") // pending, booked, cancelled
+}
+
+model DailyPlan {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  date      DateTime
+  title     String?
+  notes     String?
+  activities Json     // Array of daily activities with time, title, description, location, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BudgetItem {
+  id          String   @id @default(cuid())
+  tripId      String
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  category    String   // accommodation, transportation, food, activities, etc.
+  description String
+  amount      Float
+  currency    String   @default("TRY")
+  date        DateTime?
+  isEstimate  Boolean  @default(true)
+  isPaid      Boolean  @default(false)
+  paymentMethod String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

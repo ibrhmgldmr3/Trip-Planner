@@ -91,14 +91,14 @@ export default function AccommodationPage() {
     });
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50">
+    <main className="min-h-screen p-4 md:p-8 bg-gray-900">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
               Konaklama Seçenekleri
             </h1>
-            <p className="text-gray-800 mt-2 max-w-2xl">
+            <p className="text-gray-300 mt-2 max-w-2xl">
               Seyahatiniz için en uygun konaklama tesislerini keşfedin ve rezervasyon yapın.
             </p>
           </div>
@@ -111,61 +111,61 @@ export default function AccommodationPage() {
         </div>
 
         {/* Search Form */}
-        <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700">Konaklama Ara</h2>
+        <div className="bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-white">Konaklama Ara</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
-              <label htmlFor="city" className="block text-sm font-medium text-blue-700 mb-1">Şehir</label>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-1">Şehir</label>
               <select 
                 id="city" 
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
               >
-                <option value="İstanbul" className="text-gray-800 font-medium">İstanbul</option>
-                <option value="Ankara" className="text-gray-800 font-medium">Ankara</option>
-                <option value="İzmir" className="text-gray-800 font-medium">İzmir</option>
-                <option value="Antalya" className="text-gray-800 font-medium">Antalya</option>
+                <option value="İstanbul" className="text-white">İstanbul</option>
+                <option value="Ankara" className="text-white">Ankara</option>
+                <option value="İzmir" className="text-white">İzmir</option>
+                <option value="Antalya" className="text-white">Antalya</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="checkIn" className="block text-sm font-medium text-blue-700 mb-1 ">Giriş Tarihi</label>
+              <label htmlFor="checkIn" className="block text-sm font-medium text-gray-300 mb-1">Giriş Tarihi</label>
               <input 
                 type="date" 
                 id="checkIn" 
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={checkIn}
                 onChange={(e) => setCheckIn(e.target.value)}
               />
             </div>
             
             <div>
-              <label htmlFor="checkOut" className="block text-sm font-medium text-blue-700 mb-1">Çıkış Tarihi</label>
+              <label htmlFor="checkOut" className="block text-sm font-medium text-gray-300 mb-1">Çıkış Tarihi</label>
               <input 
                 type="date" 
                 id="checkOut" 
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={checkOut}
                 onChange={(e) => setCheckOut(e.target.value)}
               />
             </div>
             
             <div>
-              <label htmlFor="guests" className="block text-sm font-medium text-blue-700 mb-1">Misafir Sayısı</label>
+              <label htmlFor="guests" className="block text-sm font-medium text-gray-300 mb-1">Misafir Sayısı</label>
               <select 
                 id="guests" 
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={guests}
                 onChange={(e) => setGuests(Number(e.target.value))}
               >
-                <option value="1" className="text-gray-800 font-medium">1 Kişi</option>
-                <option value="2" className="text-gray-800 font-medium">2 Kişi</option>
-                <option value="3" className="text-gray-800 font-medium">3 Kişi</option>
-                <option value="4" className="text-gray-800 font-medium">4 Kişi</option>
-                <option value="5" className="text-gray-800 font-medium">5 Kişi</option>
-                <option value="6" className="text-gray-800 font-medium">6+ Kişi</option>
+                <option value="1" className="text-white">1 Kişi</option>
+                <option value="2" className="text-white">2 Kişi</option>
+                <option value="3" className="text-white">3 Kişi</option>
+                <option value="4" className="text-white">4 Kişi</option>
+                <option value="5" className="text-white">5 Kişi</option>
+                <option value="6" className="text-white">6+ Kişi</option>
               </select>
             </div>
             
@@ -184,14 +184,14 @@ export default function AccommodationPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {/* Filters */}
           <div className="md:col-span-1">
-            <div className="bg-white p-4 rounded-xl shadow-md">
-              <h3 className="font-medium text-lg mb-4 text-blue-700">Filtreler</h3>
+            <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+              <h3 className="font-medium text-lg mb-4 text-blue-400">Filtreler</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-blue-700 mb-2">Fiyat Aralığı</label>
+                  <label className="block text-sm font-medium text-blue-300 mb-2">Fiyat Aralığı</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">0 TL</span>
+                    <span className="text-sm text-gray-300">0 TL</span>
                     <input 
                       type="range" 
                       min="0" 
@@ -199,15 +199,15 @@ export default function AccommodationPage() {
                       step="100"
                       value={maxucret}
                       onChange={(e) => setMaxUcret(Number(e.target.value))}
-                      className="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer"
+                      className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer"
                     />
-                    <span className="text-sm">{maxucret} TL</span>
+                    <span className="text-sm text-gray-300">{maxucret} TL</span>
                   </div>
-                  <div className="text-xs text-right text-gray-800 font-medium mt-1">Max: {maxucret} TL</div>
+                  <div className="text-xs text-right text-gray-300 font-medium mt-1">Max: {maxucret} TL</div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-blue-700 mb-2">Yıldız Sayısı</label>
+                  <label className="block text-sm font-medium text-blue-300 mb-2">Yıldız Sayısı</label>
                   <div className="flex items-center gap-4">
                     {[0, 3, 4, 5].map(yildiz => (
                       <label key={yildiz} className="flex items-center">
@@ -219,7 +219,7 @@ export default function AccommodationPage() {
                           onChange={() => setMinYildiz(yildiz)}
                           className="mr-1"
                         />
-                        <span>
+                        <span className="text-gray-300">
                           {yildiz === 0 ? 'Tümü' : 
                             [...Array(yildiz)].map((_, i) => (
                               <span key={i} className="text-yellow-400">★</span>
@@ -232,26 +232,26 @@ export default function AccommodationPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-blue-700 mb-2">Sıralama</label>
+                  <label className="block text-sm font-medium text-blue-300 mb-2">Sıralama</label>
                   <select 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
-                    <option value="recommended" className="text-gray-800 font-medium">Önerilen</option>
-                    <option value="ucret" className="text-gray-800 font-medium">Fiyat (Artan)</option>
-                    <option value="yildiz" className="text-gray-800 font-medium">Yıldız Sayısı</option>
-                    <option value="rating" className="text-gray-800 font-medium">Misafir Puanı</option>
+                    <option value="recommended" className="text-white">Önerilen</option>
+                    <option value="ucret" className="text-white">Fiyat (Artan)</option>
+                    <option value="yildiz" className="text-white">Yıldız Sayısı</option>
+                    <option value="rating" className="text-white">Misafir Puanı</option>
                   </select>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-blue-700 mb-2">Olanaklar</label>
+                  <label className="block text-sm font-medium text-blue-300 mb-2">Olanaklar</label>
                   <div className="space-y-2">
                     {['Havuz', 'Spa', 'Ücretsiz WiFi', 'Restoran', 'Bar'].map(amenity => (
                       <label key={amenity} className="flex items-center">
                         <input type="checkbox" className="mr-2" />
-                        <span className="text-sm">{amenity}</span>
+                        <span className="text-sm text-gray-300">{amenity}</span>
                       </label>
                     ))}
                   </div>
@@ -263,17 +263,17 @@ export default function AccommodationPage() {
           {/* Results */}
           <div className="md:col-span-2 lg:col-span-3">
             <div className="mb-4 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-blue-700">
-                {city} Otelleri <span className="text-sm text-gray-800 font-medium">({filtrelenmisOteller.length} sonuç)</span>
+              <h2 className="text-xl font-semibold text-blue-400">
+                {city} Otelleri <span className="text-sm text-gray-300 font-medium">({filtrelenmisOteller.length} sonuç)</span>
               </h2>
             </div>
             
             <div className="space-y-4">
               {filtrelenmisOteller.map(hotel => (
-                <div key={hotel.id} className="bg-white rounded-xl shadow-md overflow-hidden">
+                <div key={hotel.id} className="bg-gray-800 rounded-xl shadow-md overflow-hidden">
                   <div className="md:flex">
-                    <div className="md:w-1/3 h-48 md:h-auto bg-gray-100 flex items-center justify-center">
-                      <div className="bg-blue-100 text-blue-500 w-full h-full flex items-center justify-center">
+                    <div className="md:w-1/3 h-48 md:h-auto bg-gray-700 flex items-center justify-center">
+                      <div className="bg-blue-900 text-blue-300 w-full h-full flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
@@ -283,19 +283,19 @@ export default function AccommodationPage() {
                     <div className="p-4 md:p-6 flex-1">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="text-lg font-semibold mb-1 text-blue-800">{hotel.name}</h3>
+                          <h3 className="text-lg font-semibold mb-1 text-blue-400">{hotel.name}</h3>
                           <div className="flex items-center mb-2">
                             {[...Array(hotel.yildiz)].map((_, i) => (
                               <span key={i} className="text-yellow-400">★</span>
                             ))}
-                            <span className="text-sm text-gray-800 font-medium ml-2">{hotel.district}</span>
+                            <span className="text-sm text-gray-300 font-medium ml-2">{hotel.district}</span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end">
-                          <div className="bg-blue-100 text-blue-800 rounded-lg px-2 py-1 text-sm font-semibold">
+                          <div className="bg-blue-900 text-blue-300 rounded-lg px-2 py-1 text-sm font-semibold">
                             {hotel.rating}/5
                           </div>
-                          <div className="text-xs text-gray-800 font-medium mt-1">
+                          <div className="text-xs text-gray-300 font-medium mt-1">
                             {hotel.reviewCount} değerlendirme
                           </div>
                         </div>
@@ -303,12 +303,12 @@ export default function AccommodationPage() {
                       
                       <div className="mt-2 flex flex-wrap gap-1">
                         {hotel.amenities.slice(0, 5).map(amenity => (
-                          <span key={amenity} className="inline-block bg-gray-100 rounded-full px-2 py-1 text-xs text-gray-800 font-medium">
+                          <span key={amenity} className="inline-block bg-gray-700 rounded-full px-2 py-1 text-xs text-gray-300 font-medium">
                             {amenity}
                           </span>
                         ))}
                         {hotel.amenities.length > 5 && (
-                          <span className="inline-block bg-gray-100 rounded-full px-2 py-1 text-xs text-gray-800 font-medium">
+                          <span className="inline-block bg-gray-700 rounded-full px-2 py-1 text-xs text-gray-300 font-medium">
                             +{hotel.amenities.length - 5} daha
                           </span>
                         )}
@@ -316,11 +316,11 @@ export default function AccommodationPage() {
                       
                       <div className="mt-4 flex flex-col md:flex-row md:items-end justify-between">
                         <div>
-                          <div className="text-xs text-gray-800 font-medium">Merkeze {hotel.distanceToCenter} mesafede</div>
-                          <div className="text-xs text-gray-800 font-medium">{checkIn} - {checkOut}, {guests} kişi</div>
+                          <div className="text-xs text-gray-300 font-medium">Merkeze {hotel.distanceToCenter} mesafede</div>
+                          <div className="text-xs text-gray-300 font-medium">{checkIn} - {checkOut}, {guests} kişi</div>
                         </div>
                         <div className="mt-2 md:mt-0 flex flex-col items-end">
-                          <div className="text-lg font-bold text-blue-600">{hotel.ucret} TL <span className="text-sm text-gray-800 font-medium">/ gece</span></div>
+                          <div className="text-lg font-bold text-blue-400">{hotel.ucret} TL <span className="text-sm text-gray-300 font-medium">/ gece</span></div>
                           <button className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors">
                             Rezervasyon Yap
                           </button>
@@ -335,11 +335,11 @@ export default function AccommodationPage() {
         </div>
         
         {/* Coming Soon Message */}
-        <div className="mt-8 text-center text-gray-800 font-medium">
+        <div className="mt-8 text-center text-gray-300 font-medium">
           <p className="text-sm">Bu sayfa henüz tamamlanmadı.</p>
         </div>
 
-        <div className="mt-8 text-sm text-gray-800 font-medium text-center">
+        <div className="mt-8 text-sm text-gray-300 font-medium text-center">
           &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
         </div>
       </div>
