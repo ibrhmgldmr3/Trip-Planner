@@ -12,52 +12,50 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
-  // Tarayıcı açılışında localStorage'dan veya kullanıcı sistem tercihini kontrol et
+  // Initial theme detection from localStorage or system preference
   useEffect(() => {
-    // Hydration uyumsuzluğunu önlemek için CSR modunda olduğumuzu belirt
-    setMounted(true);
-    
-    // Tailwind'in önerdiği yaklaşım kullanılarak localStorage'dan tema alınır
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      setTheme('dark');
+    const stored = localStorage.getItem('theme') as Theme | null;
+    if (stored) {
+      setTheme(stored);
     } else {
-      setTheme('light');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(prefersDark ? 'dark' : 'light');
     }
+    setMounted(true);
   }, []);
 
-  // Tema değiştirme fonksiyonu - Tailwind yaklaşımıyla
-  const toggleTheme = () => {
-    setTheme(prevTheme => {
-      const newTheme = prevTheme === 'light' ? 'dark' : 'light';
-      
-      // Tailwind'in önerdiği yaklaşım kullanılarak localStorage ve class güncellenir
-      if (newTheme === 'dark') {
-        localStorage.theme = 'dark';
-        document.documentElement.classList.add('dark');
-      } else {
-        localStorage.theme = 'light';
-        document.documentElement.classList.remove('dark');
-      }
-      
-      return newTheme;
-    });
-  };
-  
-  // Tema değiştiğinde DOM'u güncelle
+  // Update DOM and localStorage when theme changes
   useEffect(() => {
     if (!mounted) return;
-    
+
+    const root = document.documentElement;
     if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
     }
+    localStorage.setItem('theme', theme);
   }, [theme, mounted]);
 
-  // SSR/CSR uyumsuzluğunu önlemek için mounted kontrolü
+  // React to system preference changes when user has not set a theme
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      if (!('theme' in localStorage)) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  };
+
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
