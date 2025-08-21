@@ -41,7 +41,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body>
+      <body className="transition-colors">
         <AuthProvider>
           <ThemeProvider>
             <MobileMenu />
