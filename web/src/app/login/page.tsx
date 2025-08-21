@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-export default function LoginPage() {
+// SearchParams için wrapper component
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -45,7 +46,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-md p-8">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-md p-8 text-gray-800">
         <div className="text-center mb-8">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 mb-2">
             Giriş Yap
@@ -175,5 +176,14 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// Ana sayfa bileşeni
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Yükleniyor...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

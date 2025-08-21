@@ -132,9 +132,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50">
+    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 text-gray-800">
       <Toaster position="top-center" />
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto text-gray-800">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800">

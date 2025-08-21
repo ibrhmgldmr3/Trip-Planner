@@ -7,7 +7,8 @@ export interface HealthCheckResponse {
     environment?: string;
 }
 
-export async function getHealthStatus(): Promise<HealthCheckResponse> {
+// Bu fonksiyonu artık export etmiyoruz, sadece dahili olarak kullanıyoruz
+async function getHealthStatus(): Promise<HealthCheckResponse> {
     return {
         status: 'ok',
         timestamp: new Date().toISOString(),
