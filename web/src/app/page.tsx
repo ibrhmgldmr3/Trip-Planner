@@ -11,7 +11,7 @@ export default function Home() {
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900 mb-6 fade-in">
                 Hayalinizdeki Seyahati<br /><span className="animated-gradient">Kolay Planlayın</span>
               </h1>
-              <p className="text-lg text-gray-700 mb-8 max-w-lg fade-in delay-100">
+              <p className="text-lg text-gray-800 font-medium mb-8 max-w-lg fade-in delay-100">
                 Tarih, şehir, bütçe ve ilgi alanlarınıza göre kişiselleştirilmiş 
                 seyahat planları oluşturun. Bütçenize uygun ulaşım, konaklama ve 
                 etkinlik önerileriyle eksiksiz bir gezi deneyimi planlayın.
@@ -64,7 +64,7 @@ export default function Home() {
       <section className="py-16 bg-white">
         <div className="max-w-6xl mx-auto px-4 md:px-8">
           <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 fade-in">Seyahat Planlayıcımızın Özellikleri</h2>
-          <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12 fade-in delay-100">
+          <p className="text-center text-gray-800 font-medium max-w-2xl mx-auto mb-12 fade-in delay-100">
             Seyahatinizi A&apos;dan Z&apos;ye planlayın, her şeyi tek bir uygulamada organize edin.
           </p>
           
@@ -78,7 +78,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Akıllı Rota Planlama</h3>
-              <p className="text-gray-600">En optimum rotaları hesaplayarak, zamanınızı verimli kullanmanızı sağlıyoruz.</p>
+              <p className="text-gray-800 font-medium">En optimum rotaları hesaplayarak, zamanınızı verimli kullanmanızı sağlıyoruz.</p>
               <Link href="/map" className="mt-4 inline-block text-blue-600 hover:text-blue-800 text-sm font-medium">
                 Rota Planlayıcıya Git →
               </Link>
@@ -92,7 +92,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Bütçe Analizi</h3>
-              <p className="text-gray-600">Ulaşım, konaklama ve aktivite maliyetlerini hesaplayarak seyahat bütçenizi kontrol edin.</p>
+              <p className="text-gray-800 font-medium">Ulaşım, konaklama ve aktivite maliyetlerini hesaplayarak seyahat bütçenizi kontrol edin.</p>
               <Link href="/budget" className="mt-4 inline-block text-indigo-600 hover:text-indigo-800 text-sm font-medium">
                 Bütçe Planlayıcıya Git →
               </Link>
@@ -106,7 +106,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Günlük Planlama</h3>
-              <p className="text-gray-600">Sabah, öğlen ve akşam aktivitelerini içeren detaylı günlük gezi planları oluşturun.</p>
+              <p className="text-gray-800 font-medium">Sabah, öğlen ve akşam aktivitelerini içeren detaylı günlük gezi planları oluşturun.</p>
               <Link href="/daily-planner" className="mt-4 inline-block text-green-600 hover:text-green-800 text-sm font-medium">
                 Günlük Planlamaya Git →
               </Link>
@@ -121,7 +121,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Mekan Önerileri</h3>
-              <p className="text-gray-600">İlgi alanlarınıza göre kişiselleştirilmiş turistik mekan ve etkinlik önerileri.</p>
+              <p className="text-gray-800 font-medium">İlgi alanlarınıza göre kişiselleştirilmiş turistik mekan ve etkinlik önerileri.</p>
               <Link href="/planner" className="mt-4 inline-block text-red-600 hover:text-red-800 text-sm font-medium">
                 Planlayıcıya Git →
               </Link>
@@ -135,7 +135,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Uygun Ulaşım Seçenekleri</h3>
-              <p className="text-gray-600">Uçak, otobüs ve diğer ulaşım seçeneklerinin fiyat karşılaştırması ve rezervasyon bağlantıları.</p>
+              <p className="text-gray-800 font-medium">Uçak, otobüs ve diğer ulaşım seçeneklerinin fiyat karşılaştırması ve rezervasyon bağlantıları.</p>
               <Link href="/transportation" className="mt-4 inline-block text-purple-600 hover:text-purple-800 text-sm font-medium">
                 Ulaşım Seçeneklerine Git →
               </Link>
@@ -149,7 +149,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Konaklama Seçenekleri</h3>
-              <p className="text-gray-600">Bütçenize ve tercihlerinize göre en uygun konaklama seçeneklerini bulun ve rezervasyon yapın.</p>
+              <p className="text-gray-800 font-medium">Bütçenize ve tercihlerinize göre en uygun konaklama seçeneklerini bulun ve rezervasyon yapın.</p>
               <Link href="/accommodation" className="mt-4 inline-block text-yellow-600 hover:text-yellow-800 text-sm font-medium">
                 Konaklama Seçeneklerine Git →
               </Link>
@@ -162,7 +162,7 @@ export default function Home() {
       <section className="py-16 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 md:px-8">
           <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 fade-in">Nasıl Çalışır?</h2>
-          <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12 fade-in delay-100">
+          <p className="text-center text-gray-800 font-medium max-w-2xl mx-auto mb-12 fade-in delay-100">
             Birkaç basit adımda seyahat planınızı oluşturun ve seyahatinizi sorunsuz bir şekilde gerçekleştirin.
           </p>
           
@@ -170,19 +170,19 @@ export default function Home() {
             <div className="bg-white p-6 rounded-xl shadow-md hover-lift fade-in delay-100">
               <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 text-xl font-bold">1</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Seyahat Bilgilerinizi Girin</h3>
-              <p className="text-gray-600">Tarih, bütçe, konum ve tercihlerinizi belirterek size özel planlamayı başlatın.</p>
+              <p className="text-gray-800 font-medium">Tarih, bütçe, konum ve tercihlerinizi belirterek size özel planlamayı başlatın.</p>
             </div>
             
             <div className="bg-white p-6 rounded-xl shadow-md hover-lift fade-in delay-200">
               <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 text-xl font-bold">2</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Öneriler ve Seçenekler</h3>
-              <p className="text-gray-600">Ulaşım, konaklama ve aktivite önerilerini inceleyin ve size uygun olanları seçin.</p>
+              <p className="text-gray-800 font-medium">Ulaşım, konaklama ve aktivite önerilerini inceleyin ve size uygun olanları seçin.</p>
             </div>
             
             <div className="bg-white p-6 rounded-xl shadow-md hover-lift fade-in delay-300">
               <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 text-xl font-bold">3</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Seyahat Planınızı Oluşturun</h3>
-              <p className="text-gray-600">Tüm seçimlerinizi bir araya getirerek tam bir seyahat planı oluşturun ve kaydedin.</p>
+              <p className="text-gray-800 font-medium">Tüm seçimlerinizi bir araya getirerek tam bir seyahat planı oluşturun ve kaydedin.</p>
             </div>
           </div>
         </div>
@@ -217,15 +217,15 @@ export default function Home() {
             <div className="text-xl font-bold text-blue-600 mb-4 md:mb-0">Trip Planner</div>
             
             <div className="flex space-x-6">
-              <Link href="/" className="text-gray-500 hover:text-blue-600 transition">Ana Sayfa</Link>
-              <Link href="/map" className="text-gray-500 hover:text-blue-600 transition">Rota Planlayıcı</Link>
-              <Link href="/daily-planner" className="text-gray-500 hover:text-blue-600 transition">Günlük Plan</Link>
-              <Link href="/budget" className="text-gray-500 hover:text-blue-600 transition">Bütçe</Link>
+              <Link href="/" className="text-gray-800 hover:text-blue-600 transition">Ana Sayfa</Link>
+              <Link href="/map" className="text-gray-800 hover:text-blue-600 transition">Rota Planlayıcı</Link>
+              <Link href="/daily-planner" className="text-gray-800 hover:text-blue-600 transition">Günlük Plan</Link>
+              <Link href="/budget" className="text-gray-800 hover:text-blue-600 transition">Bütçe</Link>
             </div>
           </div>
           
           <div className="border-t border-gray-200 pt-6 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-800 font-medium">
               &copy; {new Date().getFullYear()} AnkaGeo Trip Planner - Tüm hakları saklıdır.
             </p>
           </div>

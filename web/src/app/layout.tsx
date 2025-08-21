@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileMenu from "@/components/MobileMenu";
+import AuthProvider from "@/providers/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
   title: "Trip Planner - Seyahat Planlayıcı",
   description: "Seyahatlerinizi planlamanın en kolay yolu",
   keywords: "seyahat planlama, gezi rotası, harita, POI, şehir gezisi",
-  authors: [{ name: "AnkaGeo" }],
+  authors: [{ name: "İbrahim Güldemir" }],
 };
 
 export default function RootLayout({
@@ -28,8 +29,10 @@ export default function RootLayout({
   return (
     <html lang="tr" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <MobileMenu />
-        {children}
+        <AuthProvider>
+          <MobileMenu />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

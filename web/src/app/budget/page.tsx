@@ -15,6 +15,7 @@ export default function BudgetPage() {
     { id: 4, category: 'Aktiviteler', amount: 1000, details: 'Müze, tur, etkinlikler', editable: true },
     { id: 5, category: 'Alışveriş', amount: 800, details: 'Hediyelik eşya', editable: true },
     { id: 6, category: 'Diğer', amount: 200, details: 'Acil durumlar', editable: true },
+    { id: 7, category: 'Eğlence', amount: 1200, details: 'Tiyatro, konser, etkinlikler', editable: true }
   ];
 
   // Toplam harcamayı hesapla
@@ -39,6 +40,7 @@ export default function BudgetPage() {
     'Aktiviteler': 'bg-green-500',
     'Alışveriş': 'bg-pink-500',
     'Diğer': 'bg-gray-500',
+    'Eğlence': 'bg-teal-500'
   };
 
   return (

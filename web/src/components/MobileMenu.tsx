@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import UserNav from "./UserNav";
+import { useSession } from "next-auth/react";
 
 export default function MobileMenu() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const { data: session } = useSession();
 
-  // Scroll event listener to add shadow to header when scrolled
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 10) {
@@ -43,8 +45,9 @@ export default function MobileMenu() {
               <li><Link href="/budget" className="text-gray-800 hover:text-blue-600 transition-colors font-medium">Bütçe</Link></li>
             </ul>
           </nav>
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center space-x-4">
             <Link href="/planner" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors hover-lift">Planlamaya Başla</Link>
+            <UserNav />
           </div>
           <div className="md:hidden">
             <button 
@@ -108,11 +111,40 @@ export default function MobileMenu() {
             <div className="pt-2 pb-1">
               <Link 
                 href="/planner"
-                className="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm text-center hover:bg-blue-700 transition-colors"
+                className="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm text-center hover:bg-blue-700 transition-colors mb-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Planlamaya Başla
               </Link>
+              
+              <div className="flex justify-center mt-3 border-t border-gray-100 pt-3">
+                {!session ? (
+                  <>
+                    <Link 
+                      href="/login"
+                      className="px-4 py-2 text-blue-600 font-medium text-sm text-center hover:bg-blue-50 rounded-lg transition-colors mr-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Giriş Yap
+                    </Link>
+                    <Link 
+                      href="/register"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm text-center hover:bg-blue-700 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Kayıt Ol
+                    </Link>
+                  </>
+                ) : (
+                  <Link 
+                    href="/profile"
+                    className="px-4 py-2 text-blue-600 font-medium text-sm text-center hover:bg-blue-50 rounded-lg transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Profilim
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>

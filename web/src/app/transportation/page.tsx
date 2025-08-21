@@ -98,10 +98,10 @@ export default function TransportationPage() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800">
               Ulaşım Seçenekleri
             </h1>
-            <p className="text-gray-600 mt-2 max-w-2xl">
+            <p className="text-gray-800 mt-2 max-w-2xl">
               Seyahatiniz için en uygun ulaşım seçeneklerini bulun ve karşılaştırın.
             </p>
           </div>
@@ -115,41 +115,41 @@ export default function TransportationPage() {
 
         {/* Search Form */}
         <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Ulaşım Ara</h2>
+          <h2 className="text-xl font-semibold mb-4 text-blue-700">Ulaşım Ara</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="from" className="block text-sm font-medium text-gray-700 mb-1">Nereden</label>
+              <label htmlFor="from" className="block text-sm font-medium text-blue-700 mb-1">Nereden</label>
               <select 
                 id="from" 
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               >
-                <option value="Ankara">Ankara</option>
-                <option value="İstanbul">İstanbul</option>
-                <option value="İzmir">İzmir</option>
-                <option value="Antalya">Antalya</option>
+                <option value="Ankara" className="text-gray-800 font-medium">Ankara</option>
+                <option value="İstanbul" className="text-gray-800 font-medium">İstanbul</option>
+                <option value="İzmir" className="text-gray-800 font-medium">İzmir</option>
+                <option value="Antalya" className="text-gray-800 font-medium">Antalya</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="to" className="block text-sm font-medium text-gray-700 mb-1">Nereye</label>
+              <label htmlFor="to" className="block text-sm font-medium text-blue-700 mb-1">Nereye</label>
               <select 
                 id="to" 
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               >
-                <option value="İstanbul">İstanbul</option>
-                <option value="Ankara">Ankara</option>
-                <option value="İzmir">İzmir</option>
-                <option value="Antalya">Antalya</option>
+                <option value="İstanbul" className="text-gray-800 font-medium">İstanbul</option>
+                <option value="Ankara" className="text-gray-800 font-medium">Ankara</option>
+                <option value="İzmir" className="text-gray-800 font-medium">İzmir</option>
+                <option value="Antalya" className="text-gray-800 font-medium">Antalya</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Tarih</label>
+              <label htmlFor="date" className="block text-sm font-medium text-blue-700 mb-1">Tarih</label>
               <input 
                 type="date" 
                 id="date" 
@@ -160,17 +160,17 @@ export default function TransportationPage() {
             </div>
             
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">Ulaşım Tipi</label>
+              <label htmlFor="type" className="block text-sm font-medium text-blue-700 mb-1">Ulaşım Tipi</label>
               <select 
                 id="type" 
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
               >
-                <option value="all">Tümü</option>
-                <option value="Uçak">Uçak</option>
-                <option value="Otobüs">Otobüs</option>
-                <option value="Tren">Tren</option>
+                <option value="all" className="text-gray-800 font-medium">Tümü</option>
+                <option value="Uçak" className="text-gray-800 font-medium">Uçak</option>
+                <option value="Otobüs" className="text-gray-800 font-medium">Otobüs</option>
+                <option value="Tren" className="text-gray-800 font-medium">Tren</option>
               </select>
             </div>
           </div>
@@ -188,18 +188,18 @@ export default function TransportationPage() {
         {/* Results */}
         <div className="bg-white p-6 rounded-xl shadow-md">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">Sonuçlar ({filteredTransportations.length})</h2>
+            <h2 className="text-xl font-semibold text-blue-700">Sonuçlar ({filteredTransportations.length})</h2>
             
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Sırala:</span>
+              <span className="text-sm text-gray-800 font-medium">Sırala:</span>
               <select 
                 className="px-2 py-1 border border-gray-300 rounded-md text-sm"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
-                <option value="price">Fiyat</option>
-                <option value="duration">Süre</option>
-                <option value="departureTime">Kalkış Zamanı</option>
+                <option value="price" className="text-gray-800 font-medium">Fiyat</option>
+                <option value="duration" className="text-gray-800 font-medium">Süre</option>
+                <option value="departureTime" className="text-gray-800 font-medium">Kalkış Zamanı</option>
               </select>
             </div>
           </div>
@@ -232,33 +232,33 @@ export default function TransportationPage() {
                       )}
                     </div>
                     <div>
-                      <div className="font-medium">{transport.company}</div>
-                      <div className="text-sm text-gray-500">{transport.type}</div>
+                      <div className="font-medium text-blue-800">{transport.company}</div>
+                      <div className="text-sm text-gray-800 font-medium">{transport.type}</div>
                     </div>
                   </div>
                   
                   <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
                     <div className="text-center">
-                      <div className="font-bold">{transport.departureTime}</div>
-                      <div className="text-sm text-gray-500">{transport.from}</div>
+                      <div className="font-bold text-blue-700">{transport.departureTime}</div>
+                      <div className="text-sm text-gray-800 font-medium">{transport.from}</div>
                     </div>
                     
                     <div className="hidden md:block">
                       <div className="w-24 h-[2px] bg-gray-300 relative">
-                        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+                        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-800 font-medium">
                           {transport.duration}
                         </div>
                       </div>
                     </div>
                     
                     <div className="text-center">
-                      <div className="font-bold">{transport.arrivalTime}</div>
-                      <div className="text-sm text-gray-500">{transport.to}</div>
+                      <div className="font-bold text-blue-700">{transport.arrivalTime}</div>
+                      <div className="text-sm text-gray-800 font-medium">{transport.to}</div>
                     </div>
                     
                     <div className="md:ml-4">
                       <div className="font-bold text-blue-600">{transport.price} TL</div>
-                      <div className="text-xs text-gray-500">{transport.seats} koltuk kaldı</div>
+                      <div className="text-xs text-gray-800 font-medium">{transport.seats} koltuk kaldı</div>
                     </div>
                     
                     <button 
@@ -280,7 +280,7 @@ export default function TransportationPage() {
           </p>
         </div>
         
-        <div className="mt-8 text-sm text-gray-500 text-center">
+        <div className="mt-8 text-sm text-gray-800 font-medium text-center">
           &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
         </div>
       </div>
