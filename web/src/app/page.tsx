@@ -19,10 +19,16 @@ export default function Home() {
               
               <div className="flex flex-wrap gap-4 fade-in delay-200">
                 <Link 
-                  href="/planner" 
+                  href="/travel-mode" 
                   className="px-5 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-md hover:bg-blue-700 transition hover-lift"
                 >
                   Planlamaya Başlayın
+                </Link>
+                <Link 
+                  href="/my-plans" 
+                  className="px-5 py-3 bg-green-600 text-white rounded-lg font-medium shadow-md hover:bg-green-700 transition hover-lift"
+                >
+                  Planlarım
                 </Link>
                 <Link 
                   href="/map" 

@@ -1,5 +1,41 @@
 import { Client, LatLngLiteral, TravelMode } from "@googlemaps/google-maps-services-js";
 
+// Google Maps API için interfaces
+interface GoogleDistance {
+  text: string;
+  value: number;
+}
+
+interface GoogleDuration {
+  text: string;
+  value: number;
+}
+
+interface GoogleLocation {
+  lat: number;
+  lng: number;
+}
+
+interface GoogleDirectionsLeg {
+  start_address: string;
+  end_address: string;
+  start_location: GoogleLocation;
+  end_location: GoogleLocation;
+  distance: GoogleDistance;
+  duration: GoogleDuration;
+  steps: GoogleDirectionsStep[];
+}
+
+interface GoogleDirectionsStep {
+  html_instructions: string;
+  distance: GoogleDistance;
+  duration: GoogleDuration;
+  start_location: GoogleLocation;
+  end_location: GoogleLocation;
+  polyline?: { points: string };
+  travel_mode?: string;
+}
+
 // Google Maps API istemcisi
 const client = new Client({});
 
@@ -106,25 +142,19 @@ export async function getDirections(
   mode: TravelMode = TravelMode.walking
 ) {
   try {
-    const waypointsStr = waypoints
-      .map((point) => `${point.lat},${point.lng}`)
-      .join("|");
-
-    const response = await client.directions({
-      params: {
-        origin: `${origin.lat},${origin.lng}`,
-        destination: `${destination.lat},${destination.lng}`,
-        // Google Maps Services JS API'de direkt olarak string vermek gerekiyor
-        // @ts-expect-error API dokümanında string olarak kabul ediliyor
-        waypoints: waypointsStr,
-        mode: mode,
-        key: API_KEY,
-      },
-    });
-
-    if (response.data.status === "OK") {
-      const route = response.data.routes[0];
-      const legs = route.legs.map((leg) => ({
+    // Client'ı direkt olarak kullanmak yerine, fetch ile istek gönderelim
+    const waypointsParam = waypoints.length > 0 
+      ? `&waypoints=${waypoints.map(wp => `${wp.lat},${wp.lng}`).join('|')}` 
+      : '';
+    
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}${waypointsParam}&mode=${mode.toLowerCase()}&key=${API_KEY}`;
+    
+    const fetchResponse = await fetch(url);
+    const data = await fetchResponse.json();
+    
+    if (data.status === "OK") {
+      const route = data.routes[0];
+      const legs = route.legs.map((leg: GoogleDirectionsLeg) => ({
         startAddress: leg.start_address,
         endAddress: leg.end_address,
         startLocation: {
@@ -137,7 +167,7 @@ export async function getDirections(
         },
         distance: leg.distance,
         duration: leg.duration,
-        steps: leg.steps.map((step) => ({
+        steps: leg.steps.map((step: GoogleDirectionsStep) => ({
           instructions: step.html_instructions,
           distance: step.distance,
           duration: step.duration,
@@ -160,11 +190,11 @@ export async function getDirections(
         overviewPolyline: route.overview_polyline.points,
         bounds: route.bounds,
         distance: legs.reduce(
-          (total, leg) => total + leg.distance.value,
+          (total: number, leg: { distance: GoogleDistance }) => total + leg.distance.value,
           0
         ),
         duration: legs.reduce(
-          (total, leg) => total + leg.duration.value,
+          (total: number, leg: { duration: GoogleDuration }) => total + leg.duration.value,
           0
         ),
       };
@@ -277,6 +307,52 @@ export async function getPopularPlacesInCity(
     return [];
   } catch (error) {
     console.error("Error getting popular places:", error);
+    throw error;
+  }
+}
+
+// Belirli bir noktanın çevresindeki mekanları getiren fonksiyon
+export async function getNearbyPlaces(
+  location: LatLngLiteral,
+  radius: number = 3000,
+  type: string = "tourist_attraction",
+  limit: number = 5
+) {
+  try {
+    const response = await client.placesNearby({
+      params: {
+        location: `${location.lat},${location.lng}`,
+        radius: radius,
+        type,
+        // @ts-expect-error API dokümanında string olarak kabul ediliyor
+        rankby: "prominence",
+        key: API_KEY,
+      },
+    });
+
+    if (response.data.status === "OK") {
+      return response.data.results.slice(0, limit).map((place) => ({
+        id: place.place_id,
+        name: place.name,
+        address: place.vicinity,
+        location: {
+          lat: place.geometry?.location.lat ?? 0,
+          lng: place.geometry?.location.lng ?? 0,
+        },
+        rating: place.rating,
+        types: place.types,
+        photos: place.photos
+          ? place.photos.map((photo) => ({
+              reference: photo.photo_reference,
+              width: photo.width,
+              height: photo.height,
+            }))
+          : [],
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error getting nearby places:", error);
     throw error;
   }
 }

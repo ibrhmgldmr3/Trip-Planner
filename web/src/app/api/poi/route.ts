@@ -1,40 +1,35 @@
 import { NextRequest } from "next/server";
-import { env } from "@/env";
-import { getPopularPlacesInCity } from "@/lib/services/google-maps-service";
+import { getPopularPlacesInCity, getNearbyPlaces } from "@/lib/services/google-maps-service";
 
 // POI (Point of Interest) bilgilerini getiren API endpoint'i - [FR4]
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const lat = searchParams.get("lat");
-  const lon = searchParams.get("lon");
   const city = searchParams.get("city");
-  const radius = searchParams.get("radius") ?? "3000";
-  const kinds = searchParams.get("kinds") ?? "interesting_places,historic,foods";
-  const provider = searchParams.get("provider") ?? "opentripmap"; // 'opentripmap' veya 'google'
+  const lat = searchParams.get("lat") ? parseFloat(searchParams.get("lat")!) : null;
+  const lon = searchParams.get("lon") ? parseFloat(searchParams.get("lon")!) : null;
   
-  // Google Maps API kullanarak şehirdeki popüler yerleri getir
-  if (provider === "google" && city) {
-    try {
-      const type = searchParams.get("type") || "tourist_attraction";
-      const limit = Number(searchParams.get("limit") || 5);
-      
-      const places = await getPopularPlacesInCity(city, type, limit);
-      return Response.json({ pois: places });
-    } catch (error) {
-      console.error("Error fetching Google POIs:", error);
-      return Response.json(
-        { error: "Google POI bilgisi getirilirken bir hata oluştu" },
-        { status: 500 }
-      );
-    }
+  if (!city && (lat === null || lon === null)) {
+    return Response.json({ error: "Şehir adı veya koordinat (lat,lon) parametreleri gerekli" }, { status: 400 });
   }
   
-  // OpenTripMap API'sini kullan (yedek)
-  if (!lat || !lon) return Response.json({ error: "lat/lon required" }, { status: 400 });
-
-  const url = `https://api.opentripmap.com/0.1/en/places/radius?radius=${radius}&lon=${lon}&lat=${lat}&kinds=${kinds}&limit=20&apikey=${env.OPENTRIPMAP_API_KEY}`;
-  const r = await fetch(url);
-  if (!r.ok) return Response.json({ error: await r.text() }, { status: r.status });
-  const data = await r.json();
-  return Response.json({ pois: data?.features ?? [] }); // GeoJSON Feature[]
+  try {
+    const type = searchParams.get("type") || "tourist_attraction";
+    const limit = Number(searchParams.get("limit") || 5);
+    const radius = Number(searchParams.get("radius") || 3000);
+    
+    let places;
+    if (city) {
+      places = await getPopularPlacesInCity(city, type, limit);
+    } else {
+      places = await getNearbyPlaces({ lat: lat!, lng: lon! }, radius, type, limit);
+    }
+    
+    return Response.json({ pois: places });
+  } catch (error) {
+    console.error("Error fetching Google POIs:", error);
+    return Response.json(
+      { error: "Google POI bilgisi getirilirken bir hata oluştu" },
+      { status: 500 }
+    );
+  }
 }

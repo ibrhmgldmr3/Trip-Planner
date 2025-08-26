@@ -2,13 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from "next/link";
-import { Suspense, useEffect, useState } from 'react';
-
-const LeafletMapView = dynamic(() => 
-  import('@/app/components/MapView').then(mod => mod.default), {
-  ssr: false,
-  loading: () => <MapLoading />
-});
+import { Suspense } from 'react';
 
 const GoogleMapView = dynamic(() => 
   import('../../components/MapView').then(mod => mod.default), {
@@ -29,22 +23,6 @@ function MapLoading() {
 }
 
 export default function MapPage() {
-  const [useGoogleMaps, setUseGoogleMaps] = useState(true);
-  
-  // Use localStorage to persist the user's map preference
-  useEffect(() => {
-    const savedPreference = localStorage.getItem('mapProvider');
-    if (savedPreference) {
-      setUseGoogleMaps(savedPreference === 'google');
-    }
-  }, []);
-  
-  const toggleMapProvider = () => {
-    const newValue = !useGoogleMaps;
-    setUseGoogleMaps(newValue);
-    localStorage.setItem('mapProvider', newValue ? 'google' : 'leaflet');
-  };
-
   return (
     <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-slate-900">
       <div className="max-w-6xl mx-auto">
@@ -59,12 +37,6 @@ export default function MapPage() {
             </p>
           </div>
           <div className="flex gap-3 mt-4 md:mt-0">
-            <button
-              onClick={toggleMapProvider}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors hover-lift fade-in delay-100"
-            >
-              {useGoogleMaps ? 'Leaflet Harita Kullan' : 'Google Harita Kullan'}
-            </button>
             <Link 
               href="/"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors self-start hover-lift fade-in delay-100"
@@ -114,7 +86,7 @@ export default function MapPage() {
 
         <div className="rounded-xl overflow-hidden shadow-lg fade-in delay-300">
           <Suspense fallback={<MapLoading />}>
-            {useGoogleMaps ? <GoogleMapView /> : <LeafletMapView />}
+            <GoogleMapView />
           </Suspense>
         </div>
         

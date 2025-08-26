@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { env } from "@/env"; // src/env.ts
 import { getDirections, optimizeRoute } from "@/lib/services/google-maps-service";
 import { TravelMode } from "@googlemaps/google-maps-services-js";
 
@@ -46,32 +45,16 @@ const routeRequestSchema = z.object({
   profile: z
     .enum([
       "driving-car",
-      "driving-hgv", 
       "cycling-regular",
-      "cycling-road",
-      "cycling-mountain",
-      "cycling-electric",
-      "foot-walking",
-      "foot-hiking",
-      "wheelchair"
+      "foot-walking"
     ])
     .default("foot-walking"),
   options: z.object({
     avoid_features: z.array(z.string()).optional(),
-    avoid_borders: z.string().optional(),
-    avoid_countries: z.array(z.string()).optional(),
-    maximum_speed: z.number().positive().optional(),
     preference: z.enum(["fastest", "shortest", "recommended"]).optional(),
     units: z.enum(["m", "km", "mi"]).optional(),
     language: z.string().optional(),
-    geometry_simplify: z.boolean().optional(),
-    continue_straight: z.boolean().optional(),
-    elevation: z.boolean().optional(),
-    extra_info: z.array(z.string()).optional(),
-    instructions: z.boolean().optional(),
-    maneuvers: z.boolean().optional(),
     suppressWarnings: z.boolean().optional(),
-    provider: z.enum(["openrouteservice", "google"]).optional(),
   }).optional(),
 });
 
@@ -88,16 +71,10 @@ function validateCoordinates(coords: number[][]): boolean {
 function profileToTravelMode(profile: string): TravelMode {
   switch (profile) {
     case "driving-car":
-    case "driving-hgv":
       return TravelMode.driving;
     case "cycling-regular":
-    case "cycling-road":
-    case "cycling-mountain":
-    case "cycling-electric":
       return TravelMode.bicycling;
     case "foot-walking":
-    case "foot-hiking":
-    case "wheelchair":
       return TravelMode.walking;
     default:
       return TravelMode.walking;
@@ -173,8 +150,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       );
     }
 
-    const { coords, profile, options = {} }: RouteRequest = validationResult.data;
-    const provider = options?.provider || "openrouteservice";
+    const { coords, profile }: RouteRequest = validationResult.data;
 
     // Additional coordinate validation
     if (!validateCoordinates(coords)) {
@@ -184,165 +160,80 @@ export async function POST(req: NextRequest): Promise<Response> {
       );
     }
 
-    // Google Maps API ile rota hesaplama
-    if (provider === "google") {
-      try {
-        const points = coords.map(([lng, lat]) => ({ lat, lng }));
-        const travelMode = profileToTravelMode(profile);
+    try {
+      const points = coords.map(([lng, lat]) => ({ lat, lng }));
+      const travelMode = profileToTravelMode(profile);
+      
+      if (points.length === 2) {
+        // İki nokta arasında basit yönlendirme
+        const route = await getDirections(points[0], points[1], [], travelMode);
         
-        if (points.length === 2) {
-          // İki nokta arasında basit yönlendirme
-          const route = await getDirections(points[0], points[1], [], travelMode);
-          
-          if (!route) {
-            return Response.json(
-              { error: "Google Maps API could not calculate a route" },
-              { status: 404 }
-            );
-          }
-          
-          const geometry = googleRouteToGeoJSON(route.overviewPolyline);
-          
-          return Response.json({
-            provider: "google",
-            geometry,
+        if (!route) {
+          return Response.json(
+            { error: "Google Maps API could not calculate a route" },
+            { status: 404 }
+          );
+        }
+        
+        const geometry = googleRouteToGeoJSON(route.overviewPolyline);
+        
+        return Response.json({
+          provider: "google",
+          geometry,
+          distance: route.distance,
+          duration: route.duration,
+          summary: {
             distance: route.distance,
-            duration: route.duration,
-            summary: {
-              distance: route.distance,
-              duration: route.duration
-            },
-            instructions: route.legs[0].steps.map((step, index) => ({
+            duration: route.duration
+          },
+          instructions: route.legs[0].steps.map((step, index) => ({
+            distance: step.distance.value,
+            duration: step.duration.value,
+            type: 0,
+            instruction: step.instructions,
+            way_points: [index, index + 1]
+          }))
+        });
+      } else {
+        // Çok noktalı optimizasyon
+        const route = await optimizeRoute(points, travelMode);
+        
+        if (!route) {
+          return Response.json(
+            { error: "Google Maps API could not optimize the route" },
+            { status: 404 }
+          );
+        }
+        
+        const geometry = googleRouteToGeoJSON(route.overviewPolyline);
+        
+        return Response.json({
+          provider: "google",
+          geometry,
+          distance: route.distance,
+          duration: route.duration,
+          summary: {
+            distance: route.distance,
+            duration: route.duration
+          },
+          instructions: route.legs.flatMap((leg, legIndex) => 
+            leg.steps.map((step, stepIndex) => ({
               distance: step.distance.value,
               duration: step.duration.value,
               type: 0,
               instruction: step.instructions,
-              way_points: [index, index + 1]
+              way_points: [legIndex + stepIndex, legIndex + stepIndex + 1]
             }))
-          });
-        } else {
-          // Çok noktalı optimizasyon
-          const route = await optimizeRoute(points, travelMode);
-          
-          if (!route) {
-            return Response.json(
-              { error: "Google Maps API could not optimize the route" },
-              { status: 404 }
-            );
-          }
-          
-          const geometry = googleRouteToGeoJSON(route.overviewPolyline);
-          
-          return Response.json({
-            provider: "google",
-            geometry,
-            distance: route.distance,
-            duration: route.duration,
-            summary: {
-              distance: route.distance,
-              duration: route.duration
-            },
-            instructions: route.legs.flatMap((leg, legIndex) => 
-              leg.steps.map((step, stepIndex) => ({
-                distance: step.distance.value,
-                duration: step.duration.value,
-                type: 0,
-                instruction: step.instructions,
-                way_points: [legIndex + stepIndex, legIndex + stepIndex + 1]
-              }))
-            )
-          });
-        }
-      } catch (error) {
-        console.error("Google Maps API route error:", error);
-        return Response.json(
-          { error: "Failed to calculate route with Google Maps API" },
-          { status: 500 }
-        );
+          )
+        });
       }
-    }
-
-    // OpenRouteService API ile rota hesaplama (Varsayılan)
-    const requestBody = {
-      coordinates: coords,
-      ...options
-    };
-
-    // Make request to OpenRouteService
-    const response = await fetch(
-      `https://api.openrouteservice.org/v2/directions/${profile}/geojson`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: env.ORS_API_KEY,
-          "Content-Type": "application/json",
-          "User-Agent": "trip-planner/1.0"
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`OpenRouteService API error (${response.status}):`, errorText);
-      
-      // Handle specific error cases
-      if (response.status === 401) {
-        return Response.json(
-          { error: "Authentication failed with OpenRouteService" },
-          { status: 500 }
-        );
-      } else if (response.status === 403) {
-        return Response.json(
-          { error: "API quota exceeded or access forbidden" },
-          { status: 429 }
-        );
-      } else if (response.status === 422) {
-        return Response.json(
-          { error: "Invalid route parameters or unreachable destination" },
-          { status: 400 }
-        );
-      }
-      
+    } catch (error) {
+      console.error("Google Maps API route error:", error);
       return Response.json(
-        { error: "Failed to calculate route" },
-        { status: response.status }
+        { error: "Failed to calculate route with Google Maps API" },
+        { status: 500 }
       );
     }
-
-    const data = await response.json();
-    
-    // Extract route information
-    const feature = data?.features?.[0];
-    if (!feature) {
-      return Response.json(
-        { error: "No route found" },
-        { status: 404 }
-      );
-    }
-
-    const geometry = feature.geometry;
-    const properties = feature.properties;
-
-    const result: RouteResponse = {
-      provider: "openrouteservice",
-      geometry: geometry || null,
-      distance: properties?.segments?.[0]?.distance,
-      duration: properties?.segments?.[0]?.duration,
-      summary: properties?.summary ? {
-        distance: properties.summary.distance,
-        duration: properties.summary.duration
-      } : undefined,
-      instructions: properties?.segments?.[0]?.steps,
-      warnings: properties?.warnings
-    };
-
-    return Response.json(result, {
-      headers: {
-        'Cache-Control': 's-maxage=300, stale-while-revalidate=600', // Cache for 5 minutes
-      }
-    });
-
   } catch (error) {
     console.error("Route API error:", error);
     
@@ -365,27 +256,20 @@ export async function GET(req: NextRequest): Promise<Response> {
   const { searchParams } = new URL(req.url);
   const provider = searchParams.get("provider") || "all";
   
-  const result: any = {
+  interface HealthResponse {
+    service: string;
+    status: string;
+    timestamp: string;
+    google?: {
+      profiles: string[];
+    };
+  }
+  
+  const result: HealthResponse = {
     service: "Route API",
     status: "healthy",
     timestamp: new Date().toISOString(),
   };
-  
-  if (provider === "all" || provider === "openrouteservice") {
-    result.openrouteservice = {
-      profiles: [
-        "driving-car",
-        "driving-hgv", 
-        "cycling-regular",
-        "cycling-road",
-        "cycling-mountain",
-        "cycling-electric",
-        "foot-walking",
-        "foot-hiking",
-        "wheelchair"
-      ]
-    };
-  }
   
   if (provider === "all" || provider === "google") {
     result.google = {

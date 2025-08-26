@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Roboto } from "next/font/google";
 import "./globals.css";
 import MobileMenu from "@/components/MobileMenu";
 import AuthProvider from "@/providers/AuthProvider";
@@ -11,6 +11,12 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const roboto = Roboto({
+  weight: ["400", "500", "700"],
+  variable: "--font-roboto",
   subsets: ["latin"],
 });
 
@@ -27,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="tr" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="tr" className={`dark ${geistSans.variable} ${geistMono.variable} ${roboto.variable}`}>
       <body className="bg-gray-900 text-white">
         <AuthProvider>
           <MobileMenu />

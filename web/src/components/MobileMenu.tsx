@@ -38,15 +38,15 @@ export default function MobileMenu() {
           </div>
           <nav className="hidden md:block">
             <ul className="flex items-center space-x-6">
-              <li><Link href="/map" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Rota Planlayıcı</Link></li>
-              <li><Link href="/transportation" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Ulaşım</Link></li>
-              <li><Link href="/accommodation" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Konaklama</Link></li>
-              <li><Link href="/daily-planner" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Günlük Plan</Link></li>
-              <li><Link href="/budget" className="text-gray-200 hover:text-blue-400 transition-colors font-medium">Bütçe</Link></li>
+              <li><Link href="/map" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Rota Planlayıcı</Link></li>
+              <li><Link href="/transportation" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Ulaşım</Link></li>
+              <li><Link href="/accommodation" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Konaklama</Link></li>
+              <li><Link href="/daily-planner" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Günlük Plan</Link></li>
+              <li><Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Bütçe</Link></li>
             </ul>
           </nav>
           <div className="hidden md:flex items-center space-x-4">
-            <Link href="/planner" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors hover-lift">Planlamaya Başla</Link>
+            <Link href="/travel-mode" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors hover-lift">Planlamaya Başla</Link>
             <UserNav />
           </div>
           <div className="md:hidden flex items-center">
@@ -110,7 +110,7 @@ export default function MobileMenu() {
             </Link>
             <div className="pt-2 pb-1">
               <Link 
-                href="/planner"
+                href="/travel-mode"
                 className="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm text-center hover:bg-blue-700 transition-colors mb-2"
                 onClick={() => setIsMenuOpen(false)}
               >

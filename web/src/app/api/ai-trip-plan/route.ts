@@ -64,15 +64,15 @@ Lütfen yanıtı markdown formatında, bölümlere ayrılmış, günlere göre d
 
     // OpenAI API'sine istek gönder
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "openai/gpt-oss-20b:free",
       messages: [
         { role: "system", content: "Sen uzman bir seyahat danışmanısın. Türkçe konuşuyorsun ve Türkiye'deki ve dünyadaki turistik yerler hakkında derin bilgiye sahipsin." },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 2500,
+      max_tokens: 10000,
     });
-
+    console.log("OpenAI Response:", completion);
     // API yanıtını al
     const response = completion.choices[0].message.content;
 
