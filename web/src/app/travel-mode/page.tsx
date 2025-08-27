@@ -1,10 +1,50 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 
 export default function TravelModePage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Session kontrol
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600 dark:text-gray-300">Oturum kontrol ediliyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Plan oluşturmak için önce giriş yapmanız gerekiyor.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
+          >
+            Giriş Yap
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
+          >
+            Ana Sayfaya Dön
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleAIMode = () => {
     toast.success('AI destekli planlama moduna yönlendiriliyorsunuz...');

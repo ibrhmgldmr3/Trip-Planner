@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
 const prisma = new PrismaClient();
 
@@ -63,6 +65,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get session bilgisini al
+    let userId = null;
+    let userEmail = null;
+    
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user) {
+        userId = session.user.id || null;
+        userEmail = session.user.email || null;
+        console.log("✅ Session bulundu:", { userId, userEmail });
+      } else {
+        console.log("ℹ️ Session bulunamadı - anonim kullanıcı");
+      }
+    } catch (sessionError) {
+      console.error("❌ Session alma hatası:", sessionError);
+    }
+
     // Günlük planları JSON string'e çevir
     const dailyPlansJson = JSON.stringify(planData.dailyPlans);
     
@@ -112,7 +131,11 @@ export async function POST(request: NextRequest) {
         // Plan türü
         sehir_bilgisi: `Manuel olarak planlanmış ${planData.basicInfo.destination} seyahati`,
         pratik_bilgiler: `${planData.basicInfo.travelers} kişi için ${duration} günlük plan`,
-        butce_tahmini: JSON.stringify(planData.budget.breakdown)
+        butce_tahmini: JSON.stringify(planData.budget.breakdown),
+        
+        // Kullanıcı bilgileri - hem ID hem email ile ilişki kur
+        user_id: userId || null,
+        userEmail: userEmail || null,
       }
     });
 

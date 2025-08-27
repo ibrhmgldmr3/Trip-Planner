@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 interface BudgetItem {
@@ -14,7 +14,7 @@ interface BudgetItem {
   isPaid: boolean;
 }
 
-export default function BudgetPage() {
+function BudgetContent() {
   const searchParams = useSearchParams();
   const tripId = searchParams.get("tripId");
   
@@ -23,7 +23,6 @@ export default function BudgetPage() {
   const [totalBudget, setTotalBudget] = useState(0);
   const [days, setDays] = useState(5);
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
-  const [budgetByCategory, setBudgetByCategory] = useState<Record<string, number>>({});
 
   useEffect(() => {
     // Fetch trip budget data
@@ -45,7 +44,6 @@ export default function BudgetPage() {
         const data = await response.json();
         setBudgetItems(data.budgetItems);
         setTotalBudget(data.totalBudget);
-        setBudgetByCategory(data.budgetByCategory);
         
         // Also fetch trip to get days
         const tripResponse = await fetch(`/api/trip?id=${tripId}`);
@@ -347,5 +345,20 @@ export default function BudgetPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function BudgetPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen p-4 md:p-8 bg-gray-900 flex justify-center items-center">
+        <div className="bg-gray-800 p-10 rounded-xl shadow-md flex justify-center items-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+          <span className="ml-3 text-gray-300">Sayfa yükleniyor...</span>
+        </div>
+      </div>
+    }>
+      <BudgetContent />
+    </Suspense>
   );
 }

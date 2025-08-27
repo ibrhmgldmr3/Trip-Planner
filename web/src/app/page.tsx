@@ -1,6 +1,23 @@
+'use client';
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { toast } from "react-hot-toast";
 
 export default function Home() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  const handlePlanClick = (route: string) => {
+    if (status === 'unauthenticated') {
+      toast.error('Plan oluşturmak için önce giriş yapmanız gerekiyor');
+      router.push('/login');
+      return;
+    }
+    router.push(route);
+  };
+
   return (
     <main className="min-h-screen">
       {/* Hero Section with enhanced animations */}
@@ -18,18 +35,18 @@ export default function Home() {
               </p>
               
               <div className="flex flex-wrap gap-4 fade-in delay-200">
-                <Link 
-                  href="/travel-mode" 
+                <button 
+                  onClick={() => handlePlanClick('/travel-mode')}
                   className="px-5 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-md hover:bg-blue-700 transition hover-lift"
                 >
                   Planlamaya Başlayın
-                </Link>
-                <Link 
-                  href="/my-plans" 
+                </button>
+                <button 
+                  onClick={() => handlePlanClick('/my-plans')}
                   className="px-5 py-3 bg-green-600 text-white rounded-lg font-medium shadow-md hover:bg-green-700 transition hover-lift"
                 >
                   Planlarım
-                </Link>
+                </button>
                 <Link 
                   href="/map" 
                   className="px-5 py-3 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-gray-700 transition hover-scale"
@@ -128,9 +145,12 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Mekan Önerileri</h3>
               <p className="text-gray-800 dark:text-gray-200 font-medium">İlgi alanlarınıza göre kişiselleştirilmiş turistik mekan ve etkinlik önerileri.</p>
-              <Link href="/planner" className="mt-4 inline-block text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium">
+              <button 
+                onClick={() => handlePlanClick('/planner')}
+                className="mt-4 inline-block text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium cursor-pointer"
+              >
                 Planlayıcıya Git →
-              </Link>
+              </button>
             </div>
             
             {/* Feature 5 */}
@@ -207,12 +227,12 @@ export default function Home() {
           <p className="text-lg mb-8 max-w-2xl mx-auto fade-in delay-100">
             Sadece birkaç tıklama ile kişiselleştirilmiş, bütçenize uygun ve zamanınızı en iyi şekilde değerlendireceğiniz bir seyahat planı oluşturun.
           </p>
-          <Link 
-            href="/planner" 
-            className="px-6 py-3 bg-white text-blue-600 dark:bg-gray-800 dark:text-blue-400 rounded-lg font-medium shadow-md hover:bg-blue-50 dark:hover:bg-gray-700 transition inline-block hover-lift fade-in delay-200"
+          <button 
+            onClick={() => handlePlanClick('/planner')}
+            className="px-6 py-3 bg-white text-blue-600 dark:bg-gray-800 dark:text-blue-400 rounded-lg font-medium shadow-md hover:bg-blue-50 dark:hover:bg-gray-700 transition inline-block hover-lift fade-in delay-200 cursor-pointer"
           >
             Ücretsiz Planlayıcıyı Kullanın
-          </Link>
+          </button>
         </div>
       </section>
 

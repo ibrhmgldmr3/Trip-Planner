@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
@@ -41,29 +41,29 @@ export default function PlanDetailPage() {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    if (planId) {
-      fetchPlanDetail();
-    }
-  }, [planId]);
-
-  const fetchPlanDetail = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/plan-detail/${planId}`);
-      if (response.ok) {
+    const fetchPlanDetailEffect = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/plan-detail/${planId}`);
+        
+        if (!response.ok) {
+          throw new Error('Plan bulunamadı');
+        }
+        
         const data = await response.json();
         setPlan(data.plan);
-      } else if (response.status === 404) {
-        setError('Plan bulunamadı');
-      } else if (response.status === 403) {
-        setError('Bu plana erişim yetkiniz yok');
-      } else {
-        setError('Plan yüklenemedi');
+      } catch (err) {
+        console.error('Plan detayları yüklenirken hata:', err);
+        setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Plan yüklenemedi');
-    } finally {
-      setLoading(false);
+    };
+
+    if (planId) {
+      fetchPlanDetailEffect();
     }
   }, [planId]);
 

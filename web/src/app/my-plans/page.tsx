@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 
 interface SavedPlan {
@@ -20,13 +21,24 @@ interface SavedPlan {
 
 export default function MyPlansPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [plans, setPlans] = useState<SavedPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPlans();
-  }, []);
+    if (status === 'loading') return; // Hala session yükleniyor
+    
+    if (status === 'unauthenticated') {
+      toast.error('Bu sayfayı görüntülemek için giriş yapmanız gerekiyor');
+      router.push('/login');
+      return;
+    }
+    
+    if (status === 'authenticated') {
+      fetchPlans();
+    }
+  }, [status, router]);
 
   const fetchPlans = async () => {
     try {
@@ -69,12 +81,42 @@ export default function MyPlansPage() {
     router.push(`/plan-detail/${planId}`);
   };
 
-  if (loading) {
+  // Session yükleniyor durumu
+  if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-xl text-gray-600 dark:text-gray-300">Planlarınız yükleniyor...</p>
+          <p className="text-xl text-gray-600 dark:text-gray-300">
+            {status === 'loading' ? 'Oturum kontrol ediliyor...' : 'Planlarınız yükleniyor...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Kullanıcı giriş yapmamış
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
+          >
+            Giriş Yap
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
+          >
+            Ana Sayfaya Dön
+          </button>
         </div>
       </div>
     );

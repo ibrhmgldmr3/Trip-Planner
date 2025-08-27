@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { useSession } from "next-auth/react";
 
 // TypeScript interfaces
 interface BasicInfo {
@@ -291,6 +292,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
 
 export default function ManualPlannerPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [currentStep, setCurrentStep] = useState(1);
   const [travelPlan, setTravelPlan] = useState<TravelPlan>({
     basicInfo: {
@@ -312,7 +314,7 @@ export default function ManualPlannerPage() {
         accommodation: 0,
         activities: 0,
         food: 0,
-        other: 0
+        other: 0,
       }
     }
   });
@@ -352,7 +354,7 @@ export default function ManualPlannerPage() {
     }
   }, [travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate, getTripDuration, travelPlan.dailyPlans.length]);
 
-  // Mock API calls
+  // Mock API calls - Fetch data when needed
   const fetchTransportOptions = async () => {
     // Simulated API call
     const mockTransport: TransportOption[] = [
@@ -387,7 +389,14 @@ export default function ManualPlannerPage() {
         selected: false
       }
     ];
-    setTransportOptions(mockTransport);
+    
+    // Mark selected transport if exists
+    const updatedOptions = mockTransport.map(option => ({
+      ...option,
+      selected: travelPlan.transport?.id === option.id
+    }));
+    
+    setTransportOptions(updatedOptions);
   };
 
   const fetchAccommodationOptions = async () => {
@@ -424,7 +433,14 @@ export default function ManualPlannerPage() {
         selected: false
       }
     ];
-    setAccommodationOptions(mockAccommodation);
+    
+    // Mark selected accommodation if exists
+    const updatedOptions = mockAccommodation.map(option => ({
+      ...option,
+      selected: travelPlan.accommodation?.id === option.id
+    }));
+    
+    setAccommodationOptions(updatedOptions);
   };
 
   const handleBasicInfoChange = (field: keyof BasicInfo, value: string | number) => {
@@ -499,11 +515,22 @@ export default function ManualPlannerPage() {
   };
 
   const calculateBudget = () => {
-    const { transport, dailyPlans } = travelPlan;
+    const { transport, accommodation, dailyPlans } = travelPlan;
+    
+    // Gerçek aktivite maliyetlerini hesapla
+    const totalActivityCost = dailyPlans.reduce((total, day) => {
+      if (day.isEmpty) return total;
+      return total + day.activities.reduce((dayTotal, activity) => dayTotal + activity.cost, 0);
+    }, 0);
+    
+    // Konaklama maliyeti (gece sayısı × gecelik fiyat)
+    const nights = getTripDuration() - 1;
+    const accommodationCost = accommodation ? accommodation.price * nights : 0;
+    
     const breakdown = {
       transport: transport?.price || 0,
-      accommodation: travelPlan.budget.breakdown.accommodation,
-      activities: dailyPlans.length * 200, // Günlük ortalama aktivite maliyeti
+      accommodation: accommodationCost,
+      activities: totalActivityCost,
       food: dailyPlans.length * 150, // Günlük ortalama yemek maliyeti
       other: 500 // Diğer masraflar
     };
@@ -537,16 +564,34 @@ export default function ManualPlannerPage() {
 
   const prevStep = () => {
     if (currentStep > 1) {
+      // Önceki adıma geçerken seçenekleri güncelle
+      if (currentStep === 3) {
+        // Ulaşım adımına geri dönüyoruz, seçenekleri güncelle
+        fetchTransportOptions();
+      }
+      if (currentStep === 4) {
+        // Konaklama adımına geri dönüyoruz, seçenekleri güncelle
+        fetchAccommodationOptions();
+      }
       setCurrentStep(currentStep - 1);
     }
   };
 
   const savePlan = async () => {
     try {
+      // Session bilgisini de ekle
+      const requestBody = {
+        ...travelPlan,
+        userInfo: session ? {
+          id: session.user?.id,
+          email: session.user?.email,
+        } : null
+      };
+
       const response = await fetch('/api/manual-travel-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(travelPlan)
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
@@ -566,6 +611,44 @@ export default function ManualPlannerPage() {
       router.push('/travel-mode');
     }
   };
+
+  // Session kontrol için UI
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl text-white">Oturum kontrol ediliyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-300 mb-6">
+            Manuel plan oluşturmak için önce giriş yapmanız gerekiyor.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
+          >
+            Giriş Yap
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
+          >
+            Ana Sayfaya Dön
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-teal-900">
@@ -624,6 +707,16 @@ export default function ManualPlannerPage() {
                 ✈️ Ulaşım Seçenekleri
               </h2>
               
+              {/* Mevcut seçim göster */}
+              {travelPlan.transport && (
+                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✅ Seçili Ulaşım:</h3>
+                  <p className="text-green-700 dark:text-green-300">
+                    {travelPlan.transport.type} - {travelPlan.transport.provider} (₺{travelPlan.transport.price})
+                  </p>
+                </div>
+              )}
+              
               <div className="space-y-4">
                 {transportOptions.map((option) => (
                   <div
@@ -631,15 +724,22 @@ export default function ManualPlannerPage() {
                     onClick={() => handleTransportSelect(option.id)}
                     className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
                       travelPlan.transport?.id === option.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300'
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-md'
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                          {option.type} - {option.provider}
-                        </h3>
+                        <div className="flex items-center mb-2">
+                          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                            {option.type} - {option.provider}
+                          </h3>
+                          {travelPlan.transport?.id === option.id && (
+                            <span className="ml-3 px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+                              Seçili
+                            </span>
+                          )}
+                        </div>
                         <p className="text-gray-600 dark:text-gray-300">
                           Süre: {option.duration} | {option.departure} - {option.arrival}
                         </p>
@@ -664,6 +764,16 @@ export default function ManualPlannerPage() {
                 🏨 Konaklama Seçenekleri
               </h2>
               
+              {/* Mevcut seçim göster */}
+              {travelPlan.accommodation && (
+                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✅ Seçili Konaklama:</h3>
+                  <p className="text-green-700 dark:text-green-300">
+                    {travelPlan.accommodation.name} - {travelPlan.accommodation.type} (₺{travelPlan.accommodation.price}/gece)
+                  </p>
+                </div>
+              )}
+              
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {accommodationOptions.map((option) => (
                   <div
@@ -671,13 +781,20 @@ export default function ManualPlannerPage() {
                     onClick={() => handleAccommodationSelect(option.id)}
                     className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
                       travelPlan.accommodation?.id === option.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300'
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-md'
                     }`}
                   >
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-                      {option.name}
-                    </h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                        {option.name}
+                      </h3>
+                      {travelPlan.accommodation?.id === option.id && (
+                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+                          Seçili
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
                       {option.type} • {option.location}
                     </p>
@@ -811,21 +928,126 @@ export default function ManualPlannerPage() {
               
               <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
+                  {/* Temel Bilgiler */}
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Temel Bilgiler</h3>
-                    <p><strong>Hedef:</strong> {travelPlan.basicInfo.destination}, {travelPlan.basicInfo.country}</p>
-                    <p><strong>Tarih:</strong> {travelPlan.basicInfo.startDate} - {travelPlan.basicInfo.endDate}</p>
-                    <p><strong>Süre:</strong> {getTripDuration()} gün</p>
-                    <p><strong>Kişi:</strong> {travelPlan.basicInfo.travelers}</p>
+                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                      📍 Temel Bilgiler
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Hedef:</strong> {travelPlan.basicInfo.destination}, {travelPlan.basicInfo.country}</p>
+                      <p><strong>Tarih:</strong> {travelPlan.basicInfo.startDate} - {travelPlan.basicInfo.endDate}</p>
+                      <p><strong>Süre:</strong> {getTripDuration()} gün</p>
+                      <p><strong>Kişi:</strong> {travelPlan.basicInfo.travelers}</p>
+                      <p><strong>Tarz:</strong> {travelPlan.basicInfo.travelStyle}</p>
+                    </div>
                   </div>
                   
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Seçimler</h3>
-                    <p><strong>Ulaşım:</strong> {travelPlan.transport?.type} - ₺{travelPlan.transport?.price}</p>
-                    <p><strong>Konaklama:</strong> {travelPlan.accommodation?.name} - ₺{travelPlan.accommodation?.price}/gece</p>
-                    <p><strong>Toplam Maliyet:</strong> ₺{travelPlan.budget.estimatedTotal}</p>
+                  {/* Ulaşım Bilgileri */}
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                      ✈️ Seçilen Ulaşım
+                    </h3>
+                    {travelPlan.transport ? (
+                      <div className="space-y-2 text-sm">
+                        <p><strong>Tip:</strong> {travelPlan.transport.type}</p>
+                        <p><strong>Sağlayıcı:</strong> {travelPlan.transport.provider}</p>
+                        <p><strong>Süre:</strong> {travelPlan.transport.duration}</p>
+                        <p><strong>Saat:</strong> {travelPlan.transport.departure} - {travelPlan.transport.arrival}</p>
+                        <p><strong>Fiyat:</strong> ₺{travelPlan.transport.price} (kişi başı)</p>
+                        <p><strong>Toplam:</strong> ₺{travelPlan.transport.price * travelPlan.basicInfo.travelers}</p>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">Henüz ulaşım seçilmedi</p>
+                    )}
                   </div>
                 </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Konaklama Bilgileri */}
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                      🏨 Seçilen Konaklama
+                    </h3>
+                    {travelPlan.accommodation ? (
+                      <div className="space-y-2 text-sm">
+                        <p><strong>Otel:</strong> {travelPlan.accommodation.name}</p>
+                        <p><strong>Tip:</strong> {travelPlan.accommodation.type}</p>
+                        <p><strong>Konum:</strong> {travelPlan.accommodation.location}</p>
+                        <p><strong>Puan:</strong> {'⭐'.repeat(travelPlan.accommodation.rating)} ({travelPlan.accommodation.rating}/5)</p>
+                        <p><strong>Gecelik:</strong> ₺{travelPlan.accommodation.price}</p>
+                        <p><strong>Toplam ({getTripDuration() - 1} gece):</strong> ₺{travelPlan.accommodation.price * (getTripDuration() - 1)}</p>
+                        <div className="mt-2">
+                          <strong>Olanaklar:</strong>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {travelPlan.accommodation.amenities.map((amenity) => (
+                              <span
+                                key={amenity}
+                                className="px-2 py-1 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs rounded"
+                              >
+                                {amenity}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">Henüz konaklama seçilmedi</p>
+                    )}
+                  </div>
+                  
+                  {/* Bütçe Özeti */}
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                      💰 Bütçe Özeti
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Mevcut Bütçe:</strong> ₺{travelPlan.budget.currentBudget}</p>
+                      <p><strong>Tahmini Toplam:</strong> ₺{travelPlan.budget.estimatedTotal}</p>
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Detaylı Dağılım:</p>
+                        <p className="text-xs">• Ulaşım: ₺{travelPlan.budget.breakdown.transport}</p>
+                        <p className="text-xs">• Konaklama: ₺{travelPlan.budget.breakdown.accommodation}</p>
+                        <p className="text-xs">• Aktiviteler: ₺{travelPlan.budget.breakdown.activities}</p>
+                        <p className="text-xs">• Yemek: ₺{travelPlan.budget.breakdown.food}</p>
+                        <p className="text-xs">• Diğer: ₺{travelPlan.budget.breakdown.other}</p>
+                      </div>
+                      <div className="pt-2 border-t">
+                        {travelPlan.budget.currentBudget >= travelPlan.budget.estimatedTotal ? (
+                          <p className="text-green-600 dark:text-green-400 font-semibold">
+                            ✅ Bütçe Yeterli! (Kalan: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal})
+                          </p>
+                        ) : (
+                          <p className="text-red-600 dark:text-red-400 font-semibold">
+                            ⚠️ Bütçe Aşımı! (Eksik: ₺{travelPlan.budget.estimatedTotal - travelPlan.budget.currentBudget})
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Günlük Planlar Özeti */}
+                {travelPlan.dailyPlans.length > 0 && (
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                      📅 Günlük Planlar Özeti
+                    </h3>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {travelPlan.dailyPlans.map((day, index) => (
+                        <div key={index} className="p-3 bg-white dark:bg-gray-700 rounded border">
+                          <h4 className="font-medium text-sm">{day.day}. Gün</h4>
+                          {day.isEmpty ? (
+                            <p className="text-xs text-gray-500 italic">Dinlenme günü</p>
+                          ) : (
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                              {day.activities.length} aktivite planlandı
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

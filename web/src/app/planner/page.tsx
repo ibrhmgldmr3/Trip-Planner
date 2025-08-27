@@ -40,7 +40,7 @@ interface TripPlanResponse {
 }
 
 export default function PlannerPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [tripPlan, setTripPlan] = useState<TripPlanResponse | null>(null);
@@ -49,13 +49,60 @@ export default function PlannerPage() {
     country: "",
     startDate: "",
     endDate: "",
-    budget: "Orta",
+    budget: "",
     transportation: [],
     interests: [],
     specialRequirements: "",
-    travelStyle: "Standart",
-    accommodation: "Otel",
+    travelStyle: "",
+    accommodation: "",
   });
+
+  const handleCheckboxChange = useCallback((type: "transportation" | "interests", value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [type]: prev[type].includes(value)
+        ? prev[type].filter(item => item !== value)
+        : [...prev[type], value]
+    }));
+  }, []);
+
+  // Session kontrol
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl text-white">Oturum kontrol ediliyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-300 mb-6">
+            Plan oluşturmak için önce giriş yapmanız gerekiyor.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
+          >
+            Giriş Yap
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
+          >
+            Ana Sayfaya Dön
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Form kontrollerini güncelleme fonksiyonları
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -65,19 +112,6 @@ export default function PlannerPage() {
       [id]: value,
     });
   };
-
-  // Checkbox kontrollerini güncelleme fonksiyonu
-  const handleCheckboxChange = useCallback((type: "transportation" | "interests", value: string) => {
-    setFormData(prev => {
-      const currentValues = prev[type];
-      return {
-        ...prev,
-        [type]: currentValues.includes(value)
-          ? currentValues.filter(item => item !== value)
-          : [...currentValues, value],
-      };
-    });
-  }, []);
 
   // Form gönderme işlemi
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -102,13 +136,23 @@ export default function PlannerPage() {
     setIsGenerating(true);
     
     try {
+      // Session bilgisini de gönder
+      const requestBody = {
+        ...formData,
+        // Session bilgisini ekle
+        userInfo: session ? {
+          id: session.user?.id,
+          email: session.user?.email,
+        } : null
+      };
+
       // Chat API'yi kullanıyoruz
       const response = await fetch("/api/trip-plan-model", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(requestBody),
       });
       
       const data = await response.json();

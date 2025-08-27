@@ -4,6 +4,8 @@ import { env } from "@/env";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
 const prisma = new PrismaClient();
 
@@ -138,9 +140,7 @@ async function saveTripPlanToDatabase(
   },
   markdownContent: string,
   htmlContent: string,
-  model: string,
-  userId?: string | null,
-  request?: NextRequest
+  model: string
 ) {
   try {
     const sections = parseTripPlanSections(markdownContent);
@@ -149,31 +149,23 @@ async function saveTripPlanToDatabase(
     // Debug: Günlük plan içeriğini kontrol et
     console.log("📅 Günlük plan uzunluğu:", sections.gun_plani?.length || 0);
     console.log("📅 Günlük plan önizleme:", sections.gun_plani?.substring(0, 200) + "...");
-    // Get the authenticated user ID from the session/auth system
-    let authUserId;
-    try {
-      // Get auth token from cookies or Authorization header
-      const authToken = request?.cookies.get('auth-token')?.value || 
-              request?.headers.get('Authorization')?.replace('Bearer ', '');
-      
-      if (authToken) {
-      // Decode the token or validate session
-      // This depends on your auth system (JWT, next-auth, etc.)
-      // Example for JWT:
-      // const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
-      // authUserId = decoded.userId;
-      
-      // For now, using a placeholder. Replace with your actual auth logic:
-      // authUserId = decoded.userId;
-      }
-    } catch (error) {
-      console.error("❌ Auth token verification failed:", error);
-    }
     
-    const userId = authUserId || 
-             request?.cookies.get('userId')?.value || 
-             request?.headers.get('x-user-id') || 
-             null;
+    // Get session bilgisini al
+    let userId = null;
+    let userEmail = null;
+    
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user) {
+        userId = session.user.id || null;
+        userEmail = session.user.email || null;
+        console.log("✅ Session bulundu:", { userId, userEmail });
+      } else {
+        console.log("ℹ️ Session bulunamadı - anonim kullanıcı");
+      }
+    } catch (sessionError) {
+      console.error("❌ Session alma hatası:", sessionError);
+    }
 
     const tripPlan = await prisma.tripPlan.create({
       data: {
@@ -208,8 +200,9 @@ async function saveTripPlanToDatabase(
       accommodation: formData.accommodation || null,
       transportation: formData.transportation ? JSON.stringify(formData.transportation) : null,
       
-      // Kullanıcı
+      // Kullanıcı bilgileri - hem ID hem email ile ilişki kur
       user_id: userId || null,
+      userEmail: userEmail || null,
       }
     });
 
@@ -528,8 +521,6 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     }
 
     // Veritabanına kaydet
-    // Request'ten userId'yi al (Bu satırı eklemelisiniz)
-    const userId = request.headers.get('x-user-id') || body.userId || null;
     const savedTripPlan = await saveTripPlanToDatabase(
       { 
       city: city.trim(),
@@ -557,9 +548,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       },
       planText,
       htmlContent,
-      "openai/gpt-oss-20b:free",
-      userId,  // userId'yi parametre olarak ekle
-      request  // request parametresini ekle
+      "deepseek/deepseek-r1-0528-qwen3-8b:free"
     );
   
 

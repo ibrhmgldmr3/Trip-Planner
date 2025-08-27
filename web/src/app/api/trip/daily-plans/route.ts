@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Query conditions for daily plans
-    const whereCondition: any = { tripId };
+    const whereCondition: { tripId: string; date?: { gte: Date; lte: Date } } = { tripId };
     
     // If date is provided, filter by date
     if (date) {

@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
     console.log("📋 Kaydedilmiş planlar getiriliyor...");
+    console.log("🔍 API endpoint çağrıldı - /api/my-plans");
     
     // Session kontrolü
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
+    console.log("🔑 Session kontrol edildi:", session ? "Mevcut" : "Yok");
     
     if (!session || !session.user?.email) {
+      console.log("❌ Session bulunamadı veya email eksik");
       return NextResponse.json(
         { error: "Giriş yapmanız gerekiyor" },
         { status: 401 }

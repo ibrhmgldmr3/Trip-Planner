@@ -3,7 +3,10 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest, 
+  context: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     
@@ -11,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const itemId = params.id;
+    const { id: itemId } = await context.params;
 
     if (!itemId) {
       return NextResponse.json(
@@ -41,10 +44,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
     }
 
-    // Remove trip data from response
-    const { trip, ...itemData } = budgetItem;
-
-    return NextResponse.json({ budgetItem: itemData });
+    return NextResponse.json({ 
+      budgetItem: {
+        id: budgetItem.id,
+        category: budgetItem.category,
+        description: budgetItem.description,
+        amount: budgetItem.amount,
+        currency: budgetItem.currency,
+        date: budgetItem.date,
+        isEstimate: budgetItem.isEstimate,
+        isPaid: budgetItem.isPaid,
+        paymentMethod: budgetItem.paymentMethod,
+        createdAt: budgetItem.createdAt,
+        updatedAt: budgetItem.updatedAt,
+        tripId: budgetItem.tripId
+      }
+    });
   } catch (error) {
     console.error("Error fetching budget item:", error);
     return NextResponse.json(
