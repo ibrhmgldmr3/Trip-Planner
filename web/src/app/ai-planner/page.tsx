@@ -57,6 +57,9 @@ export default function PlannerPage() {
     accommodation: "",
   });
 
+  // Bugünün tarihini al (YYYY-MM-DD formatında)
+  const today = new Date().toISOString().split('T')[0];
+
   const handleCheckboxChange = useCallback((type: "transportation" | "interests", value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -127,8 +130,36 @@ export default function PlannerPage() {
     if (formData.startDate && formData.endDate) {
       const start = new Date(formData.startDate);
       const end = new Date(formData.endDate);
+      const todayDate = new Date(today);
+      
+      if (start < todayDate) {
+        toast.error("Başlangıç tarihi bugünden önce olamaz");
+        return;
+      }
+      
+      if (end < todayDate) {
+        toast.error("Bitiş tarihi bugünden önce olamaz");
+        return;
+      }
+      
       if (start > end) {
         toast.error("Başlangıç tarihi bitiş tarihinden sonra olamaz");
+        return;
+      }
+    } else if (formData.startDate) {
+      const start = new Date(formData.startDate);
+      const todayDate = new Date(today);
+      
+      if (start < todayDate) {
+        toast.error("Başlangıç tarihi bugünden önce olamaz");
+        return;
+      }
+    } else if (formData.endDate) {
+      const end = new Date(formData.endDate);
+      const todayDate = new Date(today);
+      
+      if (end < todayDate) {
+        toast.error("Bitiş tarihi bugünden önce olamaz");
         return;
       }
     }
@@ -184,7 +215,7 @@ export default function PlannerPage() {
   const handleSavePlan = () => {
     if (!session) {
       toast.error("Planı kaydetmek için giriş yapmalısınız");
-      router.push("/login?callbackUrl=/planner");
+      router.push("/login?callbackUrl=/ai-planner");
       return;
     }
     
@@ -321,6 +352,7 @@ export default function PlannerPage() {
                   id="startDate" 
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
                   value={formData.startDate}
+                  min={today}
                   onChange={handleInputChange}
                 />
               </div>
@@ -332,6 +364,7 @@ export default function PlannerPage() {
                   id="endDate" 
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
                   value={formData.endDate}
+                  min={formData.startDate || today}
                   onChange={handleInputChange}
                 />
               </div>

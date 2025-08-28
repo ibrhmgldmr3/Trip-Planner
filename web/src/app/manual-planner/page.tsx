@@ -90,6 +90,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
     cost: 0,
     description: ''
   });
+  const today = new Date().toISOString().split('T')[0];
 
   const handleAddActivity = () => {
     if (newActivity.name.trim() && newActivity.startTime && newActivity.endTime) {
@@ -294,6 +295,10 @@ export default function ManualPlannerPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Bugünün tarihini al (YYYY-MM-DD formatında)
+  const today = new Date().toISOString().split('T')[0];
+  
   const [travelPlan, setTravelPlan] = useState<TravelPlan>({
     basicInfo: {
       destination: '',
@@ -444,6 +449,36 @@ export default function ManualPlannerPage() {
   };
 
   const handleBasicInfoChange = (field: keyof BasicInfo, value: string | number) => {
+    // Tarih validasyonu
+    if (field === 'startDate' || field === 'endDate') {
+      const dateValue = value as string;
+      const selectedDate = new Date(dateValue);
+      const todayDate = new Date(today);
+      
+      if (selectedDate < todayDate) {
+        toast.error(`${field === 'startDate' ? 'Başlangıç' : 'Bitiş'} tarihi bugünden önce olamaz`);
+        return;
+      }
+      
+      // Eğer bitiş tarihi seçiliyorsa ve başlangıç tarihinden önceyse
+      if (field === 'endDate' && travelPlan.basicInfo.startDate) {
+        const startDate = new Date(travelPlan.basicInfo.startDate);
+        if (selectedDate < startDate) {
+          toast.error('Bitiş tarihi başlangıç tarihinden önce olamaz');
+          return;
+        }
+      }
+      
+      // Eğer başlangıç tarihi seçiliyorsa ve bitiş tarihinden sonraysa
+      if (field === 'startDate' && travelPlan.basicInfo.endDate) {
+        const endDate = new Date(travelPlan.basicInfo.endDate);
+        if (selectedDate > endDate) {
+          toast.error('Başlangıç tarihi bitiş tarihinden sonra olamaz');
+          return;
+        }
+      }
+    }
+    
     setTravelPlan(prev => ({
       ...prev,
       basicInfo: { ...prev.basicInfo, [field]: value }
@@ -545,10 +580,44 @@ export default function ManualPlannerPage() {
 
   const nextStep = () => {
     if (currentStep < steps.length) {
-      if (currentStep === 1 && !travelPlan.basicInfo.destination) {
-        toast.error('Lütfen hedef şehri belirtin');
-        return;
+      if (currentStep === 1) {
+        if (!travelPlan.basicInfo.destination) {
+          toast.error('Lütfen hedef şehri belirtin');
+          return;
+        }
+        
+        // Tarih validasyonları
+        if (travelPlan.basicInfo.startDate) {
+          const startDate = new Date(travelPlan.basicInfo.startDate);
+          const todayDate = new Date(today);
+          
+          if (startDate < todayDate) {
+            toast.error('Başlangıç tarihi bugünden önce olamaz');
+            return;
+          }
+        }
+        
+        if (travelPlan.basicInfo.endDate) {
+          const endDate = new Date(travelPlan.basicInfo.endDate);
+          const todayDate = new Date(today);
+          
+          if (endDate < todayDate) {
+            toast.error('Bitiş tarihi bugünden önce olamaz');
+            return;
+          }
+        }
+        
+        if (travelPlan.basicInfo.startDate && travelPlan.basicInfo.endDate) {
+          const startDate = new Date(travelPlan.basicInfo.startDate);
+          const endDate = new Date(travelPlan.basicInfo.endDate);
+          
+          if (startDate > endDate) {
+            toast.error('Başlangıç tarihi bitiş tarihinden sonra olamaz');
+            return;
+          }
+        }
       }
+      
       if (currentStep === 2) {
         fetchTransportOptions();
       }
@@ -1091,6 +1160,7 @@ export default function ManualPlannerPage() {
                   <input
                     type="date"
                     value={travelPlan.basicInfo.startDate}
+                    min={today}
                     onChange={(e) => handleBasicInfoChange('startDate', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   />
@@ -1103,6 +1173,7 @@ export default function ManualPlannerPage() {
                   <input
                     type="date"
                     value={travelPlan.basicInfo.endDate}
+                    min={travelPlan.basicInfo.startDate || today}
                     onChange={(e) => handleBasicInfoChange('endDate', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   />

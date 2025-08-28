@@ -126,7 +126,7 @@ function BudgetContent() {
         {!tripId && (
           <div className="bg-yellow-800 text-yellow-200 p-4 rounded-lg mb-6">
             <p className="font-medium">Lütfen önce bir seyahat seçin.</p>
-            <Link href="/planner" className="underline mt-2 inline-block">
+            <Link href="/ai-planner" className="underline mt-2 inline-block">
               Seyahat planlarına gitmek için tıklayın
             </Link>
           </div>

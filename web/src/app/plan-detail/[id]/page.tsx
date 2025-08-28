@@ -5,6 +5,28 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 
+interface DayActivity {
+  id?: string;
+  name?: string;
+  startTime?: string;
+  endTime?: string;
+  cost?: number;
+  description?: string;
+}
+
+interface DayPlan {
+  day: number;
+  activities?: DayActivity[];
+  notes?: string;
+  isEmpty?: boolean;
+}
+
+interface ParsedDay {
+  day: number;
+  content: string;
+  isEmpty?: boolean;
+}
+
 interface PlanDetail {
   id: string;
   city: string;
@@ -97,6 +119,135 @@ export default function PlanDetailPage() {
       .replace(/###\s(.*?)\n/g, '<h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4 mb-2">$1</h3>')
       .replace(/##\s(.*?)\n/g, '<h2 class="text-xl font-bold text-gray-800 dark:text-white mt-6 mb-3">$1</h2>')
       .replace(/^\-\s(.*?)$/gm, '<li class="ml-4">• $1</li>')
+      .replace(/\n/g, '<br />');
+  };
+
+  const parseDailyPlan = (content: string | null) => {
+    if (!content) return [];
+    
+    // Önce JSON formatında olup olmadığını kontrol et
+    try {
+      const jsonData = JSON.parse(content);
+      if (Array.isArray(jsonData)) {
+        // JSON formatındaki günlük planları parse et
+        return jsonData
+          .filter((day: DayPlan) => day && typeof day === 'object')
+          .map((day: DayPlan) => {
+            let dayContent = '';
+            
+            // Aktiviteleri formatla
+            if (day.activities && Array.isArray(day.activities) && day.activities.length > 0) {
+              dayContent += '<h4 class="text-md font-semibold text-purple-600 dark:text-purple-400 mb-3">📋 Aktiviteler</h4>';
+              dayContent += '<ul class="space-y-2 mb-4">';
+              day.activities.forEach((activity: DayActivity) => {
+                if (activity && typeof activity === 'object') {
+                  dayContent += '<li class="flex items-start space-x-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">';
+                  dayContent += '<span class="text-blue-500 mt-1">📍</span>';
+                  dayContent += '<div class="flex-1">';
+                  if (activity.name) {
+                    dayContent += `<h5 class="font-semibold text-gray-800 dark:text-white">${activity.name}</h5>`;
+                  }
+                  if (activity.startTime || activity.endTime) {
+                    dayContent += '<div class="text-sm text-gray-600 dark:text-gray-300 mt-1">';
+                    if (activity.startTime) {
+                      dayContent += `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 mr-2">🕐 ${activity.startTime}</span>`;
+                    }
+                    if (activity.endTime) {
+                      dayContent += `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">${activity.endTime}</span>`;
+                    }
+                    dayContent += '</div>';
+                  }
+                  if (activity.description) {
+                    dayContent += `<p class="text-gray-600 dark:text-gray-300 mt-2">${activity.description}</p>`;
+                  }
+                  if (activity.cost && activity.cost > 0) {
+                    dayContent += `<div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">💰 ${activity.cost}₺</span></div>`;
+                  }
+                  dayContent += '</div></li>';
+                }
+              });
+              dayContent += '</ul>';
+            } else {
+              dayContent += '<div class="text-center py-8 text-gray-500 dark:text-gray-400">';
+              dayContent += '<div class="text-4xl mb-3">📝</div>';
+              dayContent += '<p>Bu gün için henüz aktivite planlanmamış</p>';
+              dayContent += '</div>';
+            }
+            
+            // Notları formatla
+            if (day.notes && day.notes.trim()) {
+              dayContent += '<h4 class="text-md font-semibold text-green-600 dark:text-green-400 mb-2 mt-4">📝 Notlar</h4>';
+              dayContent += `<div class="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border-l-4 border-yellow-400"><p class="text-gray-700 dark:text-gray-300">${day.notes}</p></div>`;
+            }
+            
+            return {
+              day: day.day || 1,
+              content: dayContent,
+              isEmpty: day.isEmpty || (!day.activities?.length && !day.notes?.trim())
+            };
+          })
+          .sort((a: ParsedDay, b: ParsedDay) => a.day - b.day);
+      }
+    } catch {
+      // JSON değilse, metin formatında parse etmeye devam et
+    }
+    
+    // Metin formatındaki günlük planları parse et
+    const dayPatterns = [
+      /(?:^|\n)\s*(?:gün\s*)?(\d+)\.?\s*gün[:\s]*([\s\S]*?)(?=(?:\n\s*(?:gün\s*)?\d+\.?\s*gün[:\s])|$)/gi,
+      /(?:^|\n)\s*day\s*(\d+)[:\s]*([\s\S]*?)(?=(?:\n\s*day\s*\d+[:\s])|$)/gi,
+      /(?:^|\n)\s*(\d+)\.\s*([\s\S]*?)(?=(?:\n\s*\d+\.)|$)/gi
+    ];
+    
+    let days: Array<ParsedDay> = [];
+    
+    for (const pattern of dayPatterns) {
+      const matches = [...content.matchAll(pattern)];
+      if (matches.length > 0) {
+        days = matches.map(match => ({
+          day: parseInt(match[1]),
+          content: match[2].trim(),
+          isEmpty: !match[2].trim()
+        }));
+        break;
+      }
+    }
+    
+    // Eğer günler bulunamazsa, genel içeriği tek parça olarak döndür
+    if (days.length === 0) {
+      // Başlık varsa günleri o şekilde ayırmayı dene
+      const titlePattern = /(?:^|\n)\s*(.*?gün.*?)[:\n]([\s\S]*?)(?=(?:\n.*?gün.*?[:\n])|$)/gi;
+      const titleMatches = [...content.matchAll(titlePattern)];
+      
+      if (titleMatches.length > 0) {
+        days = titleMatches.map((match, index) => ({
+          day: index + 1,
+          content: `<h3>${match[1]}</h3>${match[2].trim()}`,
+          isEmpty: !match[2].trim()
+        }));
+      } else {
+        // Son çare: içeriği satırlara böl ve her büyük bölümü bir gün olarak say
+        const sections = content.split(/\n\s*\n/).filter(section => section.trim().length > 50);
+        days = sections.map((section, index) => ({
+          day: index + 1,
+          content: section.trim(),
+          isEmpty: false
+        }));
+      }
+    }
+    
+    return days.sort((a, b) => a.day - b.day);
+  };
+
+  const formatDayContent = (content: string) => {
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-600 dark:text-blue-400">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em class="text-green-600 dark:text-green-400">$1</em>')
+      .replace(/###\s(.*?)\n/g, '<h4 class="text-md font-semibold text-purple-600 dark:text-purple-400 mt-3 mb-2">$1</h4>')
+      .replace(/##\s(.*?)\n/g, '<h3 class="text-lg font-bold text-indigo-600 dark:text-indigo-400 mt-4 mb-2">$1</h3>')
+      .replace(/^\-\s(.*?)$/gm, '<li class="flex items-start space-x-2 mb-1"><span class="text-blue-500 mt-1">•</span><span>$1</span></li>')
+      .replace(/(\d{1,2}:\d{2})/g, '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 mr-2">$1</span>')
+      .replace(/₺[\d,]+/g, '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">$&</span>')
       .replace(/\n/g, '<br />');
   };
 
@@ -346,14 +497,92 @@ export default function PlanDetailPage() {
 
           {activeTab === 'daily-plan' && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Günlük Plan</h2>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">Günlük Plan</h2>
               {plan.gun_plani ? (
-                <div 
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: formatContent(plan.gun_plani) || '' }}
-                />
+                (() => {
+                  const dailyPlans = parseDailyPlan(plan.gun_plani);
+                  
+                  if (dailyPlans.length === 0) {
+                    return (
+                      <div 
+                        className="prose dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: formatContent(plan.gun_plani) || '' }}
+                      />
+                    );
+                  }
+                  
+                  return (
+                    <div className="space-y-6">
+                      {dailyPlans.map((dayPlan, index) => (
+                        <div key={index} className={`rounded-xl p-6 border shadow-sm transition-all hover:shadow-md ${
+                          dayPlan.isEmpty 
+                            ? 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600' 
+                            : 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 border-blue-100 dark:border-gray-600'
+                        }`}>
+                          <div className="flex items-center mb-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mr-4 ${
+                              dayPlan.isEmpty 
+                                ? 'bg-gray-400 text-white' 
+                                : 'bg-blue-500 text-white'
+                            }`}>
+                              {dayPlan.day}
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-white">
+                              {dayPlan.day}. Gün
+                            </h3>
+                            {plan.startDate && (
+                              <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
+                                {new Date(new Date(plan.startDate).getTime() + (dayPlan.day - 1) * 24 * 60 * 60 * 1000).toLocaleDateString('tr-TR', { 
+                                  weekday: 'long', 
+                                  day: 'numeric', 
+                                  month: 'long' 
+                                })}
+                              </span>
+                            )}
+                            {dayPlan.isEmpty && (
+                              <span className="ml-2 px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded-full">
+                                Boş
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+                            <div 
+                              className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
+                              dangerouslySetInnerHTML={{ __html: dayPlan.isEmpty ? 
+                                '<div class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="text-4xl mb-3">📝</div><p>Bu gün için henüz plan yapılmamış</p></div>' :
+                                formatDayContent(dayPlan.content) 
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {dailyPlans.length > 0 && (
+                        <div className="mt-8 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <svg className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-green-800 dark:text-green-300 font-medium">
+                                Toplam {dailyPlans.length} günlük plan
+                              </span>
+                            </div>
+                            <div className="text-sm text-green-700 dark:text-green-400">
+                              {dailyPlans.filter(day => !day.isEmpty).length} dolu, {dailyPlans.filter(day => day.isEmpty).length} boş gün
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
-                <p className="text-gray-500 dark:text-gray-400">Bu plan için günlük plan mevcut değil.</p>
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📅</div>
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">Bu plan için günlük plan mevcut değil.</p>
+                </div>
               )}
             </div>
           )}

@@ -44,6 +44,13 @@ export default function UserNav() {
               >
                 Seyahatlerim
               </Link>
+              <Link
+                href="/my-plans"
+                className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                Planlarım
+              </Link>
               <button
                 onClick={() => {
                   signOut({ callbackUrl: "/" });

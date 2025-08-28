@@ -146,7 +146,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Mekan Önerileri</h3>
               <p className="text-gray-800 dark:text-gray-200 font-medium">İlgi alanlarınıza göre kişiselleştirilmiş turistik mekan ve etkinlik önerileri.</p>
               <button 
-                onClick={() => handlePlanClick('/planner')}
+                onClick={() => handlePlanClick('/ai-planner')}
                 className="mt-4 inline-block text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium cursor-pointer"
               >
                 Planlayıcıya Git →
@@ -228,7 +228,7 @@ export default function Home() {
             Sadece birkaç tıklama ile kişiselleştirilmiş, bütçenize uygun ve zamanınızı en iyi şekilde değerlendireceğiniz bir seyahat planı oluşturun.
           </p>
           <button 
-            onClick={() => handlePlanClick('/planner')}
+            onClick={() => handlePlanClick('/ai-planner')}
             className="px-6 py-3 bg-white text-blue-600 dark:bg-gray-800 dark:text-blue-400 rounded-lg font-medium shadow-md hover:bg-blue-50 dark:hover:bg-gray-700 transition inline-block hover-lift fade-in delay-200 cursor-pointer"
           >
             Ücretsiz Planlayıcıyı Kullanın

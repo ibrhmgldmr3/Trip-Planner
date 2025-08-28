@@ -48,7 +48,7 @@ export default function TravelModePage() {
 
   const handleAIMode = () => {
     toast.success('AI destekli planlama moduna yönlendiriliyorsunuz...');
-    router.push('/planner');
+    router.push('/ai-planner');
   };
 
   const handleManualMode = () => {

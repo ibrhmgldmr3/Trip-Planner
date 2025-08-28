@@ -271,7 +271,7 @@ export default function ProfilePage() {
             </svg>
             <p className="text-gray-800 mb-4 text-center">Henüz planlanmış bir seyahatiniz bulunmuyor.</p>
             <Link
-              href="/planner"
+              href="/ai-planner"
               className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-md hover:bg-blue-700 transition"
             >
               Seyahat Planla

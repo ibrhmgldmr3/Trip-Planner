@@ -150,7 +150,7 @@ body {
 }
 
 .animated-gradient {
-  background: linear-gradient(270deg, #3b82f6, #10b981, #8b5cf6);
+  background: linear-gradient(270deg, #57d7f7, #10b981, #8549e7);
   background-size: 600% 600%;
   animation: gradient-shift 8s ease infinite;
   display: inline-block;

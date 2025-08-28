@@ -136,13 +136,22 @@ export default function MobileMenu() {
                     </Link>
                   </>
                 ) : (
-                  <Link 
-                    href="/profile"
-                    className="px-4 py-2 text-blue-400 font-medium text-sm text-center hover:bg-gray-800 rounded-lg transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Profilim
-                  </Link>
+                  <>
+                    <Link 
+                      href="/profile"
+                      className="px-4 py-2 text-blue-400 font-medium text-sm text-center hover:bg-gray-800 rounded-lg transition-colors mr-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Profilim
+                    </Link>
+                    <Link 
+                      href="/my-plans"
+                      className="px-4 py-2 text-blue-400 font-medium text-sm text-center hover:bg-gray-800 rounded-lg transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Planlarım
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

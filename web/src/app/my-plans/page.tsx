@@ -27,7 +27,7 @@ export default function MyPlansPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === 'loading') return; // Hala session yükleniyor
+    if (status === 'loading') return; 
     
     if (status === 'unauthenticated') {
       toast.error('Bu sayfayı görüntülemek için giriş yapmanız gerekiyor');

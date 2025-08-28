@@ -53,7 +53,7 @@ interface ManualTravelPlan {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("🚀 Manuel seyahat planı kaydediliyor...");
+    console.log(" Manuel seyahat planı kaydediliyor...");
     
     const planData: ManualTravelPlan = await request.json();
     
