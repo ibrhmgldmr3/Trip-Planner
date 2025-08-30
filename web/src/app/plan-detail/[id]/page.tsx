@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
+import { TripStatus } from '@prisma/client';
+import { getTripStatus, getStatusLabel, getStatusColor, canCancel, canMarkAsDone } from '@/lib/trip-status';
 
 interface DayActivity {
   id?: string;
@@ -49,6 +51,7 @@ interface PlanDetail {
   pratik_bilgiler: string | null;
   butce_tahmini: string | null;
   raw_markdown: string | null;
+  status: TripStatus;
   raw_html: string | null;
 }
 
@@ -62,32 +65,59 @@ export default function PlanDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
-  useEffect(() => {
-    const fetchPlanDetailEffect = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch(`/api/plan-detail/${planId}`);
-        
-        if (!response.ok) {
-          throw new Error('Plan bulunamadı');
-        }
-        
-        const data = await response.json();
-        setPlan(data.plan);
-      } catch (err) {
-        console.error('Plan detayları yüklenirken hata:', err);
-        setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
-      } finally {
-        setLoading(false);
+  const fetchPlanDetail = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/plan-detail/${planId}`);
+      
+      if (!response.ok) {
+        throw new Error('Plan bulunamadı');
       }
-    };
-
-    if (planId) {
-      fetchPlanDetailEffect();
+      
+      const data = await response.json();
+      setPlan(data.plan);
+    } catch (err) {
+      console.error('Plan detayları yüklenirken hata:', err);
+      setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+    } finally {
+      setLoading(false);
     }
   }, [planId]);
+
+  const updatePlanStatus = async (newStatus: TripStatus) => {
+    try {
+      const response = await fetch(`/api/trip-plans/${planId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        toast.success(
+          newStatus === TripStatus.CANCELLED ? 'Plan iptal edildi' :
+          newStatus === TripStatus.DONE ? 'Plan tamamlandı ve Gezilerim\'e eklendi' :
+          'Plan durumu güncellendi'
+        );
+        // Plan verisini yeniden yükle
+        await fetchPlanDetail();
+      } else {
+        toast.error('Plan durumu güncellenemedi');
+      }
+    } catch (err) {
+      console.error('Status update error:', err);
+      toast.error('Plan durumu güncellenemedi');
+    }
+  };
+
+  useEffect(() => {
+    if (planId) {
+      fetchPlanDetail();
+    }
+  }, [planId, fetchPlanDetail]);
 
   const deletePlan = async () => {
     if (!confirm('Bu planı silmek istediğinizden emin misiniz?')) return;
@@ -342,7 +372,21 @@ export default function PlanDetailPage() {
               </div>
               
               <div className="text-right">
-                <div className="flex items-center space-x-2 mb-2">
+                <div className="flex flex-col items-end space-y-2 mb-2">
+                  {/* Status Display */}
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(getTripStatus(
+                    plan.startDate ? new Date(plan.startDate) : null,
+                    plan.endDate ? new Date(plan.endDate) : null,
+                    plan.status
+                  ))}`}>
+                    {getStatusLabel(getTripStatus(
+                      plan.startDate ? new Date(plan.startDate) : null,
+                      plan.endDate ? new Date(plan.endDate) : null,
+                      plan.status
+                    ))}
+                  </span>
+                  
+                  {/* Plan Type */}
                   {plan.ai_model === 'manual_planning' ? (
                     <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm">
                       Manuel Plan
@@ -353,6 +397,37 @@ export default function PlanDetailPage() {
                     </span>
                   )}
                 </div>
+
+                {/* Status Action Buttons */}
+                {(() => {
+                  const currentStatus = getTripStatus(
+                    plan.startDate ? new Date(plan.startDate) : null,
+                    plan.endDate ? new Date(plan.endDate) : null,
+                    plan.status
+                  );
+                  
+                  return (
+                    <div className="flex flex-col space-y-2 mb-4">
+                      {canCancel(currentStatus) && (
+                        <button
+                          onClick={() => updatePlanStatus(TripStatus.CANCELLED)}
+                          className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition-colors duration-200 text-sm font-medium"
+                        >
+                          İptal Et
+                        </button>
+                      )}
+                      {canMarkAsDone(currentStatus) && (
+                        <button
+                          onClick={() => updatePlanStatus(TripStatus.DONE)}
+                          className="bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600 transition-colors duration-200 text-sm font-medium"
+                        >
+                          Tamamlandı
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {plan.total_cost && (
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                     ₺{plan.total_cost.toLocaleString('tr-TR')}

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
+import { TripStatus } from '@prisma/client';
+import { getTripStatus, getStatusLabel, getStatusColor, canCancel, canMarkAsDone } from '@/lib/trip-status';
 
 interface SavedPlan {
   id: string;
@@ -17,6 +19,7 @@ interface SavedPlan {
   createdAt: string;
   travel_style: string | null;
   user_id: string | null;
+  status: TripStatus;
 }
 
 export default function MyPlansPage() {
@@ -54,6 +57,32 @@ export default function MyPlansPage() {
       setError('Planlar yüklenemedi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updatePlanStatus = async (planId: string, newStatus: TripStatus) => {
+    try {
+      const response = await fetch(`/api/trip-plans/${planId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        toast.success(
+          newStatus === TripStatus.CANCELLED ? 'Plan iptal edildi' :
+          newStatus === TripStatus.DONE ? 'Plan tamamlandı ve Gezilerim\'e eklendi' :
+          'Plan durumu güncellendi'
+        );
+        fetchPlans(); // Refresh the list
+      } else {
+        toast.error('Plan durumu güncellenemedi');
+      }
+    } catch (err) {
+      console.error('Status update error:', err);
+      toast.error('Plan durumu güncellenemedi');
     }
   };
 
@@ -182,7 +211,14 @@ export default function MyPlansPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-            {plans.map((plan) => (
+            {plans.map((plan) => {
+              const currentStatus = getTripStatus(
+                new Date(plan.startDate), 
+                new Date(plan.endDate), 
+                plan.status
+              );
+              
+              return (
               <div
                 key={plan.id}
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105"
@@ -204,7 +240,10 @@ export default function MyPlansPage() {
                         {new Date(plan.endDate).toLocaleDateString('tr-TR')}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-1">
+                    <div className="flex flex-col items-end space-y-1">
+                      <span className={`text-xs px-2 py-1 rounded ${getStatusColor(currentStatus)}`}>
+                        {getStatusLabel(currentStatus)}
+                      </span>
                       {plan.ai_model === 'manual_planning' ? (
                         <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs px-2 py-1 rounded">
                           Manuel
@@ -244,23 +283,46 @@ export default function MyPlansPage() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => viewPlan(plan.id)}
-                      className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors duration-200 text-sm font-medium"
-                    >
-                      Görüntüle
-                    </button>
-                    <button
-                      onClick={() => deletePlan(plan.id)}
-                      className="bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm font-medium"
-                    >
-                      Sil
-                    </button>
+                  <div className="space-y-2">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => viewPlan(plan.id)}
+                        className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors duration-200 text-sm font-medium"
+                      >
+                        Görüntüle
+                      </button>
+                      <button
+                        onClick={() => deletePlan(plan.id)}
+                        className="bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm font-medium"
+                      >
+                        Sil
+                      </button>
+                    </div>
+                    
+                    {/* Status Action Buttons */}
+                    <div className="flex space-x-2">
+                      {canCancel(currentStatus) && (
+                        <button
+                          onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
+                          className="flex-1 bg-orange-500 text-white py-2 px-3 rounded-lg hover:bg-orange-600 transition-colors duration-200 text-xs font-medium"
+                        >
+                          İptal Et
+                        </button>
+                      )}
+                      {canMarkAsDone(currentStatus) && (
+                        <button
+                          onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
+                          className="flex-1 bg-purple-500 text-white py-2 px-3 rounded-lg hover:bg-purple-600 transition-colors duration-200 text-xs font-medium"
+                        >
+                          Tamamlandı
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

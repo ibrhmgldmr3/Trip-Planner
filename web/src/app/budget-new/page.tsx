@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -19,18 +19,14 @@ interface BudgetItem {
 
 interface Trip {
   id: string;
-  city: string;
-  country: string;
+  title: string;
   startDate: string;
   endDate: string;
-  total_cost?: number;
-  budget_level?: string;
-  travel_style?: string;
-  duration?: number;
+  budget?: number;
 }
 
 export default function BudgetPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -50,166 +46,6 @@ export default function BudgetPage() {
     paymentMethod: ''
   });
 
-  // Markdown formatındaki bütçe verisini parse eden fonksiyon
-  const parseMarkdownBudget = (markdownText: string) => {
-    const items: Array<{ description: string; amount: number; category: string }> = [];
-    
-    // Basit regex ile fiyat bilgilerini çıkar
-    const priceRegex = /(\d+(?:\.\d+)?)\s*(?:TL|₺|TRY)/gi;
-    const lines = markdownText.split('\n');
-    
-    let currentCategory = 'genel';
-    
-    for (const line of lines) {
-      // Kategori başlıkları için
-      if (line.includes('**') && (line.includes('Ulaşım') || line.includes('Konaklama') || line.includes('Yemek') || line.includes('Aktivite'))) {
-        if (line.includes('Ulaşım')) currentCategory = 'ulaşım';
-        else if (line.includes('Konaklama')) currentCategory = 'konaklama';
-        else if (line.includes('Yemek')) currentCategory = 'yemek';
-        else if (line.includes('Aktivite')) currentCategory = 'aktiviteler';
-        continue;
-      }
-      
-      // Fiyat içeren satırları bul
-      const priceMatch = line.match(priceRegex);
-      if (priceMatch) {
-        const amount = parseFloat(priceMatch[0].replace(/[^0-9.]/g, ''));
-        const description = line.replace(priceRegex, '').replace(/[*-]/g, '').trim();
-        
-        if (description && amount > 0) {
-          items.push({
-            description: description || 'Açıklama yok',
-            amount: amount,
-            category: currentCategory
-          });
-        }
-      }
-    }
-    
-    return { items };
-  };
-
-  const fetchBudgetItems = useCallback(async (tripId?: string) => {
-    if (!selectedTrip && !tripId) return;
-    
-    const planId = tripId || selectedTrip?.id;
-    if (!planId) return;
-    
-    try {
-      const response = await fetch(`/api/plan-detail/${planId}`);
-      
-      if (!response.ok) {
-        throw new Error('Plan detayı yüklenemedi');
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && data.plan) {
-        // Eğer plan bütçe tahmini varsa, onu parse et
-        if (data.plan.butce_tahmini) {
-          try {
-            // Önce JSON olarak parse etmeyi dene
-            let budgetData;
-            try {
-              budgetData = JSON.parse(data.plan.butce_tahmini);
-            } catch {
-              // JSON değilse, markdown formatından parse et
-              budgetData = parseMarkdownBudget(data.plan.butce_tahmini);
-            }
-            
-            // Budget verilerini BudgetItem formatına çevir
-            const items: BudgetItem[] = [];
-            
-            // Bütçe verilerini kategori bazında işle
-            if (budgetData && budgetData.categories) {
-              Object.entries(budgetData.categories).forEach(([category, details]: [string, unknown]) => {
-                const categoryDetails = details as { items?: unknown[]; total?: number };
-                
-                if (categoryDetails.items && Array.isArray(categoryDetails.items)) {
-                  categoryDetails.items.forEach((item: unknown, index: number) => {
-                    const budgetItem = item as { description?: string; name?: string; amount?: number; price?: number };
-                    items.push({
-                      id: `${category}-${index}`,
-                      category: category,
-                      description: budgetItem.description || budgetItem.name || 'Açıklama yok',
-                      amount: budgetItem.amount || budgetItem.price || 0,
-                      currency: 'TRY',
-                      isEstimate: true,
-                      isPaid: false
-                    });
-                  });
-                } else if (categoryDetails.total) {
-                  // Eğer sadece toplam varsa, genel bir kalem oluştur
-                  items.push({
-                    id: `${category}-total`,
-                    category: category,
-                    description: `${category} toplam`,
-                    amount: categoryDetails.total,
-                    currency: 'TRY',
-                    isEstimate: true,
-                    isPaid: false
-                  });
-                }
-              });
-            } else if (budgetData && budgetData.items) {
-              // Direkt items array'i varsa
-              budgetData.items.forEach((item: unknown, index: number) => {
-                const budgetItem = item as { description?: string; name?: string; amount?: number; price?: number; category?: string };
-                items.push({
-                  id: `item-${index}`,
-                  category: budgetItem.category || 'genel',
-                  description: budgetItem.description || budgetItem.name || 'Açıklama yok',
-                  amount: budgetItem.amount || budgetItem.price || 0,
-                  currency: 'TRY',
-                  isEstimate: true,
-                  isPaid: false
-                });
-              });
-            }
-            
-            setBudgetItems(items);
-          } catch (parseError) {
-            console.error('Bütçe verisi parse edilemedi:', parseError);
-            setBudgetItems([]);
-          }
-        } else {
-          setBudgetItems([]);
-        }
-      }
-    } catch (err) {
-      console.error('Budget fetch error:', err);
-      setBudgetItems([]);
-    }
-  }, [selectedTrip]);
-
-  const fetchUserTrips = useCallback(async () => {
-    try {
-      const response = await fetch('/api/my-plans');
-      
-      if (!response.ok) {
-        throw new Error('Planlar yüklenemedi');
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && data.plans) {
-        setTrips(data.plans);
-        if (data.plans.length > 0) {
-          setSelectedTrip(data.plans[0]);
-          fetchBudgetItems(data.plans[0].id);
-        }
-      } else {
-        setTrips([]);
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Geziler yüklenemedi');
-      setTrips([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchBudgetItems]);
-
   useEffect(() => {
     if (status === 'loading') return;
     
@@ -222,7 +58,81 @@ export default function BudgetPage() {
     if (status === 'authenticated') {
       fetchUserTrips();
     }
-  }, [status, router, fetchUserTrips]);
+  }, [status, router]);
+
+  const fetchUserTrips = async () => {
+    try {
+      // Trip verilerini Al (şimdilik mock data)
+      const mockTrips: Trip[] = [
+        {
+          id: '1',
+          title: 'İstanbul Gezisi',
+          startDate: '2025-09-01',
+          endDate: '2025-09-05',
+          budget: 5000
+        },
+        {
+          id: '2',
+          title: 'Ankara Gezisi',
+          startDate: '2025-10-01',
+          endDate: '2025-10-03',
+          budget: 3000
+        }
+      ];
+      
+      setTrips(mockTrips);
+      if (mockTrips.length > 0) {
+        setSelectedTrip(mockTrips[0]);
+        fetchBudgetItems(mockTrips[0].id);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Geziler yüklenemedi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBudgetItems = async (tripId: string) => {
+    try {
+      // Mock budget items
+      const mockBudgetItems: BudgetItem[] = [
+        {
+          id: '1',
+          category: 'ulaşım',
+          description: 'Uçak bileti',
+          amount: 800,
+          currency: 'TRY',
+          isEstimate: false,
+          isPaid: true,
+          paymentMethod: 'Kredi Kartı'
+        },
+        {
+          id: '2',
+          category: 'konaklama',
+          description: 'Otel rezervasyonu',
+          amount: 1200,
+          currency: 'TRY',
+          isEstimate: false,
+          isPaid: true,
+          paymentMethod: 'Kredi Kartı'
+        },
+        {
+          id: '3',
+          category: 'yemek',
+          description: 'Restoran harcamaları',
+          amount: 600,
+          currency: 'TRY',
+          isEstimate: true,
+          isPaid: false
+        }
+      ];
+      
+      setBudgetItems(mockBudgetItems);
+    } catch (err) {
+      console.error('Budget fetch error:', err);
+    }
+  };
 
   const addBudgetItem = async () => {
     if (!selectedTrip || !newItem.description || newItem.amount <= 0) {
@@ -265,20 +175,13 @@ export default function BudgetPage() {
 
   // Hesaplamalar
   const totalExpenses = budgetItems.reduce((sum, item) => sum + item.amount, 0);
-  const totalBudget = selectedTrip?.total_cost || 0;
+  const totalBudget = selectedTrip?.budget || 0;
   const remainingBudget = totalBudget - totalExpenses;
   const budgetRatio = totalBudget > 0 ? (totalExpenses / totalBudget) * 100 : 0;
 
   // Günlük hesaplamalar
   const getDays = () => {
     if (!selectedTrip) return 1;
-    
-    // Önce duration field'ini kontrol et
-    if (selectedTrip.duration && selectedTrip.duration > 0) {
-      return selectedTrip.duration;
-    }
-    
-    // Duration yoksa tarihlerden hesapla
     const start = new Date(selectedTrip.startDate);
     const end = new Date(selectedTrip.endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -421,21 +324,14 @@ export default function BudgetPage() {
                       : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
                   }`}
                 >
-                  <h3 className="font-bold text-gray-800 dark:text-white">
-                    {trip.city}, {trip.country}
-                  </h3>
+                  <h3 className="font-bold text-gray-800 dark:text-white">{trip.title}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-300">
                     {new Date(trip.startDate).toLocaleDateString('tr-TR')} - 
                     {new Date(trip.endDate).toLocaleDateString('tr-TR')}
                   </p>
-                  {trip.total_cost && (
+                  {trip.budget && (
                     <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                      Bütçe: ₺{trip.total_cost.toLocaleString('tr-TR')}
-                    </p>
-                  )}
-                  {trip.budget_level && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      {trip.budget_level.charAt(0).toUpperCase() + trip.budget_level.slice(1)} • {trip.travel_style}
+                      Bütçe: ₺{trip.budget.toLocaleString('tr-TR')}
                     </p>
                   )}
                 </button>

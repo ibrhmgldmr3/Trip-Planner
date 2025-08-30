@@ -34,17 +34,18 @@ export async function GET(
       );
     }
 
-    // Trip'i bul
-    const trip = await prisma.tripPlan.findUnique({
+    // Trip'i bul (Trip tablosundan, sadece DONE olanları)
+    const trip = await prisma.trip.findUnique({
       where: { 
         id: tripId,
-        user_id: user.id 
+        userId: user.id,
+        status: 'DONE'
       },
     });
 
     if (!trip) {
       return NextResponse.json(
-        { error: "Yapılmış geziler bulunamadı" },
+        { error: "Tamamlanmış gezi bulunamadı" },
         { status: 404 }
       );
     }
@@ -92,27 +93,28 @@ export async function DELETE(
       );
     }
 
-    // Trip var mı ve sahibi mi?
-    const trip = await prisma.tripPlan.findUnique({
+    // Trip var mı ve sahibi mi? (Trip tablosundan, sadece DONE olanları)
+    const trip = await prisma.trip.findUnique({
       where: { 
         id: tripId,
-        user_id: user.id 
+        userId: user.id,
+        status: 'DONE'
       },
     });
 
     if (!trip) {
       return NextResponse.json(
-        { error: "Yapılmış gezi bulunamadı" },
+        { error: "Tamamlanmış gezi bulunamadı" },
         { status: 404 }
       );
     }
 
     // Sil
-    await prisma.tripPlan.delete({ where: { id: tripId } });
+    await prisma.trip.delete({ where: { id: tripId } });
 
     return NextResponse.json({
       success: true,
-      message: "Yapılmış gezi başarıyla silindi",
+      message: "Tamamlanmış gezi başarıyla silindi",
     });
   } catch (error: unknown) {
     console.error("Trip delete hatası:", error);

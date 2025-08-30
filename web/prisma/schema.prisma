@@ -212,7 +212,7 @@ model BudgetItem {
 }
 
 model TripPlan {
-  id               String    @id @default(cuid())
+  id               String      @id @default(cuid())
   tripId           String?
   city             String
   country          String?
@@ -227,7 +227,7 @@ model TripPlan {
   raw_markdown     String?
   raw_html         String?
   ai_model         String?
-  generated_at     DateTime  @default(now())
+  generated_at     DateTime    @default(now())
   user_id          String?
   total_cost       Float?
   daily_cost       Float?
@@ -236,10 +236,12 @@ model TripPlan {
   travel_style     String?
   accommodation    String?
   transportation   String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  status           TripStatus  @default(PLANNED)
+  completedAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
-  trip             Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   // Email ile User'a bağ
   userEmail        String?
@@ -256,4 +258,5 @@ enum TripStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+  DONE
 }

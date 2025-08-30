@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, TripStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
@@ -29,25 +29,41 @@ export async function GET(): Promise<NextResponse> {
       );
     }
 
-    // Kullanıcının tüm trip planlarını getir
-    const trips = await prisma.tripPlan.findMany({
-      where: { user_id: user.id },
-      orderBy: { createdAt: 'desc' },
+    // Sadece DONE statusundaki trip'leri getir
+    const trips = await prisma.trip.findMany({
+      where: { 
+        userId: user.id,
+        status: TripStatus.DONE
+      },
+      orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
+        title: true,
+        description: true,
+        startDate: true,
+        endDate: true,
         city: true,
-        gun_plani: true,
+        country: true,
+        budget: true,
+        status: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
 
     // Response formatını düzenle
     const formattedTrips = trips.map(trip => ({
       id: trip.id,
-      title: trip.city || 'Başlıksız Plan',
-      description: 'Gezi planı detayları',
-      createdAt: trip.createdAt?.toISOString() || '',
+      title: trip.title,
+      description: trip.description,
+      startDate: trip.startDate.toISOString(),
+      endDate: trip.endDate.toISOString(),
       city: trip.city,
+      country: trip.country,
+      budget: trip.budget,
+      status: trip.status,
+      createdAt: trip.createdAt.toISOString(),
+      completedAt: trip.updatedAt.toISOString(),
     }));
 
     return NextResponse.json({
@@ -58,7 +74,7 @@ export async function GET(): Promise<NextResponse> {
     console.error("My trips fetch hatası:", error);
     
     return NextResponse.json(
-      { error: "Gezi planları getirilemedi" },
+      { error: "Tamamlanmış geziler getirilemedi" },
       { status: 500 }
     );
   }
