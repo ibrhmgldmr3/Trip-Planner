@@ -1,515 +1,833 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 
-// Örnek veri
-const sampleItinerary = [
-  {
-    day: 1,
-    date: "15 Aralık 2023, Cuma",
-    activities: [
-      {
-        id: 1,
-        time: "09:00 - 11:30",
-        type: "morning",
-        title: "Ayasofya Müzesi Ziyareti",
-        location: "Sultanahmet",
-        description: "Dünyanın en önemli tarihi yapılarından biri olan Ayasofya'yı keşfedin.",
-        cost: 250,
-        category: "kültür",
-        image: "/activities/hagia-sophia.jpg"
-      },
-      {
-        id: 2,
-        time: "12:00 - 13:30",
-        type: "noon",
-        title: "Sultanahmet Köftecisi'nde Öğle Yemeği",
-        location: "Sultanahmet",
-        description: "Meşhur köfte ve piyaz ile enfes bir öğle yemeği.",
-        cost: 150,
-        category: "yemek",
-        image: "/activities/kofte.jpg"
-      },
-      {
-        id: 3,
-        time: "14:00 - 16:30",
-        type: "afternoon",
-        title: "Topkapı Sarayı Turu",
-        location: "Sultanahmet",
-        description: "Osmanlı İmparatorluğu'nun 400 yıl boyunca yönetildiği sarayı gezin.",
-        cost: 350,
-        category: "kültür",
-        image: "/activities/topkapi.jpg"
-      },
-      {
-        id: 4,
-        time: "17:00 - 18:30",
-        type: "afternoon",
-        title: "Kapalıçarşı Alışverişi",
-        location: "Kapalıçarşı",
-        description: "Dünyanın en eski ve en büyük kapalı çarşılarından birinde alışveriş yapın.",
-        cost: 0,
-        category: "alışveriş",
-        image: "/activities/grand-bazaar.jpg"
-      },
-      {
-        id: 5,
-        time: "19:30 - 21:30",
-        type: "evening",
-        title: "Akşam Yemeği - Hamdi Restaurant",
-        location: "Eminönü",
-        description: "Muhteşem manzara eşliğinde geleneksel Türk mutfağından lezzetler.",
-        cost: 400,
-        category: "yemek",
-        image: "/activities/dinner.jpg"
+interface Activity {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  cost: number;
+  description?: string;
+  category: string;
+  location: string;
+}
+
+interface DayPlan {
+  day: number;
+  date: string;
+  activities: Activity[];
+  notes: string;
+  isEmpty: boolean;
+}
+
+interface Trip {
+  id: string;
+  city: string;
+  country: string;
+  startDate: string;
+  endDate: string;
+  total_cost?: number;
+  budget_level?: string;
+  travel_style?: string;
+  duration?: number;
+  gun_plani?: string; // JSON string of daily plans
+  status?: string;
+}
+
+// Aktivite kategorileri için ikonlar
+const categoryIcons: Record<string, string> = {
+  'ulaşım': '🚗',
+  'konaklama': '🏨',
+  'yemek': '🍽️',
+  'aktiviteler': '🎯',
+  'alışveriş': '🛍️',
+  'eğlence': '🎉',
+  'kültür': '🏛️',
+  'gezi': '🚶',
+  'diğer': '📝'
+};
+
+  // Zaman dilimlerine göre renkler
+  const timeColors: Record<string, string> = {
+    'morning': 'bg-yellow-100 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700',
+    'noon': 'bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700',
+    'afternoon': 'bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700',
+    'evening': 'bg-purple-100 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700'
+  };
+
+  // Plan düzenlenebilir mi kontrol et
+  const isPlanEditable = (trip: Trip | null): boolean => {
+    return trip?.status === 'PLANLANDI';
+  };export default function DailyPlannerPage() {
+  const { status } = useSession();
+  const router = useRouter();
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [dailyPlans, setDailyPlans] = useState<DayPlan[]>([]);
+  const [originalDailyPlans, setOriginalDailyPlans] = useState<DayPlan[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  
+  // Yeni aktivite formu state'i
+  const [newActivity, setNewActivity] = useState({
+    name: '',
+    startTime: '',
+    endTime: '',
+    cost: 0,
+    description: '',
+    category: 'aktiviteler',
+    location: ''
+  });
+
+  // Saat dilimini belirle
+  const getTimeOfDay = (time: string): string => {
+    const hour = parseInt(time.split(':')[0]);
+    if (hour >= 6 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 14) return 'noon';
+    if (hour >= 14 && hour < 18) return 'afternoon';
+    return 'evening';
+  };
+
+  // Planları parse et
+  const parseDailyPlans = (plansJson: string): DayPlan[] => {
+    try {
+      // Önce JSON parse etmeyi dene
+      const parsed = JSON.parse(plansJson);
+      if (Array.isArray(parsed)) {
+        return parsed.map((plan, index) => ({
+          day: index + 1,
+          date: plan.date || '',
+          activities: plan.activities || [],
+          notes: plan.notes || '',
+          isEmpty: plan.isEmpty || false
+        }));
       }
-    ]
-  },
-  {
-    day: 2,
-    date: "16 Aralık 2023, Cumartesi",
-    activities: [
-      {
-        id: 6,
-        time: "09:30 - 11:00",
-        type: "morning",
-        title: "Galata Kulesi Ziyareti",
-        location: "Beyoğlu",
-        description: "İstanbul'un en ikonik yapılarından birinden panoramik manzaranın tadını çıkarın.",
-        cost: 200,
-        category: "kültür",
-        image: "/activities/galata.jpg"
-      },
-      {
-        id: 7,
-        time: "11:30 - 13:00",
-        type: "noon",
-        title: "İstiklal Caddesi Yürüyüşü",
-        location: "Beyoğlu",
-        description: "İstanbul'un en meşhur alışveriş ve eğlence caddesinde keyifli bir yürüyüş.",
-        cost: 0,
-        category: "gezi",
-        image: "/activities/istiklal.jpg"
-      },
-      {
-        id: 8,
-        time: "13:00 - 14:30",
-        type: "noon",
-        title: "Öğle Yemeği - Çiçek Pasajı",
-        location: "Beyoğlu",
-        description: "Tarihi Çiçek Pasajı'nda yerel lezzetlerden oluşan bir öğle yemeği.",
-        cost: 200,
-        category: "yemek",
-        image: "/activities/cicek-pasaji.jpg"
-      },
-      {
-        id: 9,
-        time: "15:00 - 17:30",
-        type: "afternoon",
-        title: "Boğaz Turu",
-        location: "Eminönü",
-        description: "İstanbul Boğazı'nın eşsiz güzelliklerini tekne turu ile keşfedin.",
-        cost: 300,
-        category: "gezi",
-        image: "/activities/bosphorus.jpg"
-      },
-      {
-        id: 10,
-        time: "18:30 - 21:00",
-        type: "evening",
-        title: "Ortaköy'de Akşam Yemeği",
-        location: "Ortaköy",
-        description: "Ortaköy Camii manzarasında kumpir ve waffle keyfi.",
-        cost: 250,
-        category: "yemek",
-        image: "/activities/ortakoy.jpg"
+      return [];
+    } catch (error) {
+      console.log('JSON parse hatası, markdown formatında veri var:', error);
+      
+      // JSON parse edilemiyorsa, bu alan markdown formatında
+      // Bu durumda boş planlar döndürelim
+      return [];
+    }
+  };
+
+  // Seçili trip için günlük planları yükle
+  const loadDailyPlans = useCallback(async (trip: Trip) => {
+    try {
+      const response = await fetch(`/api/plan-detail/${trip.id}`);
+      
+      if (!response.ok) {
+        throw new Error('Plan detayı yüklenemedi');
       }
-    ]
-  },
-  {
-    day: 3,
-    date: "17 Aralık 2023, Pazar",
-    activities: [
-      {
-        id: 11,
-        time: "09:00 - 12:00",
-        type: "morning",
-        title: "Dolmabahçe Sarayı Turu",
-        location: "Beşiktaş",
-        description: "Osmanlı İmparatorluğu'nun son dönemlerine ait muhteşem sarayı keşfedin.",
-        cost: 300,
-        category: "kültür",
-        image: "/activities/dolmabahce.jpg"
-      },
-      {
-        id: 12,
-        time: "12:30 - 14:00",
-        type: "noon",
-        title: "Beşiktaş'ta Öğle Yemeği",
-        location: "Beşiktaş",
-        description: "Yerel bir restaurantta enfes balık yemekleri.",
-        cost: 250,
-        category: "yemek",
-        image: "/activities/fish.jpg"
-      },
-      {
-        id: 13,
-        time: "14:30 - 17:00",
-        type: "afternoon",
-        title: "İstanbul Modern Sanat Müzesi",
-        location: "Karaköy",
-        description: "Türkiye'nin ilk modern sanat müzesinde çağdaş sanat eserleri.",
-        cost: 180,
-        category: "kültür",
-        image: "/activities/istanbul-modern.jpg"
-      },
-      {
-        id: 14,
-        time: "17:30 - 19:00",
-        type: "evening",
-        title: "Karaköy Sokakları Keşfi",
-        location: "Karaköy",
-        description: "İstanbul'un hızla gelişen semtindeki şık kafe ve dükkanları keşfedin.",
-        cost: 100,
-        category: "gezi",
-        image: "/activities/karakoy.jpg"
-      },
-      {
-        id: 15,
-        time: "19:30 - 21:30",
-        type: "evening",
-        title: "Türk Gecesi Show",
-        location: "Sultanahmet",
-        description: "Geleneksel Türk müziği ve dansları eşliğinde akşam yemeği.",
-        cost: 500,
-        category: "eğlence",
-        image: "/activities/turkish-night.jpg"
+      
+      const data = await response.json();
+      
+      if (data.success && data.plan) {
+        let plans: DayPlan[] = [];
+        
+        if (data.plan.gun_plani) {
+          plans = parseDailyPlans(data.plan.gun_plani);
+        }
+        
+        // Eğer planlar boşsa veya parse edilemiyorsa, trip süresine göre boş planlar oluştur
+        if (plans.length === 0) {
+          const duration = getDuration(trip);
+          plans = Array.from({ length: duration }, (_, index) => ({
+            day: index + 1,
+            date: formatDate(trip.startDate, index),
+            activities: [],
+            notes: '',
+            isEmpty: false
+          }));
+        }
+        
+        setDailyPlans(plans);
+        setOriginalDailyPlans([...plans]); // Orijinal planları sakla
+        setHasChanges(false); // Yeni plan yüklendiğinde değişiklik yok
       }
-    ]
+    } catch (err) {
+      console.error('Daily plans fetch error:', err);
+      toast.error('Günlük planlar yüklenemedi');
+    }
+  }, []);
+
+  // Kullanıcı planlarını getir
+  const fetchUserTrips = useCallback(async () => {
+    try {
+      const response = await fetch('/api/my-plans');
+      
+      if (!response.ok) {
+        throw new Error('Planlar yüklenemedi');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.plans) {
+        setTrips(data.plans);
+        if (data.plans.length > 0) {
+          setSelectedTrip(data.plans[0]);
+          loadDailyPlans(data.plans[0]);
+        }
+      } else {
+        setTrips([]);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Geziler yüklenemedi');
+      setTrips([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadDailyPlans]);
+
+  // Trip süresini hesapla
+  const getDuration = (trip: Trip): number => {
+    if (trip.duration && trip.duration > 0) return trip.duration;
+    
+    const start = new Date(trip.startDate);
+    const end = new Date(trip.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
+    return daysDiff === 0 ? 1 : daysDiff;
+  };
+
+  // Tarihi formatla
+  const formatDate = (startDate: string, dayIndex: number): string => {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + dayIndex);
+    return date.toLocaleDateString('tr-TR', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    
+    if (status === 'unauthenticated') {
+      toast.error('Bu sayfayı görüntülemek için giriş yapmanız gerekiyor');
+      router.push('/login');
+      return;
+    }
+    
+    if (status === 'authenticated') {
+      fetchUserTrips();
+    }
+  }, [status, router, fetchUserTrips]);
+
+  // Aktivite ekle
+  const addActivity = () => {
+    if (!selectedTrip || !newActivity.name || !newActivity.startTime || !newActivity.endTime) {
+      toast.error('Lütfen tüm zorunlu alanları doldurun');
+      return;
+    }
+
+    if (!isPlanEditable(selectedTrip)) {
+      toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki planlar düzenlenebilir.');
+      return;
+    }
+
+    const activity: Activity = {
+      id: Date.now().toString(),
+      ...newActivity
+    };
+
+    const updatedPlans = dailyPlans.map(plan => {
+      if (plan.day === selectedDay) {
+        return {
+          ...plan,
+          activities: [...plan.activities, activity]
+        };
+      }
+      return plan;
+    });
+
+    setDailyPlans(updatedPlans);
+    setHasChanges(true); // Değişiklik var olarak işaretle
+    
+    setNewActivity({
+      name: '',
+      startTime: '',
+      endTime: '',
+      cost: 0,
+      description: '',
+      category: 'aktiviteler',
+      location: ''
+    });
+    setShowAddForm(false);
+    toast.success('Aktivite eklendi (Kaydetmeyi unutmayın!)');
+  };
+
+  // Aktivite sil
+  const deleteActivity = (activityId: string) => {
+    if (!isPlanEditable(selectedTrip)) {
+      toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki planlar düzenlenebilir.');
+      return;
+    }
+
+    if (!confirm('Bu aktiviteyi silmek istediğinizden emin misiniz?')) return;
+
+    const updatedPlans = dailyPlans.map(plan => {
+      if (plan.day === selectedDay) {
+        return {
+          ...plan,
+          activities: plan.activities.filter(activity => activity.id !== activityId)
+        };
+      }
+      return plan;
+    });
+
+    setDailyPlans(updatedPlans);
+    setHasChanges(true); // Değişiklik var olarak işaretle
+    toast.success('Aktivite silindi (Kaydetmeyi unutmayın!)');
+  };
+
+  // Değişiklikleri kaydet
+  const saveChanges = async () => {
+    if (!selectedTrip) return;
+
+    try {
+      await saveDailyPlans(dailyPlans);
+      setOriginalDailyPlans([...dailyPlans]); // Orijinal planları güncelle
+      setHasChanges(false);
+      toast.success('Değişiklikler kaydedildi!');
+    } catch (error) {
+      console.error('Kaydetme hatası:', error);
+      toast.error('Değişiklikler kaydedilemedi');
+    }
+  };
+
+  // Değişiklikleri iptal etme fonksiyonu
+  const cancelChanges = () => {
+    setDailyPlans([...originalDailyPlans]);
+    setHasChanges(false);
+    toast.success('Değişiklikler iptal edildi');
+  };
+
+  // Günlük planları kaydet
+  const saveDailyPlans = async (plans: DayPlan[]) => {
+    if (!selectedTrip) return;
+
+    try {
+      const response = await fetch(`/api/plan-detail/${selectedTrip.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          daily_plans: JSON.stringify(plans)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Plan kaydedilemedi');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Plan kaydedilirken hata oluştu');
+    }
+  };
+
+  // Seçili günün planı
+  const selectedDayPlan = dailyPlans.find(plan => plan.day === selectedDay);
+
+  // Loading durumu
+  if (status === 'loading' || loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600 dark:text-gray-300">
+            Günlük planlar yükleniyor...
+          </p>
+        </div>
+      </div>
+    );
   }
-];
 
-// Aktivite tiplerine göre renkler
-const typeColors = {
-  morning: "bg-yellow-900 border-yellow-700 text-yellow-300",
-  noon: "bg-blue-900 border-blue-700 text-blue-300",
-  afternoon: "bg-green-900 border-green-700 text-green-300",
-  evening: "bg-purple-900 border-purple-700 text-purple-300"
-};
-
-// Kategori ikonları
-const categoryIcons = {
-  kültür: "🏛️",
-  yemek: "🍽️",
-  gezi: "🚶",
-  alışveriş: "🛍️",
-  eğlence: "🎭"
-};
-
-export default function DailyPlannerPage() {
-  const [activeDay, setActiveDay] = useState(1);
-  const [filterType, setFilterType] = useState("all");
-  const [showDetails, setShowDetails] = useState<number | null>(null);
-  
-  const currentDay = sampleItinerary.find(day => day.day === activeDay);
-  
-  const filteredActivities = currentDay?.activities.filter(activity => 
-    filterType === "all" || activity.type === filterType
-  ) || [];
-  
-  return (
-    <main className="min-h-screen p-4 md:p-8 bg-gray-900">
-      <div className="max-w-6xl mx-auto text-gray-300">
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
-              Günlük Plan
-            </h1>
-            <p className="text-gray-300 mt-2 max-w-2xl">
-              İstanbul seyahatinizin günlük aktivite planını görüntüleyin ve düzenleyin.
-            </p>
-          </div>
-          <Link 
-            href="/"
-            className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors self-start"
+  // Giriş yapmamış kullanıcı
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 mr-4"
+          >
+            Giriş Yap
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
           >
             Ana Sayfaya Dön
-          </Link>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">😞</div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600"
+          >
+            Tekrar Dene
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900">
+      <div className="container mx-auto px-4 py-16">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+            📅 Günlük Plan Yöneticisi
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            Seyahat planlarınızı gün gün düzenleyin ve aktivitelerinizi takip edin
+          </p>
         </div>
 
-        {/* Day Selection */}
-        <div className="bg-gray-800 p-4 rounded-xl shadow-md mb-6 overflow-x-auto">
-          <div className="flex space-x-2">
-            {sampleItinerary.map(day => (
-              <button
-                key={day.day}
-                className={`px-4 py-2 rounded-lg flex-shrink-0 transition-colors ${
-                  activeDay === day.day 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-                onClick={() => setActiveDay(day.day)}
-              >
-                <div className="font-medium">{day.day}. Gün</div>
-                <div className="text-xs mt-1">{day.date.split(',')[0]}</div>
-              </button>
-            ))}
-          </div>
+        {/* Navigation Buttons */}
+        <div className="text-center mb-8 flex justify-center space-x-4">
+          <button
+            onClick={() => router.push('/my-plans')}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            📋 Planlarım
+          </button>
+          <button
+            onClick={() => router.push('/budget')}
+            className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            💰 Maliyet
+          </button>
+          <button
+            onClick={() => router.push('/travel-mode')}
+            className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
+          >
+            + Yeni Plan Oluştur
+          </button>
         </div>
 
-        {/* Daily Overview */}
-        {currentDay && (
-          <div className="bg-gray-800 p-6 rounded-xl shadow-md mb-8">
-            <h2 className="text-xl font-bold mb-4 text-white">
-              {currentDay.day}. Gün - {currentDay.date}
-            </h2>
-            
-            <div className="flex flex-wrap gap-2 mb-6">
-              <button 
-                className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'all' ? 'bg-gray-600 text-white' : 'bg-gray-700 text-gray-300'
-                }`}
-                onClick={() => setFilterType('all')}
-              >
-                Tümü
-              </button>
-              <button 
-                className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'morning' ? 'bg-yellow-600 text-white' : 'bg-yellow-900 text-yellow-300'
-                }`}
-                onClick={() => setFilterType('morning')}
-              >
-                Sabah
-              </button>
-              <button 
-                className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'noon' ? 'bg-blue-600 text-white' : 'bg-blue-900 text-blue-300'
-                }`}
-                onClick={() => setFilterType('noon')}
-              >
-                Öğle
-              </button>
-              <button 
-                className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'afternoon' ? 'bg-green-600 text-white' : 'bg-green-900 text-green-300'
-                }`}
-                onClick={() => setFilterType('afternoon')}
-              >
-                Öğleden Sonra
-              </button>
-              <button 
-                className={`px-3 py-1 rounded-md text-sm ${
-                  filterType === 'evening' ? 'bg-purple-600 text-white' : 'bg-purple-900 text-purple-300'
-                }`}
-                onClick={() => setFilterType('evening')}
-              >
-                Akşam
-              </button>
+        {/* Trip Selection */}
+        {trips.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Gezi Seçin</h2>
+              {selectedTrip && (
+                <div className="flex items-center space-x-2">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedTrip.status === 'PLANLANDI' 
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                  }`}>
+                    {selectedTrip.status === 'PLANLANDI' ? '✅ Düzenlenebilir' : '🔒 Salt Okunur'}
+                  </span>
+                </div>
+              )}
             </div>
-            
-            {/* Timeline */}
-            <div className="relative">
-              {/* Vertical line */}
-              <div className="absolute top-0 bottom-0 left-[15px] md:left-[23px] w-0.5 bg-gray-600"></div>
-              
-              <div className="space-y-6">
-                {filteredActivities.map(activity => (
-                  <div key={activity.id} className="relative pl-10 md:pl-16">
-                    {/* Timeline dot */}
-                    <div className={`absolute left-0 top-2 w-[30px] h-[30px] rounded-full border-4 flex items-center justify-center
-                      ${activity.type === 'morning' ? 'bg-yellow-900 border-yellow-600' : 
-                        activity.type === 'noon' ? 'bg-blue-900 border-blue-600' : 
-                        activity.type === 'afternoon' ? 'bg-green-900 border-green-600' : 
-                        'bg-purple-900 border-purple-600'
-                      }`}>
-                      {categoryIcons[activity.category as keyof typeof categoryIcons]}
-                    </div>
-                    
-                    {/* Activity card */}
-                    <div 
-                      className={`border rounded-lg overflow-hidden shadow-sm transition-all ${
-                        showDetails === activity.id ? 'shadow-md' : ''
-                      } ${
-                        activity.type === 'morning' ? 'border-yellow-700 bg-gray-700' : 
-                        activity.type === 'noon' ? 'border-blue-700 bg-gray-700' : 
-                        activity.type === 'afternoon' ? 'border-green-700 bg-gray-700' : 
-                        'border-purple-700 bg-gray-700'
-                      }`}
-                    >
-                      <div 
-                        className="p-4 cursor-pointer"
-                        onClick={() => setShowDetails(showDetails === activity.id ? null : activity.id)}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium text-lg text-white">{activity.title}</h3>
-                            <div className="text-sm text-gray-400 mt-1">{activity.time} • {activity.location}</div>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <div className="text-sm font-medium text-blue-300">{activity.cost > 0 ? `${activity.cost} TL` : 'Ücretsiz'}</div>
-                            <div className={`mt-1 text-xs px-2 py-0.5 rounded-full ${
-                              typeColors[activity.type as keyof typeof typeColors]
-                            }`}>
-                              {activity.type === 'morning' ? 'Sabah' : 
-                               activity.type === 'noon' ? 'Öğle' : 
-                               activity.type === 'afternoon' ? 'Öğleden Sonra' : 
-                               'Akşam'}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Details section */}
-                      {showDetails === activity.id && (
-                        <div className="px-4 pb-4">
-                          <div className="mt-2 pt-2 border-t border-gray-600">
-                            <p className="text-sm text-gray-300 mb-3">{activity.description}</p>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <span className="bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded-full">
-                                  {categoryIcons[activity.category as keyof typeof categoryIcons]} {activity.category}
-                                </span>
-                              </div>
-                              <div className="flex space-x-2">
-                                <button className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors">
-                                  Düzenle
-                                </button>
-                                <button className="px-3 py-1 bg-red-900 text-red-300 text-xs rounded-md hover:bg-red-800 transition-colors">
-                                  Kaldır
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {trips.map((trip) => (
+                <button
+                  key={trip.id}
+                  onClick={() => {
+                    setSelectedTrip(trip);
+                    loadDailyPlans(trip);
+                    setSelectedDay(1);
+                  }}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    selectedTrip?.id === trip.id
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
+                  }`}
+                >
+                  <h3 className="font-bold text-gray-800 dark:text-white">
+                    {trip.city}, {trip.country}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {new Date(trip.startDate).toLocaleDateString('tr-TR')} - 
+                    {new Date(trip.endDate).toLocaleDateString('tr-TR')}
+                  </p>
+                  {trip.total_cost && (
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                      Maliyet: ₺{trip.total_cost.toLocaleString('tr-TR')}
+                    </p>
+                  )}
+                  <div className="flex justify-between items-center mt-2">
+                    {trip.budget_level && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        {trip.budget_level.charAt(0).toUpperCase() + trip.budget_level.slice(1)} • {trip.travel_style}
+                      </p>
+                    )}
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      trip.status === 'PLANLANDI' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      {trip.status || 'PLANLANDI'}
+                    </span>
                   </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedTrip && dailyPlans.length > 0 && (
+          <>
+            {/* Day Selection */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Gün Seçin</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+                {dailyPlans.map((plan) => (
+                  <button
+                    key={plan.day}
+                    onClick={() => setSelectedDay(plan.day)}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      selectedDay === plan.day
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300'
+                    }`}
+                  >
+                    <div className="font-bold text-gray-800 dark:text-white">
+                      {plan.day}. Gün
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                      {plan.date.split(' ')[0]} {plan.date.split(' ')[1]}
+                    </div>
+                    <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      {plan.activities.length} aktivite
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
-          </div>
+
+            {/* Selected Day Activities */}
+            {selectedDayPlan && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                      {selectedDayPlan.day}. Gün - {selectedDayPlan.date}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {selectedDayPlan.activities.length} aktivite planlandı
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    {isPlanEditable(selectedTrip) ? (
+                      <button
+                        onClick={() => setShowAddForm(!showAddForm)}
+                        className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                      >
+                        {showAddForm ? 'İptal' : '+ Aktivite Ekle'}
+                      </button>
+                    ) : (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
+                        🔒 Bu plan salt okunur
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save/Cancel Buttons */}
+                {hasChanges && (
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-orange-400 rounded-full animate-pulse"></div>
+                        <span className="text-blue-800 dark:text-blue-200 font-medium">
+                          Kaydedilmemiş değişiklikler var
+                        </span>
+                      </div>
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={cancelChanges}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          İptal Et
+                        </button>
+                        <button
+                          onClick={saveChanges}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                          Kaydet
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Activity Form */}
+                {showAddForm && isPlanEditable(selectedTrip) && (
+                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg mb-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                    <h3 className="font-medium text-gray-800 dark:text-white mb-4">Yeni Aktivite Ekle</h3>
+                    
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Aktivite Adı *
+                        </label>
+                        <input
+                          type="text"
+                          value={newActivity.name}
+                          onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                          placeholder="Ör: Müze ziyareti"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Kategori
+                        </label>
+                        <select
+                          value={newActivity.category}
+                          onChange={(e) => setNewActivity({...newActivity, category: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                        >
+                          <option value="aktiviteler">🎯 Aktiviteler</option>
+                          <option value="yemek">🍽️ Yemek</option>
+                          <option value="kültür">🏛️ Kültür</option>
+                          <option value="gezi">🚶 Gezi</option>
+                          <option value="alışveriş">🛍️ Alışveriş</option>
+                          <option value="eğlence">🎉 Eğlence</option>
+                          <option value="diğer">📝 Diğer</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Konum
+                        </label>
+                        <input
+                          type="text"
+                          value={newActivity.location}
+                          onChange={(e) => setNewActivity({...newActivity, location: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                          placeholder="Ör: Sultanahmet"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Maliyet (₺)
+                        </label>
+                        <input
+                          type="number"
+                          value={newActivity.cost}
+                          onChange={(e) => setNewActivity({...newActivity, cost: Number(e.target.value)})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                          placeholder="0"
+                          min="0"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Başlangıç Saati *
+                        </label>
+                        <input
+                          type="time"
+                          value={newActivity.startTime}
+                          onChange={(e) => setNewActivity({...newActivity, startTime: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Bitiş Saati *
+                        </label>
+                        <input
+                          type="time"
+                          value={newActivity.endTime}
+                          onChange={(e) => setNewActivity({...newActivity, endTime: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Açıklama
+                      </label>
+                      <textarea
+                        value={newActivity.description}
+                        onChange={(e) => setNewActivity({...newActivity, description: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
+                        placeholder="Aktivite hakkında notlar..."
+                        rows={3}
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={addActivity}
+                      className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
+                    >
+                      Aktivite Ekle
+                    </button>
+                  </div>
+                )}
+
+                {/* Activities List */}
+                {selectedDayPlan.activities.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">📝</div>
+                    <h3 className="text-xl font-medium text-gray-800 dark:text-white mb-2">
+                      Henüz Aktivite Yok
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      Bu güne ait ilk aktivitenizi ekleyerek başlayın.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedDayPlan.activities
+                      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                      .map((activity) => {
+                        const timeOfDay = getTimeOfDay(activity.startTime);
+                        return (
+                          <div
+                            key={activity.id}
+                            className={`p-4 rounded-lg border-2 ${timeColors[timeOfDay]}`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <span className="text-xl">
+                                    {categoryIcons[activity.category] || '📝'}
+                                  </span>
+                                  <h4 className="font-bold text-gray-800 dark:text-white">
+                                    {activity.name}
+                                  </h4>
+                                  <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
+                                    {activity.category}
+                                  </span>
+                                </div>
+                                
+                                <div className="grid md:grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                  <div>
+                                    <span className="font-medium">⏰ Saat:</span> {activity.startTime} - {activity.endTime}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">📍 Konum:</span> {activity.location || 'Belirtilmemiş'}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">💰 Maliyet:</span> ₺{activity.cost}
+                                  </div>
+                                </div>
+                                
+                                {activity.description && (
+                                  <p className="text-sm text-gray-600 dark:text-gray-300 italic">
+                                    {activity.description}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              <div className="ml-4 flex flex-col space-y-2">
+                                {isPlanEditable(selectedTrip) ? (
+                                  <button
+                                    onClick={() => deleteActivity(activity.id)}
+                                    className="text-red-500 hover:text-red-700 p-1"
+                                    title="Aktiviteyi Sil"
+                                  >
+                                    🗑️
+                                  </button>
+                                ) : (
+                                  <div className="text-gray-400 p-1" title="Bu plan düzenlenemez">
+                                    🔒
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Day Summary */}
+                {selectedDayPlan.activities.length > 0 && (
+                  <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="grid md:grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {selectedDayPlan.activities.length}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">Toplam Aktivite</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          ₺{selectedDayPlan.activities.reduce((sum, activity) => sum + activity.cost, 0)}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">Günlük Maliyet</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                          {(() => {
+                            if (selectedDayPlan.activities.length === 0) return '0h';
+                            const totalMinutes = selectedDayPlan.activities.reduce((sum, activity) => {
+                              const start = activity.startTime.split(':').map(Number);
+                              const end = activity.endTime.split(':').map(Number);
+                              return sum + (end[0] - start[0]) * 60 + (end[1] - start[1]);
+                            }, 0);
+                            return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+                          })()}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">Toplam Süre</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
-        {/* Daily Summary */}
-        {currentDay && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Cost Summary */}
-            <div className="bg-gray-800 p-4 rounded-xl shadow-md">
-              <h3 className="font-medium text-lg mb-3 text-white">Günlük Maliyet</h3>
-              <div className="text-2xl font-bold text-blue-400 mb-2">
-                {currentDay.activities.reduce((sum, act) => sum + act.cost, 0)} TL
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300">Yemek</span>
-                  <span className="font-medium text-gray-300">
-                    {currentDay.activities
-                      .filter(a => a.category === 'yemek')
-                      .reduce((sum, a) => sum + a.cost, 0)} TL
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300">Kültür</span>
-                  <span className="font-medium text-gray-300">
-                    {currentDay.activities
-                      .filter(a => a.category === 'kültür')
-                      .reduce((sum, a) => sum + a.cost, 0)} TL
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300">Diğer</span>
-                  <span className="font-medium text-gray-300">
-                    {currentDay.activities
-                      .filter(a => !['yemek', 'kültür'].includes(a.category))
-                      .reduce((sum, a) => sum + a.cost, 0)} TL
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Activity Stats */}
-            <div className="bg-gray-800 p-4 rounded-xl shadow-md">
-              <h3 className="font-medium text-lg mb-3 text-white">Aktivite Özeti</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-2 bg-gray-700 rounded-lg">
-                  <div className="text-2xl font-bold text-white">{currentDay.activities.length}</div>
-                  <div className="text-xs text-gray-400">Toplam Aktivite</div>
-                </div>
-                <div className="text-center p-2 bg-gray-700 rounded-lg">
-                  <div className="text-2xl font-bold text-white">
-                    {Math.round(currentDay.activities.reduce((sum, a) => {
-                      const [start, end] = a.time.split(' - ');
-                      const startTime = start.split(':').map(Number);
-                      const endTime = end.split(':').map(Number);
-                      return sum + (endTime[0] - startTime[0]) + (endTime[1] - startTime[1])/60;
-                    }, 0))}
-                  </div>
-                  <div className="text-xs text-gray-400">Toplam Saat</div>
-                </div>
-                <div className="text-center p-2 bg-gray-700 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-300">
-                    {currentDay.activities.filter(a => a.type === 'morning').length}
-                  </div>
-                  <div className="text-xs text-gray-400">Sabah</div>
-                </div>
-                <div className="text-center p-2 bg-gray-700 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-300">
-                    {currentDay.activities.filter(a => a.type === 'evening').length}
-                  </div>
-                  <div className="text-xs text-gray-400">Akşam</div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Add New Activity */}
-            <div className="bg-blue-900 p-4 rounded-xl border border-blue-700 flex flex-col justify-center items-center">
-              <h3 className="font-medium text-lg text-blue-300 mb-3">Yeni Aktivite Ekle</h3>
-              <p className="text-sm text-blue-300 text-center mb-4">
-                Bu güne yeni bir aktivite ekleyerek seyahat planınızı kişiselleştirin.
-              </p>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Aktivite Ekle
-              </button>
-            </div>
+        {trips.length === 0 && (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">🗓️</div>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Henüz Plan Yok</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Günlük plan oluşturmak için önce bir seyahat planı oluşturun.
+            </p>
+            <button
+              onClick={() => router.push('/travel-mode')}
+              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600"
+            >
+              İlk Planınızı Oluşturun
+            </button>
           </div>
         )}
-        
-        {/* Tips for the day */}
-        {currentDay && (
-          <div className="bg-gray-800 p-6 rounded-xl shadow-md mb-8">
-            <h3 className="font-medium text-lg mb-4 text-white">Bugün İçin İpuçları</h3>
-            <div className="bg-yellow-900 border-l-4 border-yellow-600 p-4 rounded-r-lg">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-300">
-                    {currentDay.day === 1 && "Sultanahmet bölgesindeki müzeler genellikle kalabalık olur. Ayasofya ziyaretiniz için sabah erken saatleri tercih edin."}
-                    {currentDay.day === 2 && "Boğaz turu için hava durumunu kontrol etmeyi unutmayın. Hafif bir yağmur ihtimali var."}
-                    {currentDay.day === 3 && "Dolmabahçe Sarayı Pazartesi günleri kapalıdır. Önceden bilet alırsanız sıra beklemezsiniz."}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Coming Soon Message */}
-        <div className="mt-8 bg-gray-800 border border-gray-700 p-4 rounded-lg text-center">
-          <p className="text-yellow-300">
-            <strong>Bilgilendirme:</strong> Bu özellik şu an demo amaçlıdır. Tam işlevsellik yakında eklenecektir.
-          </p>
-        </div>
-        
-        <div className="mt-8 text-sm text-gray-400 text-center">
-          &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
-        </div>
       </div>
-    </main>
+    </div>
   );
 }

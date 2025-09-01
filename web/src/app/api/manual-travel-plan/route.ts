@@ -94,7 +94,9 @@ export async function POST(request: NextRequest) {
     // Seyahat süresini hesapla
     const startDate = new Date(planData.basicInfo.startDate);
     const endDate = new Date(planData.basicInfo.endDate);
-    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
+    const duration = daysDiff === 0 ? 1 : daysDiff;
 
     // Veritabanına kaydet
     const savedPlan = await prisma.tripPlan.create({

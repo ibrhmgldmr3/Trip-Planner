@@ -42,7 +42,7 @@ export default function MobileMenu() {
               <li><Link href="/transportation" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Ulaşım</Link></li>
               <li><Link href="/accommodation" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Konaklama</Link></li>
               <li><Link href="/daily-planner" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Günlük Plan</Link></li>
-              <li><Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Bütçe</Link></li>
+              <li><Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">Maliyet</Link></li>
             </ul>
           </nav>
           <div className="hidden md:flex items-center space-x-4">
@@ -106,7 +106,7 @@ export default function MobileMenu() {
               className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800"
               onClick={() => setIsMenuOpen(false)}
             >
-              Bütçe
+              Maliyet
             </Link>
             <div className="pt-2 pb-1">
               <Link 

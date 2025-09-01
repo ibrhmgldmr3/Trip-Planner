@@ -950,53 +950,7 @@ export default function PlannerPage() {
           </div>
         )}
 
-        {/* Kullanıcı Senaryoları Bölümü */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700 dark:text-blue-300">Kullanıcı Senaryoları</h2>
-          
-          <div className="space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-              <h3 className="text-lg font-medium text-blue-800 dark:text-blue-300 mb-2">Senaryo 1 – Detaylı Tatil Planlama</h3>
-              <div className="flex flex-col md:flex-row md:gap-8">
-                <div className="mb-4 md:mb-0 md:w-1/3">
-                  <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-sm">
-                    <p className="text-blue-600 dark:text-blue-400 font-medium mb-2">Kullanıcı Girdisi:</p>
-                    <p className="text-gray-800 dark:text-gray-200 font-medium">&quot;21.08.2025 – 30.08.2025, İzmir, deniz gören yerler ve tatlıcılar, bütçe 15.000₺&quot;</p>
-                  </div>
-                </div>
-                <div className="md:w-2/3">
-                  <p className="text-blue-600 dark:text-blue-400 font-medium mb-2">Sistemin Yanıtı:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-gray-800 dark:text-gray-300 ml-2">
-                    <li>İzmir&apos;deki POI&apos;leri (sahil, tatlıcı, tarihi yerler) getirir</li>
-                    <li>Uçuş biletlerini listeler</li>
-                    <li>Günlük rota planı oluşturur</li>
-                    <li>Tahmini bütçe çıkartır</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800">
-              <h3 className="text-lg font-medium text-blue-800 dark:text-blue-300 mb-2">Senaryo 2 – Sadece Şehir Girişi</h3>
-              <div className="flex flex-col md:flex-row md:gap-8">
-                <div className="mb-4 md:mb-0 md:w-1/3">
-                  <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-sm">
-                    <p className="text-indigo-600 dark:text-indigo-400 font-medium mb-2">Kullanıcı Girdisi:</p>
-                    <p className="text-gray-800 dark:text-gray-200 font-medium">&quot;05.09.2025 – 08.09.2025 İstanbul&quot;</p>
-                  </div>
-                </div>
-                <div className="md:w-2/3">
-                  <p className="text-indigo-600 dark:text-indigo-400 font-medium mb-2">Sistemin Yanıtı:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-gray-800 dark:text-gray-300 ml-2">
-                    <li>En popüler 5 turistik mekanı listeler</li>
-                    <li>Kullanıcıya rota önerir</li>
-                    <li>Günlük plan sunar</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        
         
         {/* Sonuç Bölümü */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-blue-900/60 p-6 rounded-xl shadow-md mb-8">

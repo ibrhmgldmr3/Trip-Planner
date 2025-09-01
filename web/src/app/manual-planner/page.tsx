@@ -90,7 +90,6 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
     cost: 0,
     description: ''
   });
-  const today = new Date().toISOString().split('T')[0];
 
   const handleAddActivity = () => {
     if (newActivity.name.trim() && newActivity.startTime && newActivity.endTime) {
@@ -333,7 +332,7 @@ export default function ManualPlannerPage() {
     { id: 2, title: 'Ulaşım', icon: '✈️' },
     { id: 3, title: 'Konaklama', icon: '🏨' },
     { id: 4, title: 'Günlük Planlar', icon: '📅' },
-    { id: 5, title: 'Bütçe Analizi', icon: '💰' },
+    { id: 5, title: 'Maliyet Analizi', icon: '💰' },
     { id: 6, title: 'Özet & Kaydet', icon: '✅' }
   ];
 
@@ -342,8 +341,71 @@ export default function ManualPlannerPage() {
     if (!travelPlan.basicInfo.startDate || !travelPlan.basicInfo.endDate) return 0;
     const start = new Date(travelPlan.basicInfo.startDate);
     const end = new Date(travelPlan.basicInfo.endDate);
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
+    return daysDiff === 0 ? 1 : daysDiff;
   }, [travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate]);
+
+  // Create a simple string for activities cost tracking
+  const activitiesCostString = travelPlan.dailyPlans.map(day => 
+    day.activities.reduce((sum, act) => sum + act.cost, 0)
+  ).join(',');
+
+  // Update budget when relevant data changes
+  useEffect(() => {
+    // Gecikmeli güncelleme ile sonsuz döngüyü önle
+    const timeoutId = setTimeout(() => {
+      const { transport, accommodation, dailyPlans } = travelPlan;
+      
+      // Gerçek aktivite maliyetlerini hesapla
+      const totalActivityCost = dailyPlans.reduce((total, day) => {
+        if (day.isEmpty) return total;
+        return total + day.activities.reduce((dayTotal, activity) => dayTotal + activity.cost, 0);
+      }, 0);
+      
+      // Konaklama maliyeti (gece sayısı × gecelik fiyat)
+      const duration = getTripDuration();
+      const nights = Math.max(duration - 1, 0);
+      const accommodationCost = accommodation ? accommodation.price * nights : 0;
+      
+      const breakdown = {
+        transport: transport?.price || 0,
+        accommodation: accommodationCost,
+        activities: totalActivityCost,
+        food: dailyPlans.length * 150, // Günlük ortalama yemek maliyeti
+        other: 500 // Diğer masraflar
+      };
+
+      const estimatedTotal = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+
+      // Sadece budget değiştiyse güncelle (sonsuz döngüyü önlemek için)
+      setTravelPlan(prev => {
+        const currentTotal = prev.budget.estimatedTotal;
+        const currentBreakdown = JSON.stringify(prev.budget.breakdown);
+        const newBreakdown = JSON.stringify(breakdown);
+        
+        if (currentTotal !== estimatedTotal || currentBreakdown !== newBreakdown) {
+          return {
+            ...prev,
+            budget: { ...prev.budget, breakdown, estimatedTotal }
+          };
+        }
+        return prev;
+      });
+    }, 100); // 100ms gecikme
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    travelPlan.transport?.price,
+    travelPlan.accommodation?.price,
+    activitiesCostString,
+    travelPlan.basicInfo.startDate,
+    travelPlan.basicInfo.endDate,
+    travelPlan.dailyPlans.length,
+    getTripDuration,
+    travelPlan
+  ]);
 
   // Initialize daily plans when dates change
   useEffect(() => {
@@ -502,15 +564,9 @@ export default function ManualPlannerPage() {
   const handleAccommodationSelect = (accommodationId: string) => {
     const selected = accommodationOptions.find(a => a.id === accommodationId);
     if (selected) {
-      const totalNights = getTripDuration() - 1;
-      const totalPrice = selected.price * totalNights;
       setTravelPlan(prev => ({
         ...prev,
-        accommodation: { ...selected, selected: true },
-        budget: {
-          ...prev.budget,
-          breakdown: { ...prev.budget.breakdown, accommodation: totalPrice }
-        }
+        accommodation: { ...selected, selected: true }
       }));
     }
   };
@@ -546,35 +602,6 @@ export default function ManualPlannerPage() {
             }
           : plan
       )
-    }));
-  };
-
-  const calculateBudget = () => {
-    const { transport, accommodation, dailyPlans } = travelPlan;
-    
-    // Gerçek aktivite maliyetlerini hesapla
-    const totalActivityCost = dailyPlans.reduce((total, day) => {
-      if (day.isEmpty) return total;
-      return total + day.activities.reduce((dayTotal, activity) => dayTotal + activity.cost, 0);
-    }, 0);
-    
-    // Konaklama maliyeti (gece sayısı × gecelik fiyat)
-    const nights = getTripDuration() - 1;
-    const accommodationCost = accommodation ? accommodation.price * nights : 0;
-    
-    const breakdown = {
-      transport: transport?.price || 0,
-      accommodation: accommodationCost,
-      activities: totalActivityCost,
-      food: dailyPlans.length * 150, // Günlük ortalama yemek maliyeti
-      other: 500 // Diğer masraflar
-    };
-
-    const estimatedTotal = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
-
-    setTravelPlan(prev => ({
-      ...prev,
-      budget: { ...prev.budget, breakdown, estimatedTotal }
     }));
   };
 
@@ -623,9 +650,6 @@ export default function ManualPlannerPage() {
       }
       if (currentStep === 3) {
         fetchAccommodationOptions();
-      }
-      if (currentStep === 5) {
-        calculateBudget();
       }
       setCurrentStep(currentStep + 1);
     }
@@ -923,11 +947,11 @@ export default function ManualPlannerPage() {
             </div>
           )}
 
-          {/* Step 5: Bütçe Analizi */}
+          {/* Step 5: Maliyet Analizi */}
           {currentStep === 5 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                💰 Bütçe Analizi
+                💰 Maliyet Analizi
               </h2>
               
               <div className="grid md:grid-cols-2 gap-8">
@@ -1044,7 +1068,7 @@ export default function ManualPlannerPage() {
                         <p><strong>Konum:</strong> {travelPlan.accommodation.location}</p>
                         <p><strong>Puan:</strong> {'⭐'.repeat(travelPlan.accommodation.rating)} ({travelPlan.accommodation.rating}/5)</p>
                         <p><strong>Gecelik:</strong> ₺{travelPlan.accommodation.price}</p>
-                        <p><strong>Toplam ({getTripDuration() - 1} gece):</strong> ₺{travelPlan.accommodation.price * (getTripDuration() - 1)}</p>
+                        <p><strong>Toplam ({getTripDuration() - 1} gece):</strong> ₺{travelPlan.budget.breakdown.accommodation}</p>
                         <div className="mt-2">
                           <strong>Olanaklar:</strong>
                           <div className="flex flex-wrap gap-1 mt-1">

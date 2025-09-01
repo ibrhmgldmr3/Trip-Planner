@@ -155,11 +155,41 @@ export default function PlanDetailPage() {
   const parseDailyPlan = (content: string | null) => {
     if (!content) return [];
     
+    console.log("🔍 Ham günlük plan verisi:", content.substring(0, 300) + "...");
+    
+    // "### Günlük Detaylı Program" başlığından sonrasını al
+    let actualContent = content;
+    const detailedProgramIndex = content.indexOf("### Günlük Detaylı Program");
+    if (detailedProgramIndex !== -1) {
+      // Başlığın bitiminden sonrasını al
+      const afterTitle = content.substring(detailedProgramIndex + "### Günlük Detaylı Program".length);
+      // İlk satır sonunu bul ve ondan sonrasını al
+      const firstNewlineIndex = afterTitle.indexOf('\n');
+      if (firstNewlineIndex !== -1) {
+        actualContent = afterTitle.substring(firstNewlineIndex + 1);
+        console.log("✂️ '### Günlük Detaylı Program' başlığından sonrası alındı");
+      }
+    }
+    
+    // Alternatif başlık kontrolü
+    if (actualContent === content) {
+      const gunlukProgramIndex = content.indexOf("## Günlük Program");
+      if (gunlukProgramIndex !== -1) {
+        const afterTitle = content.substring(gunlukProgramIndex + "## Günlük Program".length);
+        const firstNewlineIndex = afterTitle.indexOf('\n');
+        if (firstNewlineIndex !== -1) {
+          actualContent = afterTitle.substring(firstNewlineIndex + 1);
+          console.log("✂️ '## Günlük Program' başlığından sonrası alındı");
+        }
+      }
+    }
+
+    console.log("🎯 İşlenecek içerik:", actualContent.substring(0, 300) + "...");
+    
     // Önce JSON formatında olup olmadığını kontrol et
     try {
-      const jsonData = JSON.parse(content);
+      const jsonData = JSON.parse(actualContent);
       if (Array.isArray(jsonData)) {
-        // JSON formatındaki günlük planları parse et
         return jsonData
           .filter((day: DayPlan) => day && typeof day === 'object')
           .map((day: DayPlan) => {
@@ -222,51 +252,108 @@ export default function PlanDetailPage() {
       // JSON değilse, metin formatında parse etmeye devam et
     }
     
-    // Metin formatındaki günlük planları parse et
+    // Gelişmiş metin formatı ayrıştırması
+    const normalizedContent = actualContent.trim();
+    
+    // Çeşitli gün kalıplarını test et
     const dayPatterns = [
-      /(?:^|\n)\s*(?:gün\s*)?(\d+)\.?\s*gün[:\s]*([\s\S]*?)(?=(?:\n\s*(?:gün\s*)?\d+\.?\s*gün[:\s])|$)/gi,
-      /(?:^|\n)\s*day\s*(\d+)[:\s]*([\s\S]*?)(?=(?:\n\s*day\s*\d+[:\s])|$)/gi,
-      /(?:^|\n)\s*(\d+)\.\s*([\s\S]*?)(?=(?:\n\s*\d+\.)|$)/gi
+      // Tarih formatı: "#### 2025-09-01" veya "# 2025-09-01"
+      /(?:^|\n)#+\s*(\d{4}-\d{2}-\d{2})\s*\n([\s\S]*?)(?=\n#+\s*\d{4}-\d{2}-\d{2}|\n#+\s*[^\d]|$)/g,
+      // Gün formatı: "#### 1. Gün" veya "# 1. Gün"  
+      /(?:^|\n)#+\s*(\d+)\.?\s*[Gg]ün\s*\n([\s\S]*?)(?=\n#+\s*\d+\.?\s*[Gg]ün|\n#+\s*[^\d]|$)/g,
+      // Gün + Tarih: "#### 1 Eylül Pazartesi"
+      /(?:^|\n)#+\s*(\d+)\s+[A-Za-zÇĞıİÖŞÜçğıiöşü]+\s+[A-Za-zÇĞıİÖŞÜçğıiöşü]+\s*\n([\s\S]*?)(?=\n#+\s*\d+\s+[A-Za-zÇĞıİÖŞÜçğıiöşü]|\n#+\s*[^\d]|$)/g,
+      // Basit sayı formatı: "1." ile başlayan satırlar
+      /(?:^|\n)(\d+)\.\s*\n([\s\S]*?)(?=\n\d+\.\s*\n|$)/g
     ];
     
     let days: Array<ParsedDay> = [];
     
-    for (const pattern of dayPatterns) {
-      const matches = [...content.matchAll(pattern)];
-      if (matches.length > 0) {
-        days = matches.map(match => ({
-          day: parseInt(match[1]),
-          content: match[2].trim(),
-          isEmpty: !match[2].trim()
-        }));
-        break;
-      }
-    }
-    
-    // Eğer günler bulunamazsa, genel içeriği tek parça olarak döndür
-    if (days.length === 0) {
-      // Başlık varsa günleri o şekilde ayırmayı dene
-      const titlePattern = /(?:^|\n)\s*(.*?gün.*?)[:\n]([\s\S]*?)(?=(?:\n.*?gün.*?[:\n])|$)/gi;
-      const titleMatches = [...content.matchAll(titlePattern)];
+    for (let i = 0; i < dayPatterns.length; i++) {
+      const pattern = dayPatterns[i];
+      const matches = [...normalizedContent.matchAll(pattern)];
       
-      if (titleMatches.length > 0) {
-        days = titleMatches.map((match, index) => ({
-          day: index + 1,
-          content: `<h3>${match[1]}</h3>${match[2].trim()}`,
-          isEmpty: !match[2].trim()
-        }));
-      } else {
-        // Son çare: içeriği satırlara böl ve her büyük bölümü bir gün olarak say
-        const sections = content.split(/\n\s*\n/).filter(section => section.trim().length > 50);
-        days = sections.map((section, index) => ({
-          day: index + 1,
-          content: section.trim(),
-          isEmpty: false
-        }));
+      if (matches.length > 0) {
+        console.log(`✅ Pattern ${i + 1} başarılı - ${matches.length} gün bulundu`);
+        
+        days = matches.map(match => {
+          let dayNumber = 1;
+          
+          if (i === 0) { // Tarih formatı
+            const dateStr = match[1];
+            const dayMatch = dateStr.match(/-(\d{2})$/);
+            dayNumber = dayMatch ? parseInt(dayMatch[1]) : 1;
+          } else if (i === 1 || i === 2) { // Gün numarası formatları
+            dayNumber = parseInt(match[1]) || 1;
+          } else { // Basit sayı formatı
+            dayNumber = parseInt(match[1]) || 1;
+          }
+          
+          const dayContent = match[2].trim();
+          console.log(`📅 Gün ${dayNumber}: ${dayContent.substring(0, 100)}...`);
+          
+          return {
+            day: dayNumber,
+            content: dayContent,
+            isEmpty: !dayContent || dayContent.length < 10
+          };
+        }).filter(day => !day.isEmpty);
+        
+        if (days.length > 0) break;
       }
     }
     
-    return days.sort((a, b) => a.day - b.day);
+    // Eğer hiçbir pattern çalışmazsa, alternatif yöntemler dene
+    if (days.length === 0) {
+      console.log("⚠️ Standart patternler çalışmadı, alternatif yöntemler deneniyor...");
+      
+      // --- ayırıcılarını kullanarak böl
+      if (normalizedContent.includes('---')) {
+        const sections = normalizedContent.split(/\n?\s*---\s*\n?/).filter(section => section.trim());
+        
+        if (sections.length > 1) {
+          console.log(`📋 --- ayırıcısı ile ${sections.length} bölüm bulundu`);
+          
+          days = sections.map((section, index) => {
+            // Bölümde gün numarası var mı kontrol et
+            const dayMatch = section.match(/(\d+)\.?\s*gün/i);
+            const dayNumber = dayMatch ? parseInt(dayMatch[1]) : index + 1;
+            
+            return {
+              day: dayNumber,
+              content: section.trim(),
+              isEmpty: section.trim().length < 10
+            };
+          }).filter(day => day.content.length > 0);
+        }
+      }
+      
+      // Hâlâ başarısızsa, büyük paragrafları gün olarak say
+      if (days.length === 0) {
+        const paragraphs = normalizedContent
+          .split(/\n\s*\n+/)
+          .filter(p => p.trim().length > 50); // Çok kısa paragrafları atla
+        
+        if (paragraphs.length > 0) {
+          console.log(`📝 ${paragraphs.length} büyük paragraf gün olarak kabul edildi`);
+          
+          days = paragraphs.map((paragraph, index) => ({
+            day: index + 1,
+            content: paragraph.trim(),
+            isEmpty: false
+          }));
+        }
+      }
+    }
+    
+    // Günleri sırala ve boş olanları filtrele
+    const sortedDays = days
+      .filter(day => day.content && day.content.trim().length > 0)
+      .sort((a, b) => a.day - b.day);
+    
+    console.log(`📊 Toplam ${sortedDays.length} gün ayrıştırıldı`);
+    
+    return sortedDays;
   };
 
   const formatDayContent = (content: string) => {
@@ -324,7 +411,7 @@ export default function PlanDetailPage() {
     { id: 'daily-plan', label: 'Günlük Plan', icon: '📅' },
     { id: 'food-guide', label: 'Yemek Rehberi', icon: '🍽️' },
     { id: 'practical-info', label: 'Pratik Bilgiler', icon: '💡' },
-    { id: 'budget', label: 'Bütçe', icon: '💰' }
+    { id: 'budget', label: 'Maliyet', icon: '💰' }
   ];
 
   return (
@@ -692,14 +779,92 @@ export default function PlanDetailPage() {
 
           {activeTab === 'budget' && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Bütçe Tahmini</h2>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">Plan Maliyeti</h2>
+              
+              {/* Maliyet Özeti */}
+              <div className="grid md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-6 rounded-xl border border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-600 dark:text-green-400">Toplam Maliyet</p>
+                      <p className="text-2xl font-bold text-green-800 dark:text-green-300">
+                        ₺{plan.total_cost ? plan.total_cost.toLocaleString('tr-TR') : '0'}
+                      </p>
+                    </div>
+                    <div className="text-green-500 text-3xl">💰</div>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Günlük Ortalama</p>
+                      <p className="text-2xl font-bold text-blue-800 dark:text-blue-300">
+                        ₺{plan.daily_cost ? plan.daily_cost.toLocaleString('tr-TR') : '0'}
+                      </p>
+                    </div>
+                    <div className="text-blue-500 text-3xl">📅</div>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-6 rounded-xl border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Önerilen Bütçe</p>
+                      <p className="text-2xl font-bold text-purple-800 dark:text-purple-300">
+                        ₺{plan.total_cost ? Math.round(plan.total_cost * 1.2).toLocaleString('tr-TR') : '0'}
+                      </p>
+                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">%20 rezerv ile</p>
+                    </div>
+                    <div className="text-purple-500 text-3xl">🎯</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detaylı Maliyet */}
               {plan.butce_tahmini ? (
-                <div 
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: formatContent(plan.butce_tahmini) || '' }}
-                />
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Detaylı Maliyet Dağılımı</h3>
+                  <div 
+                    className="prose dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: formatContent(plan.butce_tahmini) || '' }}
+                  />
+                  
+                  <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <div className="flex items-start space-x-3">
+                      <div className="text-yellow-500 text-xl">💡</div>
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
+                          Maliyet Düzenleme
+                        </p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                          Bu planın maliyetlerini düzenlemek için <strong>Maliyet Planlayıcı</strong>&apos;ya gidin.
+                          Orada her kalemi tek tek düzenleyebilir ve planın toplam maliyetini güncelleyebilirsiniz.
+                        </p>
+                        <a 
+                          href="/budget" 
+                          className="inline-flex items-center mt-2 text-sm font-medium text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+                        >
+                          Maliyet Planlayıcıya Git →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <p className="text-gray-500 dark:text-gray-400">Bu plan için bütçe tahmini mevcut değil.</p>
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">💰</div>
+                  <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Maliyet Detayı Yok</h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    Bu plan için detaylı maliyet bilgisi mevcut değil.
+                  </p>
+                  <a 
+                    href="/budget" 
+                    className="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    Maliyet Planlayıcıya Git
+                  </a>
+                </div>
               )}
             </div>
           )}

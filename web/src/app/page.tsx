@@ -114,10 +114,10 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Bütçe Analizi</h3>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Maliyet Analizi</h3>
               <p className="text-gray-800 dark:text-gray-200 font-medium">Ulaşım, konaklama ve aktivite maliyetlerini hesaplayarak seyahat bütçenizi kontrol edin.</p>
               <Link href="/budget" className="mt-4 inline-block text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm font-medium">
-                Bütçe Planlayıcıya Git →
+                Maliyet Planlayıcıya Git →
               </Link>
             </div>
             
@@ -246,7 +246,7 @@ export default function Home() {
               <Link href="/" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Ana Sayfa</Link>
               <Link href="/map" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Rota Planlayıcı</Link>
               <Link href="/daily-planner" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Günlük Plan</Link>
-              <Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Bütçe</Link>
+              <Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Maliyet</Link>
             </div>
           </div>
           

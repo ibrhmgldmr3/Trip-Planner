@@ -298,7 +298,9 @@ export async function POST(request: NextRequest) {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      const tripDuration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
+      const tripDuration = daysDiff === 0 ? 1 : daysDiff;
       durationText = `${tripDuration} gün`;
     }
 
@@ -347,7 +349,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     console.log("📤 OpenRouter API'sine istek gönderiliyor...");
     console.log("🔑 API Key:", env.OPENROUTER_API_KEY ? "✅ Mevcut" : "❌ Eksik");
     console.log("🌐 API URL:", "https://openrouter.ai/api/v1/chat/completions");
-    console.log("🤖 Model:", "deepseek/deepseek-r1-0528-qwen3-8b:free");
+    console.log("🤖 Model:", "openai/gpt-oss-20b:free");
     console.log("🏙️ Şehir:", city);
 
     // OpenRouter API çağrısı
@@ -360,7 +362,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
         "X-Title": "Trip Planner App"
       },
       body: JSON.stringify({
-        model: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        model: "meta-llama/llama-3.3-70b-instruct:free",
         messages: [
           { 
             role: "system", 
@@ -548,7 +550,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       },
       planText,
       htmlContent,
-      "deepseek/deepseek-r1-0528-qwen3-8b:free"
+      "openai/gpt-oss-20b:free"
     );
   
 

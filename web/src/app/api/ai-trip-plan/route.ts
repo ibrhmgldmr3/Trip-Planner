@@ -33,7 +33,9 @@ export async function POST(request: Request) {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      const duration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
+      const duration = daysDiff === 0 ? 1 : daysDiff;
       durationText = `${duration} gün süreli`;
     }
 
