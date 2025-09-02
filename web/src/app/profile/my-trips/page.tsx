@@ -26,26 +26,34 @@ export default function MyTripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>('all');
 
-  // Seyahatleri getir
+  // Seyahatleri getir (sadece DONE statusündekiler)
   const fetchTrips = async () => {
     try {
-      const response = await fetch('/api/my-trips');
+      console.log("🚀 My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
+      const response = await fetch('/api/my-trips?status=DONE');
       
       if (!response.ok) {
         throw new Error('Seyahatler yüklenemedi');
       }
       
       const data = await response.json();
+      console.log("📦 My-Trips: API'den gelen data:", data);
       
       if (data.success && data.trips) {
-        setTrips(data.trips);
+        // Ekstra güvenlik için client-side'da da DONE olanları filtrele
+        const doneTrips = data.trips.filter((trip: Trip) => trip.status === 'DONE');
+        console.log("✅ My-Trips: Filtrelenmiş DONE planlar:", {
+          toplamGelenPlan: data.trips.length,
+          doneOlanPlan: doneTrips.length,
+          planStatusleri: data.trips.map((t: Trip) => ({ city: t.city, status: t.status }))
+        });
+        setTrips(doneTrips);
       } else {
         setTrips([]);
       }
     } catch (err) {
-      console.error('Fetch error:', err);
+      console.error('My-Trips fetch error:', err);
       setError('Seyahatler yüklenemedi');
       setTrips([]);
     } finally {
@@ -67,12 +75,6 @@ export default function MyTripsPage() {
     }
   }, [status, router]);
 
-  // Filtrelenmiş seyahatler
-  const filteredTrips = trips.filter(trip => {
-    if (filter === 'all') return true;
-    return trip.status.toLowerCase() === filter.toLowerCase();
-  });
-
   // Tarih formatla
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('tr-TR', {
@@ -90,26 +92,14 @@ export default function MyTripsPage() {
     return daysDiff === 0 ? 1 : daysDiff;
   };
 
-  // Status rengi
-  const getStatusColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case 'planned': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
-      case 'completed': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
-    }
+  // Status rengi (DONE için özel renk)
+  const getStatusColor = (): string => {
+    return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
   };
 
-  // Status text
-  const getStatusText = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case 'planned': return 'Planlandı';
-      case 'active': return 'Aktif';
-      case 'completed': return 'Tamamlandı';
-      case 'cancelled': return 'İptal Edildi';
-      default: return status;
-    }
+  // Status text (DONE için özel text)
+  const getStatusText = (): string => {
+    return 'Gerçekleşti';
   };
 
   // Loading durumu
@@ -177,10 +167,10 @@ export default function MyTripsPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            🗂️ Seyahat Geçmişim
+            🗂️ Gerçekleşen Seyahatlerim
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
-            Geçmiş ve gelecek seyahatlerinizi görüntüleyin
+            Başarıyla tamamladığınız seyahatlerinizin geçmişi
           </p>
         </div>
 
@@ -206,59 +196,33 @@ export default function MyTripsPage() {
           </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <div className="flex flex-wrap gap-3">
-              {[
-                { key: 'all', label: 'Tümü', count: trips.length },
-                { key: 'planned', label: 'Planlandı', count: trips.filter(t => t.status.toLowerCase() === 'planned').length },
-                { key: 'active', label: 'Aktif', count: trips.filter(t => t.status.toLowerCase() === 'active').length },
-                { key: 'completed', label: 'Tamamlandı', count: trips.filter(t => t.status.toLowerCase() === 'completed').length },
-                { key: 'cancelled', label: 'İptal Edildi', count: trips.filter(t => t.status.toLowerCase() === 'cancelled').length }
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilter(tab.key)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    filter === tab.key
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {tab.label} ({tab.count})
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* Trips List */}
-        {filteredTrips.length === 0 ? (
+        {trips.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">✈️</div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-              {filter === 'all' ? 'Henüz Seyahat Yok' : `${filter.charAt(0).toUpperCase() + filter.slice(1)} Seyahat Bulunamadı`}
+              Henüz Gerçekleştirilmiş Seyahat Yok
             </h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-              {filter === 'all' 
-                ? 'İlk seyahat planınızı oluşturarak başlayın.'
-                : 'Bu kategoride seyahat bulunmuyor.'
-              }
+              Bir planı &quot;DONE&quot; olarak işaretlediğinizde buraya eklenir.
             </p>
-            {filter === 'all' && (
-              <button
-                onClick={() => router.push('/travel-mode')}
-                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
-              >
-                İlk Seyahatinizi Planlayın
-              </button>
-            )}
+            <button
+              onClick={() => router.push('/my-plans')}
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
+            >
+              📋 Planlarımı Gör
+            </button>
+            <button
+              onClick={() => router.push('/travel-mode')}
+              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600"
+            >
+              + Yeni Plan Oluştur
+            </button>
           </div>
         ) : (
           <div className="max-w-6xl mx-auto">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTrips.map((trip) => (
+              {trips.map((trip) => (
                 <div
                   key={trip.id}
                   className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden"
@@ -276,8 +240,8 @@ export default function MyTripsPage() {
                           </p>
                         )}
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(trip.status)}`}>
-                        {getStatusText(trip.status)}
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor()}`}>
+                        {getStatusText()}
                       </span>
                     </div>
 
@@ -364,36 +328,29 @@ export default function MyTripsPage() {
           <div className="max-w-4xl mx-auto mt-12">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6 text-center">
-                📊 Seyahat Özeti
+                📊 Gerçekleştirilen Seyahat Özeti
               </h3>
               
-              <div className="grid md:grid-cols-4 gap-6">
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {trips.length}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Toplam Seyahat</div>
-                </div>
-                
+              <div className="grid md:grid-cols-3 gap-6">
                 <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {trips.filter(t => t.status.toLowerCase() === 'completed').length}
+                    {trips.length}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Tamamlanan</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Gerçekleşen Seyahat</div>
+                </div>
+                
+                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    ₺{trips.reduce((sum, trip) => sum + (trip.total_cost || 0), 0).toLocaleString('tr-TR')}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Toplam Harcama</div>
                 </div>
                 
                 <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                   <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    ₺{trips.reduce((sum, trip) => sum + (trip.total_cost || 0), 0).toLocaleString('tr-TR')}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Toplam Maliyet</div>
-                </div>
-                
-                <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                     {Array.from(new Set(trips.map(t => t.city))).length}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Farklı Şehir</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Gezilen Şehir</div>
                 </div>
               </div>
             </div>

@@ -52,7 +52,10 @@ export async function GET() {
         createdAt: true,
         travel_style: true,
         budget_level: true,
-        user_id: true
+        user_id: true,
+        status: true,
+        completedAt: true,
+        updatedAt: true
       },
       orderBy: {
         createdAt: 'desc'

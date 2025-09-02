@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, TripStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
 const prisma = new PrismaClient();
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     // Session kontrolü
     const session = await getServerSession(authOptions);
@@ -15,6 +15,15 @@ export async function GET(): Promise<NextResponse> {
         { status: 401 }
       );
     }
+
+    // Query parametrelerini al
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get('status');
+    
+    console.log("🎯 My-trips API çağrısı:", {
+      statusFilter,
+      requestUrl: request.url
+    });
 
     // Kullanıcıyı email ile bul
     const user = await prisma.user.findUnique({
@@ -29,11 +38,21 @@ export async function GET(): Promise<NextResponse> {
       );
     }
 
-    // TripPlan tablosundan kullanıcının tüm seyahatlerini getir
+    // Where clause'unu hazırla
+    const whereClause: { user_id: string; status?: TripStatus } = { 
+      user_id: user.id
+    };
+
+    // Eğer status filtresi varsa ekle
+    if (statusFilter) {
+      whereClause.status = statusFilter as TripStatus;
+    }
+    
+    console.log("🔍 Where clause:", whereClause);
+
+    // TripPlan tablosundan kullanıcının seyahatlerini getir
     const trips = await prisma.tripPlan.findMany({
-      where: { 
-        user_id: user.id
-      },
+      where: whereClause,
       orderBy: [
         { createdAt: 'desc' },
         { startDate: 'desc' }
@@ -70,6 +89,12 @@ export async function GET(): Promise<NextResponse> {
       completedAt: trip.completedAt?.toISOString() || null,
       createdAt: trip.createdAt.toISOString(),
     }));
+
+    console.log("📊 Bulunan planlar:", {
+      toplamPlan: trips.length,
+      statusFilter,
+      planStatusleri: trips.map(t => ({ id: t.id, city: t.city, status: t.status }))
+    });
 
     return NextResponse.json({
       success: true,

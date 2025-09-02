@@ -43,10 +43,21 @@ export default function MyTripsPage() {
 
   const fetchTrips = async () => {
     try {
-      const response = await fetch('/api/my-trips');
+      console.log("🚀 My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
+      const response = await fetch('/api/my-trips?status=DONE');
+      
       if (response.ok) {
         const data = await response.json();
-        setTrips(data.trips);
+        console.log("📦 My-Trips: API'den gelen data:", data);
+        
+        // Ekstra güvenlik için client-side'da da DONE olanları filtrele
+        const doneTrips = data.trips.filter((trip: Trip) => trip.status === 'DONE');
+        console.log("✅ My-Trips: Filtrelenmiş DONE planlar:", {
+          toplamGelenPlan: data.trips.length,
+          doneOlanPlan: doneTrips.length,
+          planStatusleri: data.trips.map((t: Trip) => ({ city: t.city, status: t.status }))
+        });
+        setTrips(doneTrips);
       } else {
         setError('Geziler yüklenemedi');
       }
