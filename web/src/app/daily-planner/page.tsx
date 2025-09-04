@@ -38,31 +38,33 @@ interface Trip {
   status?: string;
 }
 
-// Aktivite kategorileri için ikonlar
+// Aktivite kategorileri için simpler names
 const categoryIcons: Record<string, string> = {
-  'ulaşım': '🚗',
-  'konaklama': '🏨',
-  'yemek': '🍽️',
-  'aktiviteler': '🎯',
-  'alışveriş': '🛍️',
-  'eğlence': '🎉',
-  'kültür': '🏛️',
-  'gezi': '🚶',
-  'diğer': '📝'
+  'ulaşım': 'Ulaşım',
+  'konaklama': 'Konaklama',
+  'yemek': 'Yemek',
+  'aktiviteler': 'Aktiviteler',
+  'alışveriş': 'Alışveriş',
+  'eğlence': 'Eğlence',
+  'kültür': 'Kültür',
+  'gezi': 'Gezi',
+  'diğer': 'Diğer'
 };
 
-  // Zaman dilimlerine göre renkler
-  const timeColors: Record<string, string> = {
-    'morning': 'bg-yellow-100 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700',
-    'noon': 'bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700',
-    'afternoon': 'bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700',
-    'evening': 'bg-purple-100 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700'
-  };
+// Zaman dilimlerine göre modern renkler
+const timeColors: Record<string, string> = {
+  'morning': 'bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-300 dark:border-yellow-700 shadow-yellow-100 dark:shadow-yellow-900/20',
+  'noon': 'bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-900/20 dark:to-sky-900/20 border-blue-300 dark:border-blue-700 shadow-blue-100 dark:shadow-blue-900/20',
+  'afternoon': 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-700 shadow-green-100 dark:shadow-green-900/20',
+  'evening': 'bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-300 dark:border-purple-700 shadow-purple-100 dark:shadow-purple-900/20'
+};
 
   // Plan düzenlenebilir mi kontrol et
   const isPlanEditable = (trip: Trip | null): boolean => {
     return trip?.status === 'PLANLANDI';
-  };export default function DailyPlannerPage() {
+  };
+
+export default function DailyPlannerPage() {
   const { status } = useSession();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -360,7 +362,7 @@ const categoryIcons: Record<string, string> = {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4">●</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -386,7 +388,7 @@ const categoryIcons: Record<string, string> = {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
+          <div className="text-6xl mb-4">!</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <button
@@ -406,7 +408,7 @@ const categoryIcons: Record<string, string> = {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            📅 Günlük Plan Yöneticisi
+            Günlük Plan Yöneticisi
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
             Seyahat planlarınızı gün gün düzenleyin ve aktivitelerinizi takip edin
@@ -419,7 +421,7 @@ const categoryIcons: Record<string, string> = {
             onClick={() => router.push('/my-plans')}
             className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            📋 Planlarım
+            Planlarım
           </button>
           <button
             onClick={() => router.push('/budget')}
@@ -447,7 +449,7 @@ const categoryIcons: Record<string, string> = {
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                       : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                   }`}>
-                    {selectedTrip.status === 'PLANLANDI' ? '✅ Düzenlenebilir' : '🔒 Salt Okunur'}
+                    {selectedTrip.status === 'PLANLANDI' ? 'Düzenlenebilir' : 'Salt Okunur'}
                   </span>
                 </div>
               )}
@@ -551,7 +553,7 @@ const categoryIcons: Record<string, string> = {
                       </button>
                     ) : (
                       <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
-                        🔒 Bu plan salt okunur
+                        ● Bu plan salt okunur
                       </div>
                     )}
                   </div>
@@ -613,12 +615,12 @@ const categoryIcons: Record<string, string> = {
                           onChange={(e) => setNewActivity({...newActivity, category: e.target.value})}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
                         >
-                          <option value="aktiviteler">🎯 Aktiviteler</option>
+                          <option value="aktiviteler">Aktiviteler</option>
                           <option value="yemek">🍽️ Yemek</option>
-                          <option value="kültür">🏛️ Kültür</option>
-                          <option value="gezi">🚶 Gezi</option>
+                          <option value="kültür">Kültür</option>
+                          <option value="gezi">Gezi</option>
                           <option value="alışveriş">🛍️ Alışveriş</option>
-                          <option value="eğlence">🎉 Eğlence</option>
+                          <option value="eğlence">Eğlence</option>
                           <option value="diğer">📝 Diğer</option>
                         </select>
                       </div>
@@ -759,11 +761,11 @@ const categoryIcons: Record<string, string> = {
                                     className="text-red-500 hover:text-red-700 p-1"
                                     title="Aktiviteyi Sil"
                                   >
-                                    🗑️
+                                    Sil
                                   </button>
                                 ) : (
                                   <div className="text-gray-400 p-1" title="Bu plan düzenlenemez">
-                                    🔒
+                                    ●
                                   </div>
                                 )}
                               </div>

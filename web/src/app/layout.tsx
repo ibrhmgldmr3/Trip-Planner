@@ -34,10 +34,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr" className={`dark ${geistSans.variable} ${geistMono.variable} ${roboto.variable}`}>
-      <body className="bg-gray-900 text-white">
+      <body className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen">
         <AuthProvider>
           <MobileMenu />
-          {children}
+          <main className="relative">
+            {children}
+          </main>
         </AuthProvider>
       </body>
     </html>

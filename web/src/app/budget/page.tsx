@@ -511,13 +511,13 @@ export default function BudgetPage() {
   };
 
   const categoryLabels: Record<string, string> = {
-    'ulaşım': '🚗 Ulaşım',
-    'konaklama': '🏨 Konaklama',
-    'yemek': '🍽️ Yemek',
-    'aktiviteler': '🎯 Aktiviteler',
-    'alışveriş': '🛍️ Alışveriş',
-    'eğlence': '🎉 Eğlence',
-    'diğer': '📝 Diğer'
+    'ulaşım': 'Ulaşım',
+    'konaklama': 'Konaklama',
+    'yemek': 'Yemek',
+    'aktiviteler': 'Aktiviteler',
+    'alışveriş': 'Alışveriş',
+    'eğlence': 'Eğlence',
+    'diğer': 'Diğer'
   };
 
   // Loading durumu
@@ -539,7 +539,7 @@ export default function BudgetPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4">●</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -565,7 +565,7 @@ export default function BudgetPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
+          <div className="text-6xl mb-4">!</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <button
@@ -598,7 +598,7 @@ export default function BudgetPage() {
             onClick={() => router.push('/my-plans')}
             className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            📋 Planlarım
+            Planlarım
           </button>
           <button
             onClick={() => router.push('/travel-mode')}
@@ -703,7 +703,7 @@ export default function BudgetPage() {
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">🎯</span>
+                    <span className="text-2xl">●</span>
                     <div>
                       <h4 className="font-semibold text-blue-800 dark:text-blue-200">Plan Temel Maliyeti</h4>
                       <p className="text-sm text-blue-600 dark:text-blue-400">AI tarafından oluşturulan plan maliyeti</p>
@@ -754,7 +754,7 @@ export default function BudgetPage() {
                         onClick={cancelChanges}
                         className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
                       >
-                        ❌ İptal
+                        ✕ İptal
                       </button>
                     </>
                   )}
@@ -780,13 +780,13 @@ export default function BudgetPage() {
                         onChange={(e) => setNewItem({...newItem, category: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
                       >
-                        <option value="ulaşım">🚗 Ulaşım</option>
-                        <option value="konaklama">🏨 Konaklama</option>
-                        <option value="yemek">🍽️ Yemek</option>
-                        <option value="aktiviteler">🎯 Aktiviteler</option>
-                        <option value="alışveriş">🛍️ Alışveriş</option>
-                        <option value="eğlence">🎉 Eğlence</option>
-                        <option value="diğer">📝 Diğer</option>
+                        <option value="ulaşım">Ulaşım</option>
+                        <option value="konaklama">Konaklama</option>
+                        <option value="yemek">Yemek</option>
+                        <option value="aktiviteler">Aktiviteler</option>
+                        <option value="alışveriş">Alışveriş</option>
+                        <option value="eğlence">Eğlence</option>
+                        <option value="diğer">Diğer</option>
                       </select>
                     </div>
                     
@@ -869,7 +869,7 @@ export default function BudgetPage() {
                                 : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                             }`}
                           >
-                            {item.isPaid ? '✅ Ödendi' : '⏳ Ödenmedi'}
+                            {item.isPaid ? '✓ Ödendi' : '○ Ödenmedi'}
                           </button>
                         )}
                         {!isPlanEditable(selectedTrip) && (
@@ -878,7 +878,7 @@ export default function BudgetPage() {
                               ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
                               : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                           }`}>
-                            {item.isPaid ? '✅ Ödendi' : '⏳ Ödenmedi'}
+                            {item.isPaid ? '✓ Ödendi' : '○ Ödenmedi'}
                           </span>
                         )}
                         
@@ -887,7 +887,7 @@ export default function BudgetPage() {
                             onClick={() => deleteBudgetItem(item.id)}
                             className="text-red-500 hover:text-red-700 p-1"
                           >
-                            🗑️
+                            Sil
                           </button>
                         )}
                       </div>
@@ -899,7 +899,7 @@ export default function BudgetPage() {
 
             {/* Budget Tips */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 p-6 rounded-xl border border-blue-200 dark:border-blue-800">
-              <h3 className="text-lg font-medium text-blue-800 dark:text-blue-300 mb-3">💡 Bütçe İpuçları</h3>
+              <h3 className="text-lg font-medium text-blue-800 dark:text-blue-300 mb-3">Bütçe İpuçları</h3>
               <ul className="list-disc list-inside space-y-2 text-blue-700 dark:text-blue-300">
                 <li>Yerel marketlerden alışveriş yaparak yemek maliyetlerinizi düşürebilirsiniz</li>
                 <li>Şehir kartları ile ulaşım ve müze girişlerinde tasarruf sağlayabilirsiniz</li>

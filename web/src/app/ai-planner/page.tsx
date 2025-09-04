@@ -519,7 +519,7 @@ export default function PlannerPage() {
                     </h2>
                     {tripPlan.plan.startDate && tripPlan.plan.endDate && (
                       <p className="text-blue-100 mb-1">
-                        📅 {new Date(tripPlan.plan.startDate).toLocaleDateString('tr-TR')} - {new Date(tripPlan.plan.endDate).toLocaleDateString('tr-TR')}
+                        {new Date(tripPlan.plan.startDate).toLocaleDateString('tr-TR')} - {new Date(tripPlan.plan.endDate).toLocaleDateString('tr-TR')}
                       </p>
                     )}
                     {tripPlan.plan.duration && (
@@ -589,7 +589,7 @@ export default function PlannerPage() {
                       align-items: center;
                     }
                     .prose h3:before {
-                      content: "📍";
+                      content: "•";
                       margin-right: 0.5rem;
                     }
                     .prose ul {
@@ -888,7 +888,7 @@ export default function PlannerPage() {
                       )}
                       {tripPlan.plan.metadata.savedToDatabase && (
                         <div className="text-green-600 dark:text-green-400">
-                          ✅ Veritabanında saklandı
+                          ✓ Veritabanında saklandı
                         </div>
                       )}
                     </div>

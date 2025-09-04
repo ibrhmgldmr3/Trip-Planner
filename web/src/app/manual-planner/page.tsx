@@ -272,7 +272,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
                   <strong>Günlük Özet:</strong> {day.activities.length} aktivite
                 </span>
                 <span className="text-green-700 dark:text-green-300 font-bold">
-                  Toplam: ₺{day.activities.reduce((sum, act) => sum + act.cost, 0)}
+                  Toplam: ₺{day.activities.reduce((sum, act) => (sum + act.cost), 0)}
                 </span>
               </div>
             </div>
@@ -328,12 +328,12 @@ export default function ManualPlannerPage() {
   const [accommodationOptions, setAccommodationOptions] = useState<AccommodationOption[]>([]);
 
   const steps = [
-    { id: 1, title: 'Temel Bilgiler', icon: '📍' },
-    { id: 2, title: 'Ulaşım', icon: '✈️' },
-    { id: 3, title: 'Konaklama', icon: '🏨' },
-    { id: 4, title: 'Günlük Planlar', icon: '📅' },
-    { id: 5, title: 'Maliyet Analizi', icon: '💰' },
-    { id: 6, title: 'Özet & Kaydet', icon: '✅' }
+    { id: 1, title: 'Temel Bilgiler', icon: '●' },
+    { id: 2, title: 'Ulaşım', icon: '✈' },
+    { id: 3, title: 'Konaklama', icon: '�' },
+    { id: 4, title: 'Günlük Planlar', icon: '�' },
+    { id: 5, title: 'Maliyet Analizi', icon: '₺' },
+    { id: 6, title: 'Özet & Kaydet', icon: '✓' }
   ];
 
   // Calculate trip duration
@@ -658,11 +658,11 @@ export default function ManualPlannerPage() {
   const prevStep = () => {
     if (currentStep > 1) {
       // Önceki adıma geçerken seçenekleri güncelle
-      if (currentStep === 3) {
+      if (currentStep === 3 || currentStep === 2) {
         // Ulaşım adımına geri dönüyoruz, seçenekleri güncelle
         fetchTransportOptions();
       }
-      if (currentStep === 4) {
+      if (currentStep === 4 || currentStep === 3) {
         // Konaklama adımına geri dönüyoruz, seçenekleri güncelle
         fetchAccommodationOptions();
       }
@@ -797,13 +797,13 @@ export default function ManualPlannerPage() {
           {currentStep === 2 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                ✈️ Ulaşım Seçenekleri
+                Ulaşım Seçenekleri
               </h2>
               
               {/* Mevcut seçim göster */}
               {travelPlan.transport && (
                 <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✅ Seçili Ulaşım:</h3>
+                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✓ Seçili Ulaşım:</h3>
                   <p className="text-green-700 dark:text-green-300">
                     {travelPlan.transport.type} - {travelPlan.transport.provider} (₺{travelPlan.transport.price})
                   </p>
@@ -854,13 +854,13 @@ export default function ManualPlannerPage() {
           {currentStep === 3 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                🏨 Konaklama Seçenekleri
+                Konaklama Seçenekleri
               </h2>
               
               {/* Mevcut seçim göster */}
               {travelPlan.accommodation && (
                 <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✅ Seçili Konaklama:</h3>
+                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">Seçili Konaklama:</h3>
                   <p className="text-green-700 dark:text-green-300">
                     {travelPlan.accommodation.name} - {travelPlan.accommodation.type} (₺{travelPlan.accommodation.price}/gece)
                   </p>
@@ -951,7 +951,7 @@ export default function ManualPlannerPage() {
           {currentStep === 5 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                💰 Maliyet Analizi
+                Maliyet Analizi
               </h2>
               
               <div className="grid md:grid-cols-2 gap-8">
@@ -999,7 +999,7 @@ export default function ManualPlannerPage() {
               <div className="mt-6 p-4 rounded-lg">
                 {travelPlan.budget.currentBudget > travelPlan.budget.estimatedTotal ? (
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
-                    <h4 className="font-semibold">✅ Bütçeniz Yeterli!</h4>
+                    <h4 className="font-semibold">Bütçeniz Yeterli!</h4>
                     <p>Kalan tutar: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal}</p>
                   </div>
                 ) : (
