@@ -20,7 +20,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     const { id: planId } = await context.params;
-    console.log(`🗑️ Plan siliniyor: ${planId}`);
+    console.log(`Plan siliniyor: ${planId}`);
 
     // Session kontrolü
     // NextAuth v4:
@@ -72,14 +72,14 @@ export async function DELETE(
     // Sil
     await prisma.tripPlan.delete({ where: { id: planId } });
 
-    console.log(`✅ Plan başarıyla silindi: ${plan.city}`);
+    console.log(`Plan başarıyla silindi: ${plan.city}`);
 
     return NextResponse.json({
       success: true,
       message: "Plan başarıyla silindi",
     });
   } catch (error: unknown) {
-    console.error("💥 Plan silme hatası:", error);
+    console.error("Plan silme hatası:", error);
 
     const errorDetails =
       error instanceof Error

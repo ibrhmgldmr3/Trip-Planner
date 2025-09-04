@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
@@ -238,7 +238,7 @@ export default function DailyRouteMap({ activities, city, onRouteCalculated }: D
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            📍 Günlük Rota Planlayıcı
+            Günlük Rota Planlayıcı
           </h3>
           <div className="flex space-x-2">
             <button
@@ -253,7 +253,7 @@ export default function DailyRouteMap({ activities, city, onRouteCalculated }: D
                 </>
               ) : (
                 <>
-                  <span>🗺️</span>
+                  <span></span>
                   <span>Rota Oluştur</span>
                 </>
               )}
@@ -300,7 +300,7 @@ export default function DailyRouteMap({ activities, city, onRouteCalculated }: D
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">{activity.startTime}</span>
                 <span className="font-medium text-gray-800 dark:text-white">{activity.name}</span>
-                <span className="text-gray-500 dark:text-gray-400 text-xs">📍 {activity.location}</span>
+                <span className="text-gray-500 dark:text-gray-400 text-xs">{activity.location}</span>
               </div>
             ))}
           </div>
@@ -316,3 +316,5 @@ export default function DailyRouteMap({ activities, city, onRouteCalculated }: D
     </div>
   );
 }
+
+

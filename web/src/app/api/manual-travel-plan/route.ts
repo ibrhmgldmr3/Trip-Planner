@@ -74,12 +74,12 @@ export async function POST(request: NextRequest) {
       if (session?.user) {
         userId = session.user.id || null;
         userEmail = session.user.email || null;
-        console.log("✅ Session bulundu:", { userId, userEmail });
+        console.log("? Session bulundu:", { userId, userEmail });
       } else {
-        console.log("ℹ️ Session bulunamadı - anonim kullanıcı");
+        console.log("?? Session bulunamadı - anonim kullanıcı");
       }
     } catch (sessionError) {
-      console.error("❌ Session alma hatası:", sessionError);
+      console.error("? Session alma hatası:", sessionError);
     }
 
     // Günlük planları JSON string'e çevir
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         
         // Meta veriler
         ai_model: "manual_planning",
-        raw_markdown: `# ${planData.basicInfo.destination} Seyahat Planı\n\n## Tarih: ${planData.basicInfo.startDate} - ${planData.basicInfo.endDate}\n\n## Kişi Sayısı: ${planData.basicInfo.travelers}\n\n## Toplam Maliyet: ₺${planData.budget.estimatedTotal}`,
+        raw_markdown: `# ${planData.basicInfo.destination} Seyahat Planı\n\n## Tarih: ${planData.basicInfo.startDate} - ${planData.basicInfo.endDate}\n\n## Kişi Sayısı: ${planData.basicInfo.travelers}\n\n## Toplam Maliyet: ?${planData.budget.estimatedTotal}`,
         
         // Diğer alanlar
         travel_style: planData.basicInfo.travelStyle,
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log("✅ Manuel plan kaydedildi:", savedPlan.id);
+    console.log("? Manuel plan kaydedildi:", savedPlan.id);
 
     return NextResponse.json({
       success: true,
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error("💥 Manuel plan kaydetme hatası:", error);
+    console.error("?? Manuel plan kaydetme hatası:", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -179,3 +179,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

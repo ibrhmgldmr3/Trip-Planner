@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -101,7 +101,7 @@ export default function MyPlansPage() {
 
   const updatePlanStatus = async (planId: string, newStatus: TripStatus) => {
     try {
-      console.log('🔄 Plan statüsü güncelleme başlatıldı:', { planId, newStatus });
+      console.log('Plan statüsü güncelleme başlatıldı:', { planId, newStatus });
       
       const response = await fetch('/api/plan-status', {
         method: 'PUT',
@@ -111,12 +111,12 @@ export default function MyPlansPage() {
         body: JSON.stringify({ planId, status: newStatus }),
       });
 
-      console.log('📡 API Response Status:', response.status);
-      console.log('📡 API Response OK:', response.ok);
+      console.log('API Response Status:', response.status);
+      console.log('API Response OK:', response.ok);
 
       if (response.ok) {
         const responseData = await response.json();
-        console.log('✅ API Response Data:', responseData);
+        console.log('? API Response Data:', responseData);
         
         toast.success(
           newStatus === TripStatus.CANCELLED ? 'Plan iptal edildi' :
@@ -126,11 +126,11 @@ export default function MyPlansPage() {
         fetchPlans(); // Refresh the list
       } else {
         const errorData = await response.json();
-        console.error('❌ API Error Response:', errorData);
+        console.error('? API Error Response:', errorData);
         toast.error(errorData.error || 'Plan durumu güncellenemedi');
       }
     } catch (err) {
-      console.error('💥 Status update error:', err);
+      console.error('Status update error:', err);
       toast.error('Plan durumu güncellenemedi');
     }
   };
@@ -178,7 +178,7 @@ export default function MyPlansPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -204,7 +204,7 @@ export default function MyPlansPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <button
@@ -244,7 +244,7 @@ export default function MyPlansPage() {
         {/* Plans Grid */}
         {plans.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">✈️</div>
+            <div className="text-6xl mb-4"></div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
               Henüz Plan Yok
             </h2>
@@ -374,13 +374,13 @@ export default function MyPlansPage() {
                             onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
                             className="flex-1 bg-green-500 text-white py-2 px-3 rounded-lg hover:bg-green-600 transition-colors duration-200 text-xs font-medium"
                           >
-                            ✅ Uygulandı
+                            ? Uygulandı
                           </button>
                           <button
                             onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
                             className="flex-1 bg-red-500 text-white py-2 px-3 rounded-lg hover:bg-red-600 transition-colors duration-200 text-xs font-medium"
                           >
-                            ❌ İptal
+                            ? İptal
                           </button>
                         </>
                       )}
@@ -396,3 +396,6 @@ export default function MyPlansPage() {
     </div>
   );
 }
+
+
+

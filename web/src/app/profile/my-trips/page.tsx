@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
@@ -30,7 +30,7 @@ export default function MyTripsPage() {
   // Seyahatleri getir (sadece DONE statusündekiler)
   const fetchTrips = async () => {
     try {
-      console.log("🚀 My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
+      console.log("My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
       const response = await fetch('/api/my-trips?status=DONE');
       
       if (!response.ok) {
@@ -38,12 +38,12 @@ export default function MyTripsPage() {
       }
       
       const data = await response.json();
-      console.log("📦 My-Trips: API'den gelen data:", data);
+      console.log("My-Trips: API'den gelen data:", data);
       
       if (data.success && data.trips) {
         // Ekstra güvenlik için client-side'da da DONE olanları filtrele
         const doneTrips = data.trips.filter((trip: Trip) => trip.status === 'DONE');
-        console.log("✅ My-Trips: Filtrelenmiş DONE planlar:", {
+        console.log("? My-Trips: Filtrelenmiş DONE planlar:", {
           toplamGelenPlan: data.trips.length,
           doneOlanPlan: doneTrips.length,
           planStatusleri: data.trips.map((t: Trip) => ({ city: t.city, status: t.status }))
@@ -121,7 +121,7 @@ export default function MyTripsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -147,7 +147,7 @@ export default function MyTripsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <button
@@ -167,7 +167,7 @@ export default function MyTripsPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            🗂️ Gerçekleşen Seyahatlerim
+             Gerçekleşen Seyahatlerim
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
             Başarıyla tamamladığınız seyahatlerinizin geçmişi
@@ -180,13 +180,13 @@ export default function MyTripsPage() {
             onClick={() => router.push('/profile')}
             className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors"
           >
-            👤 Profile Dön
+            Profile Dön
           </button>
           <button
             onClick={() => router.push('/my-plans')}
             className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            📋 Planlarım
+            Planlarım
           </button>
           <button
             onClick={() => router.push('/travel-mode')}
@@ -199,7 +199,7 @@ export default function MyTripsPage() {
         {/* Trips List */}
         {trips.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">✈️</div>
+            <div className="text-6xl mb-4"></div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
               Henüz Gerçekleştirilmiş Seyahat Yok
             </h2>
@@ -210,7 +210,7 @@ export default function MyTripsPage() {
               onClick={() => router.push('/my-plans')}
               className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
             >
-              📋 Planlarımı Gör
+              Planlarımı Gör
             </button>
             <button
               onClick={() => router.push('/travel-mode')}
@@ -248,13 +248,13 @@ export default function MyTripsPage() {
                     {/* Dates */}
                     <div className="mb-4">
                       <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
-                        <span className="mr-2">📅</span>
+                        <span className="mr-2"></span>
                         <span>
                           {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
                         </span>
                       </div>
                       <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                        <span className="mr-2">⏱️</span>
+                        <span className="mr-2"></span>
                         <span>
                           {trip.duration || `${calculateDuration(trip.startDate, trip.endDate)} gün`}
                         </span>
@@ -266,13 +266,13 @@ export default function MyTripsPage() {
                       <div className="mb-4 space-y-2">
                         {trip.total_cost && (
                           <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                            <span className="mr-2">💰</span>
+                            <span className="mr-2"></span>
                             <span>₺{trip.total_cost.toLocaleString('tr-TR')}</span>
                           </div>
                         )}
                         {trip.budget_level && (
                           <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                            <span className="mr-2">🎯</span>
+                            <span className="mr-2"></span>
                             <span>
                               {trip.budget_level.charAt(0).toUpperCase() + trip.budget_level.slice(1)}
                               {trip.travel_style && ` • ${trip.travel_style}`}
@@ -286,7 +286,7 @@ export default function MyTripsPage() {
                     {trip.status.toLowerCase() === 'completed' && trip.completedAt && (
                       <div className="mb-4">
                         <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-                          <span className="mr-2">✅</span>
+                          <span className="mr-2">?</span>
                           <span>Tamamlandı: {formatDate(trip.completedAt)}</span>
                         </div>
                       </div>
@@ -328,7 +328,7 @@ export default function MyTripsPage() {
           <div className="max-w-4xl mx-auto mt-12">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6 text-center">
-                📊 Gerçekleştirilen Seyahat Özeti
+                Gerçekleştirilen Seyahat Özeti
               </h3>
               
               <div className="grid md:grid-cols-3 gap-6">
@@ -360,3 +360,5 @@ export default function MyTripsPage() {
     </div>
   );
 }
+
+

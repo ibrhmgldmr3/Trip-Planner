@@ -35,3 +35,4 @@ export const config = {
     "/my-trips/:path*",
   ],
 };
+

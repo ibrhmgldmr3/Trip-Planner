@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
 
-// Örnek veriler
+// �rnek veriler
 const otelOrnekleri = [
   {
     id: 1,
@@ -96,10 +96,10 @@ export default function AccommodationPage() {
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
-              Konaklama Seçenekleri
+              Konaklama Se�enekleri
             </h1>
             <p className="text-gray-300 mt-2 max-w-2xl">
-              Seyahatiniz için en uygun konaklama tesislerini keşfedin ve rezervasyon yapın.
+              Seyahatiniz için en uygun konaklama tesislerini ke�fedin ve rezervasyon yap�n.
             </p>
           </div>
           <Link 
@@ -125,13 +125,13 @@ export default function AccommodationPage() {
               >
                 <option value="İstanbul" className="text-white">İstanbul</option>
                 <option value="Ankara" className="text-white">Ankara</option>
-                <option value="İzmir" className="text-white">İzmir</option>
+                <option value="�zmir" className="text-white">�zmir</option>
                 <option value="Antalya" className="text-white">Antalya</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="checkIn" className="block text-sm font-medium text-gray-300 mb-1">Giriş Tarihi</label>
+              <label htmlFor="checkIn" className="block text-sm font-medium text-gray-300 mb-1">giriş Tarihi</label>
               <input 
                 type="date" 
                 id="checkIn" 
@@ -142,7 +142,7 @@ export default function AccommodationPage() {
             </div>
             
             <div>
-              <label htmlFor="checkOut" className="block text-sm font-medium text-gray-300 mb-1">Çıkış Tarihi</label>
+              <label htmlFor="checkOut" className="block text-sm font-medium text-gray-300 mb-1">��k�� Tarihi</label>
               <input 
                 type="date" 
                 id="checkOut" 
@@ -153,7 +153,7 @@ export default function AccommodationPage() {
             </div>
             
             <div>
-              <label htmlFor="guests" className="block text-sm font-medium text-gray-300 mb-1">Misafir Sayısı</label>
+              <label htmlFor="guests" className="block text-sm font-medium text-gray-300 mb-1">Misafir Say�s�</label>
               <select 
                 id="guests" 
                 className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -189,7 +189,7 @@ export default function AccommodationPage() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-blue-300 mb-2">Fiyat Aralığı</label>
+                  <label className="block text-sm font-medium text-blue-300 mb-2">Fiyat Aral���</label>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-300">0 TL</span>
                     <input 
@@ -207,7 +207,7 @@ export default function AccommodationPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-blue-300 mb-2">Yıldız Sayısı</label>
+                  <label className="block text-sm font-medium text-blue-300 mb-2">Yıldız Say�s�</label>
                   <div className="flex items-center gap-4">
                     {[0, 3, 4, 5].map(yildiz => (
                       <label key={yildiz} className="flex items-center">
@@ -220,9 +220,9 @@ export default function AccommodationPage() {
                           className="mr-1"
                         />
                         <span className="text-gray-300">
-                          {yildiz === 0 ? 'Tümü' : 
+                          {yildiz === 0 ? 'T�m�' : 
                             [...Array(yildiz)].map((_, i) => (
-                              <span key={i} className="text-yellow-400">★</span>
+                              <span key={i} className="text-yellow-400">?</span>
                             ))
                           }
                         </span>
@@ -240,7 +240,7 @@ export default function AccommodationPage() {
                   >
                     <option value="recommended" className="text-white">Önerilen</option>
                     <option value="ucret" className="text-white">Fiyat (Artan)</option>
-                    <option value="yildiz" className="text-white">Yıldız Sayısı</option>
+                    <option value="yildiz" className="text-white">Yıldız Say�s�</option>
                     <option value="rating" className="text-white">Misafir Puanı</option>
                   </select>
                 </div>
@@ -286,7 +286,7 @@ export default function AccommodationPage() {
                           <h3 className="text-lg font-semibold mb-1 text-blue-400">{hotel.name}</h3>
                           <div className="flex items-center mb-2">
                             {[...Array(hotel.yildiz)].map((_, i) => (
-                              <span key={i} className="text-yellow-400">★</span>
+                              <span key={i} className="text-yellow-400">?</span>
                             ))}
                             <span className="text-sm text-gray-300 font-medium ml-2">{hotel.district}</span>
                           </div>
@@ -317,7 +317,7 @@ export default function AccommodationPage() {
                       <div className="mt-4 flex flex-col md:flex-row md:items-end justify-between">
                         <div>
                           <div className="text-xs text-gray-300 font-medium">Merkeze {hotel.distanceToCenter} mesafede</div>
-                          <div className="text-xs text-gray-300 font-medium">{checkIn} - {checkOut}, {guests} kişi</div>
+                          <div className="text-xs text-gray-300 font-medium">{checkIn} - {checkOut}, {guests} Kişi</div>
                         </div>
                         <div className="mt-2 md:mt-0 flex flex-col items-end">
                           <div className="text-lg font-bold text-blue-400">{hotel.ucret} TL <span className="text-sm text-gray-300 font-medium">/ gece</span></div>
@@ -336,13 +336,15 @@ export default function AccommodationPage() {
         
         {/* Coming Soon Message */}
         <div className="mt-8 text-center text-gray-300 font-medium">
-          <p className="text-sm">Bu sayfa henüz tamamlanmadı.</p>
+          <p className="text-sm">Bu sayfa hen�z tamamlanmad�.</p>
         </div>
 
         <div className="mt-8 text-sm text-gray-300 font-medium text-center">
-          &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
+          &copy; {new Date().getFullYear()} Trip Planner - T�m haklar� sakl�d�r.
         </div>
       </div>
     </main>
   );
 }
+
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -31,11 +31,13 @@ interface Trip {
   startDate: string;
   endDate: string;
   total_cost?: number;
+  daily_cost?: number;
   budget_level?: string;
   travel_style?: string;
   duration?: number;
   gun_plani?: string; // JSON string of daily plans
   status?: string;
+  travelers?: number;
 }
 
 // Aktivite kategorileri için simpler names
@@ -58,6 +60,8 @@ const timeColors: Record<string, string> = {
   'afternoon': 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-700 shadow-green-100 dark:shadow-green-900/20',
   'evening': 'bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-300 dark:border-purple-700 shadow-purple-100 dark:shadow-purple-900/20'
 };
+
+// The parseMarkdownToPlans function has been moved inside the component
 
   // Plan düzenlenebilir mi kontrol et
   const isPlanEditable = (trip: Trip | null): boolean => {
@@ -110,33 +114,305 @@ export default function DailyPlannerPage() {
     return 'evening';
   };
 
-  // Planları parse et
-  const parseDailyPlans = (plansJson: string): DayPlan[] => {
+  // Planları parse et - useCallback ile sarmalanmış
+  const parseMarkdownToPlans = useCallback((markdownContent: string): DayPlan[] => {
+    console.log('Starting advanced markdown parsing for daily plans');
+    console.log('Content length:', markdownContent.length);
+    
+    const days: DayPlan[] = [];
+    
+    // Güvenli regex pattern'ler - sonsuz döngüyü önlemek için
+    try {
+      // İlk önce AI formatı deneyelim: #### 2025-09-05
+      const aiDateMatches = [...markdownContent.matchAll(/#### (\d{4}-\d{2}-\d{2})/g)];
+      console.log(`? Found ${aiDateMatches.length} AI date patterns`);
+      
+      if (aiDateMatches.length > 0) {
+        aiDateMatches.forEach((match, index) => {
+          const dateMatch = match[1];
+          const dayNumber = index + 1;
+          
+          // Tarih formatını düzenle
+          let dayDate: string;
+          try {
+            dayDate = new Date(dateMatch).toLocaleDateString('tr-TR', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            });
+          } catch {
+            dayDate = dateMatch;
+          }
+          
+          // Bu günün içeriğini al
+          const dayStartIndex = match.index || 0;
+          const nextMatch = aiDateMatches[index + 1];
+          const dayEndIndex = nextMatch ? (nextMatch.index || markdownContent.length) : markdownContent.length;
+          
+          const dayContent = markdownContent.slice(dayStartIndex, dayEndIndex).trim();
+          console.log(`? Day ${dayNumber} content length: ${dayContent.length}`);
+          
+          // Aktiviteleri çıkar
+          const activities = extractActivitiesFromMarkdown(dayContent);
+          console.log(`? Extracted ${activities.length} activities for day ${dayNumber}`);
+          
+          days.push({
+            day: dayNumber,
+            date: dayDate,
+            activities: activities,
+            notes: dayContent,
+            isEmpty: activities.length === 0
+          });
+        });
+        
+        console.log(`? Successfully parsed ${days.length} days using AI date format`);
+        return days.sort((a, b) => a.day - b.day);
+      }
+      
+      // AI formatı bulunamazsa, manuel gün formatı deneyelim: ### 1. Gün
+      const dayMatches = [...markdownContent.matchAll(/### (\d+)\. Gün/g)];
+      console.log(`? Found ${dayMatches.length} manual day patterns`);
+      
+      if (dayMatches.length > 0) {
+        dayMatches.forEach((match, index) => {
+          const dayNumber = parseInt(match[1]);
+          const dayDate = `${dayNumber}. Gün`;
+          
+          // Bu günün içeriğini al
+          const dayStartIndex = match.index || 0;
+          const nextMatch = dayMatches[index + 1];
+          const dayEndIndex = nextMatch ? (nextMatch.index || markdownContent.length) : markdownContent.length;
+          
+          const dayContent = markdownContent.slice(dayStartIndex, dayEndIndex).trim();
+          
+          // Aktiviteleri çıkar
+          const activities = extractActivitiesFromMarkdown(dayContent);
+          
+          days.push({
+            day: dayNumber,
+            date: dayDate,
+            activities: activities,
+            notes: dayContent,
+            isEmpty: activities.length === 0
+          });
+        });
+        
+        console.log(`? Successfully parsed ${days.length} days using manual day format`);
+        return days.sort((a, b) => a.day - b.day);
+      }
+      
+      // Hiçbir format bulunamazsa tek gün olarak işle
+      console.log('No specific day format found, creating single day from content');
+      const activities = extractActivitiesFromMarkdown(markdownContent);
+      console.log(`? Created single day with ${activities.length} activities`);
+      
+      days.push({
+        day: 1,
+        date: '1. Gün',
+        activities: activities,
+        notes: markdownContent,
+        isEmpty: activities.length === 0
+      });
+      
+    } catch (error) {
+      console.error('? Error parsing markdown:', error);
+      // Hata durumunda boş gün döndür
+      days.push({
+        day: 1,
+        date: '1. Gün',
+        activities: [],
+        notes: 'Parsing hatası oluştu',
+        isEmpty: true
+      });
+    }
+    
+    console.log(`? Final result: ${days.length} days total`);
+    return days;
+  }, []);
+
+  const parseDailyPlans = useCallback((plansJson: string): DayPlan[] => {
+    console.log('? parseDailyPlans input:', plansJson);
+    console.log('? parseDailyPlans input type:', typeof plansJson);
+    
     try {
       // Önce JSON parse etmeyi dene
       const parsed = JSON.parse(plansJson);
+      console.log('? JSON parse successful:', parsed);
+      console.log('? Is array?', Array.isArray(parsed));
+      
       if (Array.isArray(parsed)) {
-        return parsed.map((plan, index) => ({
+        const result = parsed.map((plan, index) => ({
           day: index + 1,
           date: plan.date || '',
           activities: plan.activities || [],
           notes: plan.notes || '',
           isEmpty: plan.isEmpty || false
         }));
+        console.log('? Mapped result:', result);
+        return result;
       }
       return [];
     } catch (error) {
-      console.log('JSON parse hatası, markdown formatında veri var:', error);
+      console.log('? JSON parse hatası, markdown formatında veri var:', error);
       
-      // JSON parse edilemiyorsa, bu alan markdown formatında
-      // Bu durumda boş planlar döndürelim
-      return [];
+      // JSON parse edilemiyorsa, markdown formatında olabilir
+      // Bu durumda markdown'dan günlük planlar çıkarmaya çalış
+      return parseMarkdownToPlans(plansJson);
     }
+  }, [parseMarkdownToPlans]);
+
+  // Markdown formatından günlük planları parse et
+
+
+  // Markdown içeriğinden aktiviteleri çıkar
+  const extractActivitiesFromMarkdown = (dayContent: string): Activity[] => {
+    const activities: Activity[] = [];
+    let activityId = 1;
+    
+    console.log(`? Extracting activities from ${dayContent.length} chars of content`);
+    
+    try {
+      // İlk pattern: AI formatı - **Sabah (09:00 - 12:00):** formatı
+      const timeBlockMatches = [...dayContent.matchAll(/- \*\*(\w+) \((\d{1,2}:\d{2}) - (\d{1,2}:\d{2})\):\*\*/g)];
+      console.log(`? Found ${timeBlockMatches.length} time blocks`);
+      
+      if (timeBlockMatches.length > 0) {
+        timeBlockMatches.forEach((match, index) => {
+          const timeBlockName = match[1]; // Sabah, Öğle, Akşam vs.
+          const startTime = match[2];
+          const endTime = match[3];
+          
+          console.log(`? Processing time block: ${timeBlockName} (${startTime} - ${endTime})`);
+          
+          // Bu zaman bloğundan sonraki içeriği al
+          const blockStartIndex = (match.index || 0) + match[0].length;
+          const nextMatch = timeBlockMatches[index + 1];
+          const blockEndIndex = nextMatch ? (nextMatch.index || dayContent.length) : dayContent.length;
+          
+          const blockContent = dayContent.slice(blockStartIndex, blockEndIndex);
+          console.log(`? Block content length: ${blockContent.length}`);
+          
+          // Bu blok içindeki aktiviteleri bul
+          const blockActivities = blockContent.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('-') && line.length > 3)
+            .map(line => line.replace(/^-\s*/, '').trim())
+            .filter(text => text.length > 0);
+          
+          console.log(`? Found ${blockActivities.length} activities in ${timeBlockName} block`);
+          
+          blockActivities.forEach((activityText) => {
+            // Kategori belirle
+            let category = 'aktiviteler';
+            const lowText = activityText.toLowerCase();
+            
+            if (lowText.includes('yemek') || lowText.includes('kahvaltı') || 
+                lowText.includes('öğle') || lowText.includes('akşam') ||
+                lowText.includes('restoran') || lowText.includes('lokanta')) {
+              category = 'yemek';
+            } else if (lowText.includes('müze') || lowText.includes('tarihi') ||
+                       lowText.includes('kültür') || lowText.includes('camii') ||
+                       lowText.includes('kale') || lowText.includes('saray')) {
+              category = 'kültür';
+            } else if (lowText.includes('alışveriş') || lowText.includes('çarşı') ||
+                       lowText.includes('pazar') || lowText.includes('mağaza')) {
+              category = 'alışveriş';
+            } else if (lowText.includes('park') || lowText.includes('doğa') ||
+                       lowText.includes('bahçe') || lowText.includes('gezi')) {
+              category = 'gezi';
+            }
+            
+            const activity = {
+              id: `ai-${activityId}`,
+              name: activityText.length > 50 ? activityText.substring(0, 50) + '...' : activityText,
+              startTime: startTime,
+              endTime: endTime,
+              cost: 0,
+              description: activityText,
+              category: category,
+              location: ''
+            };
+            
+            activities.push(activity);
+            activityId++;
+            console.log(`? Added activity: ${activity.name} (${category})`);
+          });
+        });
+        
+        console.log(`? Total extracted activities from time blocks: ${activities.length}`);
+        return activities;
+      }
+      
+      // Eğer zaman blokları bulunamazsa, basit zaman formatını dene
+      const timeMatches = [...dayContent.matchAll(/(\d{1,2}:\d{2})\s*[-:]?\s*([^\n]+)/g)];
+      console.log(`? Found ${timeMatches.length} simple time patterns`);
+      
+      if (timeMatches.length > 0) {
+        timeMatches.forEach((match) => {
+          const time = match[1];
+          const description = match[2].trim();
+          
+          if (description.length > 3) { // Çok kısa açıklamaları görmezden gel
+            activities.push({
+              id: `simple-${activityId}`,
+              name: description.length > 50 ? description.substring(0, 50) + '...' : description,
+              startTime: time,
+              endTime: time, // Bitiş saati bilinmiyor
+              cost: 0,
+              description: description,
+              category: 'aktiviteler',
+              location: ''
+            });
+            
+            activityId++;
+            console.log(`? Added simple activity: ${description.substring(0, 30)}...`);
+          }
+        });
+        
+        console.log(`? Total extracted activities from time patterns: ${activities.length}`);
+        return activities;
+      }
+      
+      // Hala aktivite bulunamadıysa, sadece liste öğelerini al
+      const lines = dayContent.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.startsWith('-') && line.length > 3)
+        .slice(0, 20); // Maksimum 20 öğe al, sonsuz döngüyü önle
+      
+      console.log(`? Found ${lines.length} list items`);
+      
+      lines.forEach((line) => {
+        const activityText = line.replace(/^-\s*/, '').trim();
+        if (activityText && activityText.length > 3) {
+          activities.push({
+            id: `list-${activityId}`,
+            name: activityText.length > 50 ? activityText.substring(0, 50) + '...' : activityText,
+            startTime: '09:00',
+            endTime: '10:00',
+            cost: 0,
+            description: activityText,
+            category: 'aktiviteler',
+            location: ''
+          });
+          
+          activityId++;
+          console.log(`? Added list activity: ${activityText.substring(0, 30)}...`);
+        }
+      });
+      
+    } catch (error) {
+      console.error('? Error extracting activities:', error);
+    }
+    
+    console.log(`? Total extracted activities: ${activities.length}`);
+    return activities;
   };
 
   // Seçili trip için günlük planları yükle
   const loadDailyPlans = useCallback(async (trip: Trip) => {
     try {
+      console.log('? Loading daily plans for trip:', trip.id, trip.city);
       const response = await fetch(`/api/plan-detail/${trip.id}`);
       
       if (!response.ok) {
@@ -144,17 +420,34 @@ export default function DailyPlannerPage() {
       }
       
       const data = await response.json();
+      console.log('? API Response data:', data);
       
       if (data.success && data.plan) {
         let plans: DayPlan[] = [];
         
         if (data.plan.gun_plani) {
-          plans = parseDailyPlans(data.plan.gun_plani);
+          console.log('gun_plani data:', data.plan.gun_plani);
+          console.log('gun_plani type:', typeof data.plan.gun_plani);
+          
+          // Eğer gun_plani string değilse (null, undefined vs), boş planlar oluştur
+          if (typeof data.plan.gun_plani === 'string') {
+            plans = parseDailyPlans(data.plan.gun_plani);
+            plans = plans
+              .map((p, idx) => ({ ...p, day: typeof p.day === 'number' && p.day > 0 ? p.day : idx + 1 }))
+              .sort((a, b) => a.day - b.day);
+            console.log('? Parsed plans:', plans);
+          } else {
+            console.log('gun_plani is not a string, creating empty plans');
+          }
+        } else {
+          console.log('No gun_plani data found, creating empty plans');
         }
         
         // Eğer planlar boşsa veya parse edilemiyorsa, trip süresine göre boş planlar oluştur
         if (plans.length === 0) {
+          console.log('? No plans found, creating empty plans for duration');
           const duration = getDuration(trip);
+          console.log('Trip duration:', duration, 'days');
           plans = Array.from({ length: duration }, (_, index) => ({
             day: index + 1,
             date: formatDate(trip.startDate, index),
@@ -162,9 +455,13 @@ export default function DailyPlannerPage() {
             notes: '',
             isEmpty: false
           }));
+          console.log('? Created empty plans:', plans);
         }
         
         setDailyPlans(plans);
+        if (plans.length > 0) {
+          setSelectedDay(plans[0].day);
+        }
         setOriginalDailyPlans([...plans]); // Orijinal planları sakla
         setHasChanges(false); // Yeni plan yüklendiğinde değişiklik yok
       }
@@ -172,7 +469,7 @@ export default function DailyPlannerPage() {
       console.error('Daily plans fetch error:', err);
       toast.error('Günlük planlar yüklenemedi');
     }
-  }, []);
+  }, [parseDailyPlans]);
 
   // Kullanıcı planlarını getir
   const fetchUserTrips = useCallback(async () => {
@@ -243,7 +540,7 @@ export default function DailyPlannerPage() {
   }, [status, router, fetchUserTrips]);
 
   // Aktivite ekle
-  const addActivity = () => {
+  const addActivity = async () => {
     if (!selectedTrip || !newActivity.name || !newActivity.startTime || !newActivity.endTime) {
       toast.error('Lütfen tüm zorunlu alanları doldurun');
       return;
@@ -270,29 +567,45 @@ export default function DailyPlannerPage() {
     });
 
     setDailyPlans(updatedPlans);
-    setHasChanges(true); // Değişiklik var olarak işaretle
-    
-    setNewActivity({
-      name: '',
-      startTime: '',
-      endTime: '',
-      cost: 0,
-      description: '',
-      category: 'aktiviteler',
-      location: ''
-    });
-    setShowAddForm(false);
-    toast.success('Aktivite eklendi (Kaydetmeyi unutmayın!)');
+    try {
+      await saveDailyPlans(updatedPlans);
+      setHasChanges(false);
+      setNewActivity({
+        name: '',
+        startTime: '',
+        endTime: '',
+        cost: 0,
+        description: '',
+        category: 'aktiviteler',
+        location: ''
+      });
+      setShowAddForm(false);
+      toast.success('Aktivite eklendi ve kaydedildi');
+    } catch {
+      setHasChanges(true);
+      toast.error('Aktivite eklendi ancak kaydedilemedi');
+    }
   };
 
   // Aktivite sil
-  const deleteActivity = (activityId: string) => {
+  const deleteActivity = async (activityId: string) => {
     if (!isPlanEditable(selectedTrip)) {
       toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki ve gelecek tarihli planlar düzenlenebilir.');
       return;
     }
 
     if (!confirm('Bu aktiviteyi silmek istediğinizden emin misiniz?')) return;
+
+    // Aktivitenin maliyetini bul
+    let removedActivityCost = 0;
+    dailyPlans.forEach(plan => {
+      if (plan.day === selectedDay) {
+        const activity = plan.activities.find(act => act.id === activityId);
+        if (activity) {
+          removedActivityCost = activity.cost || 0;
+        }
+      }
+    });
 
     const updatedPlans = dailyPlans.map(plan => {
       if (plan.day === selectedDay) {
@@ -305,8 +618,14 @@ export default function DailyPlannerPage() {
     });
 
     setDailyPlans(updatedPlans);
-    setHasChanges(true); // Değişiklik var olarak işaretle
-    toast.success('Aktivite silindi (Kaydetmeyi unutmayın!)');
+    try {
+      await saveDailyPlans(updatedPlans);
+      setHasChanges(false);
+      toast.success('Aktivite silindi (₺' + removedActivityCost + ' azaldı)');
+    } catch {
+      setHasChanges(true);
+      toast.error('Aktivite silindi ancak kaydedilemedi');
+    }
   };
 
   // Değişiklikleri kaydet
@@ -314,10 +633,34 @@ export default function DailyPlannerPage() {
     if (!selectedTrip) return;
 
     try {
-      await saveDailyPlans(dailyPlans);
+      const response = await saveDailyPlans(dailyPlans);
+      
+      if (response && response.plan && response.plan.total_cost !== undefined) {
+        // Seçili tripte toplam maliyeti güncelle
+        setSelectedTrip(prev => ({
+          ...prev!,
+          total_cost: response.plan.total_cost,
+          daily_cost: response.plan.daily_cost || prev?.daily_cost
+        }));
+        
+        // Trips listesinde de seçili trip'in maliyetini güncelle
+        setTrips(prev => prev.map(trip => 
+          trip.id === selectedTrip.id 
+            ? { 
+                ...trip, 
+                total_cost: response.plan.total_cost, 
+                daily_cost: response.plan.daily_cost || trip.daily_cost 
+              } 
+            : trip
+        ));
+        
+        toast.success(`Değişiklikler kaydedildi! Toplam Maliyet: ?${response.plan.total_cost.toLocaleString('tr-TR')}`);
+      } else {
+        toast.success('Değişiklikler kaydedildi!');
+      }
+      
       setOriginalDailyPlans([...dailyPlans]); // Orijinal planları güncelle
       setHasChanges(false);
-      toast.success('Değişiklikler kaydedildi!');
     } catch (error) {
       console.error('Kaydetme hatası:', error);
       toast.error('Değişiklikler kaydedilemedi');
@@ -333,7 +676,7 @@ export default function DailyPlannerPage() {
 
   // Günlük planları kaydet
   const saveDailyPlans = async (plans: DayPlan[]) => {
-    if (!selectedTrip) return;
+    if (!selectedTrip) return null;
 
     try {
       const response = await fetch(`/api/plan-detail/${selectedTrip.id}`, {
@@ -347,9 +690,14 @@ export default function DailyPlannerPage() {
       if (!response.ok) {
         throw new Error('Plan kaydedilemedi');
       }
+      
+      // Yanıtı JSON olarak dönüştür ve döndür
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Save error:', error);
       toast.error('Plan kaydedilirken hata oluştu');
+      return null;
     }
   };
 
@@ -375,7 +723,7 @@ export default function DailyPlannerPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">●</div>
+          <div className="text-6xl mb-4">?</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -440,7 +788,7 @@ export default function DailyPlannerPage() {
             onClick={() => router.push('/budget')}
             className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors"
           >
-            💰 Maliyet
+            ? Maliyet
           </button>
           <button
             onClick={() => router.push('/travel-mode')}
@@ -566,7 +914,7 @@ export default function DailyPlannerPage() {
                       </button>
                     ) : (
                       <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
-                        ● Bu plan salt okunur
+                        ? Bu plan salt okunur
                       </div>
                     )}
                   </div>
@@ -595,6 +943,24 @@ export default function DailyPlannerPage() {
                         >
                           Kaydet
                         </button>
+                      </div>
+                    </div>
+                    
+                    {/* Değişiklikler özeti */}
+                    <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                      <div className="bg-white dark:bg-gray-700 p-3 rounded-md">
+                        <div className="font-medium text-gray-700 dark:text-gray-300">Mevcut Toplam Maliyet</div>
+                        <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                          ₺{selectedTrip?.total_cost?.toLocaleString('tr-TR') || '0'}
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-gray-700 p-3 rounded-md">
+                        <div className="font-medium text-gray-700 dark:text-gray-300">Tahmini Yeni Maliyet</div>
+                        <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                          ₺{dailyPlans.reduce((sum, day) => {
+                            return sum + day.activities.reduce((actSum, act) => actSum + (act.cost || 0), 0);
+                          }, 0).toLocaleString('tr-TR')}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -629,12 +995,12 @@ export default function DailyPlannerPage() {
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white"
                         >
                           <option value="aktiviteler">Aktiviteler</option>
-                          <option value="yemek">🍽️ Yemek</option>
+                          <option value="yemek"> Yemek</option>
                           <option value="kültür">Kültür</option>
                           <option value="gezi">Gezi</option>
-                          <option value="alışveriş">🛍️ Alışveriş</option>
+                          <option value="alışveriş">Alışveriş</option>
                           <option value="eğlence">Eğlence</option>
-                          <option value="diğer">📝 Diğer</option>
+                          <option value="diğer">? Diğer</option>
                         </select>
                       </div>
                       
@@ -653,7 +1019,7 @@ export default function DailyPlannerPage() {
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Maliyet (₺)
+                          Maliyet (?)
                         </label>
                         <input
                           type="number"
@@ -715,7 +1081,7 @@ export default function DailyPlannerPage() {
                 {/* Activities List */}
                 {selectedDayPlan.activities.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="text-6xl mb-4">📝</div>
+                    <div className="text-6xl mb-4">?</div>
                     <h3 className="text-xl font-medium text-gray-800 dark:text-white mb-2">
                       Henüz Aktivite Yok
                     </h3>
@@ -738,7 +1104,7 @@ export default function DailyPlannerPage() {
                               <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-2">
                                   <span className="text-xl">
-                                    {categoryIcons[activity.category] || '📝'}
+                                    {categoryIcons[activity.category] || '?'}
                                   </span>
                                   <h4 className="font-bold text-gray-800 dark:text-white">
                                     {activity.name}
@@ -750,13 +1116,13 @@ export default function DailyPlannerPage() {
                                 
                                 <div className="grid md:grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-300 mb-2">
                                   <div>
-                                    <span className="font-medium">⏰ Saat:</span> {activity.startTime} - {activity.endTime}
+                                    <span className="font-medium">? Saat:</span> {activity.startTime} - {activity.endTime}
                                   </div>
                                   <div>
-                                    <span className="font-medium">📍 Konum:</span> {activity.location || 'Belirtilmemiş'}
+                                    <span className="font-medium">? Konum:</span> {activity.location || 'Belirtilmemiş'}
                                   </div>
                                   <div>
-                                    <span className="font-medium">💰 Maliyet:</span> ₺{activity.cost}
+                                    <span className="font-medium">? Maliyet:</span> ₺{activity.cost}
                                   </div>
                                 </div>
                                 
@@ -778,7 +1144,7 @@ export default function DailyPlannerPage() {
                                   </button>
                                 ) : (
                                   <div className="text-gray-400 p-1" title="Bu plan düzenlenemez">
-                                    ●
+                                    ?
                                   </div>
                                 )}
                               </div>
@@ -829,7 +1195,7 @@ export default function DailyPlannerPage() {
 
         {trips.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">🗓️</div>
+            <div className="text-6xl mb-4"></div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Henüz Plan Yok</h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               Günlük plan oluşturmak için önce bir seyahat planı oluşturun.
@@ -846,3 +1212,10 @@ export default function DailyPlannerPage() {
     </div>
   );
 }
+
+
+
+
+
+
+

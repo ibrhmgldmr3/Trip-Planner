@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -43,16 +43,16 @@ export default function MyTripsPage() {
 
   const fetchTrips = async () => {
     try {
-      console.log("🚀 My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
+      console.log("My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
       const response = await fetch('/api/my-trips?status=DONE');
       
       if (response.ok) {
         const data = await response.json();
-        console.log("📦 My-Trips: API'den gelen data:", data);
+        console.log("My-Trips: API'den gelen data:", data);
         
         // Ekstra güvenlik için client-side'da da DONE olanları filtrele
         const doneTrips = data.trips.filter((trip: Trip) => trip.status === 'DONE');
-        console.log("✅ My-Trips: Filtrelenmiş DONE planlar:", {
+        console.log("? My-Trips: Filtrelenmiş DONE planlar:", {
           toplamGelenPlan: data.trips.length,
           doneOlanPlan: doneTrips.length,
           planStatusleri: data.trips.map((t: Trip) => ({ city: t.city, status: t.status }))
@@ -108,7 +108,7 @@ export default function MyTripsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -134,7 +134,7 @@ export default function MyTripsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <button
@@ -155,7 +155,7 @@ export default function MyTripsPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            🌟 Gezilerim
+            Gezilerim
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
             Tamamladığınız tüm seyahatler
@@ -168,7 +168,7 @@ export default function MyTripsPage() {
             onClick={() => router.push('/my-plans')}
             className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            📋 Planlarım
+            Planlarım
           </button>
           <button
             onClick={() => router.push('/travel-mode')}
@@ -181,7 +181,7 @@ export default function MyTripsPage() {
         {/* Trips Grid */}
         {trips.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">🗺️</div>
+            <div className="text-6xl mb-4"></div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
               Henüz Tamamlanmış Gezi Yok
             </h2>
@@ -219,7 +219,7 @@ export default function MyTripsPage() {
                       </p>
                     </div>
                     <span className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs px-2 py-1 rounded-full">
-                      Tamamlandı ✅
+                      Tamamlandı ?
                     </span>
                   </div>
 
@@ -278,3 +278,5 @@ export default function MyTripsPage() {
     </div>
   );
 }
+
+

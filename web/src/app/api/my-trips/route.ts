@@ -20,7 +20,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status');
     
-    console.log("🎯 My-trips API çağrısı:", {
+    console.log("?? My-trips API çağrısı:", {
       statusFilter,
       requestUrl: request.url
     });
@@ -48,7 +48,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       whereClause.status = statusFilter as TripStatus;
     }
     
-    console.log("🔍 Where clause:", whereClause);
+    console.log("?? Where clause:", whereClause);
 
     // TripPlan tablosundan kullanıcının seyahatlerini getir
     const trips = await prisma.tripPlan.findMany({
@@ -90,7 +90,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       createdAt: trip.createdAt.toISOString(),
     }));
 
-    console.log("📊 Bulunan planlar:", {
+    console.log("?? Bulunan planlar:", {
       toplamPlan: trips.length,
       statusFilter,
       planStatusleri: trips.map(t => ({ id: t.id, city: t.city, status: t.status }))

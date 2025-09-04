@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
@@ -146,7 +146,7 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -174,7 +174,7 @@ export default function ProfilePage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            👤 Profilim
+            Profilim
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
             Hesap bilgilerinizi görüntüleyin ve düzenleyin
@@ -187,19 +187,19 @@ export default function ProfilePage() {
             onClick={() => router.push('/my-plans')}
             className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            📋 Planlarım
+            Planlarım
           </button>
           <button
             onClick={() => router.push('/budget')}
             className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors"
           >
-            💰 Finansal Tercihler
+            Finansal Tercihler
           </button>
           <button
             onClick={() => router.push('/daily-planner')}
             className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors"
           >
-            📅 Günlük Plan
+            Günlük Plan
           </button>
         </div>
 
@@ -234,7 +234,7 @@ export default function ProfilePage() {
                         onClick={() => setEditing(true)}
                         className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                       >
-                        ✏️ Düzenle
+                        Düzenle
                       </button>
                     )}
                   </div>
@@ -382,23 +382,23 @@ export default function ProfilePage() {
                           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
                         >
                           <option value="all">Hepsi</option>
-                          <option value="plane">✈️ Uçak</option>
-                          <option value="car">🚗 Araba</option>
-                          <option value="bus">🚌 Otobüs</option>
-                          <option value="train">🚆 Tren</option>
-                          <option value="boat">🚢 Gemi</option>
+                          <option value="plane">Uçak</option>
+                          <option value="car">Araba</option>
+                          <option value="bus">Otobüs</option>
+                          <option value="train">Tren</option>
+                          <option value="boat">Gemi</option>
                         </select>
                       ) : (
                         <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
                           {(() => {
                             const transport = profile?.preferredTransport || 'all';
                             switch(transport) {
-                              case 'plane': return '✈️ Uçak';
-                              case 'car': return '🚗 Araba';
-                              case 'bus': return '🚌 Otobüs';
-                              case 'train': return '🚆 Tren';
-                              case 'boat': return '🚢 Gemi';
-                              default: return '🚗✈️ Hepsi';
+                              case 'plane': return 'Uçak';
+                              case 'car': return 'Araba';
+                              case 'bus': return 'Otobüs';
+                              case 'train': return 'Tren';
+                              case 'boat': return 'Gemi';
+                              default: return '? Hepsi';
                             }
                           })()}
                         </p>
@@ -415,20 +415,20 @@ export default function ProfilePage() {
                           onChange={(e) => setEditForm({...editForm, preferredCurrency: e.target.value})}
                           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
                         >
-                          <option value="TRY">🇹🇷 Türk Lirası (TRY)</option>
-                          <option value="USD">🇺🇸 Amerikan Doları (USD)</option>
-                          <option value="EUR">🇪🇺 Euro (EUR)</option>
-                          <option value="GBP">🇬🇧 İngiliz Sterlini (GBP)</option>
+                          <option value="TRY">? Türk Lirası (TRY)</option>
+                          <option value="USD">? Amerikan Doları (USD)</option>
+                          <option value="EUR">? Euro (EUR)</option>
+                          <option value="GBP">? İngiliz Sterlini (GBP)</option>
                         </select>
                       ) : (
                         <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
                           {(() => {
                             const currency = profile?.preferredCurrency || 'TRY';
                             switch(currency) {
-                              case 'USD': return '🇺🇸 Amerikan Doları (USD)';
-                              case 'EUR': return '🇪🇺 Euro (EUR)';
-                              case 'GBP': return '🇬🇧 İngiliz Sterlini (GBP)';
-                              default: return '🇹🇷 Türk Lirası (TRY)';
+                              case 'USD': return '? Amerikan Doları (USD)';
+                              case 'EUR': return '? Euro (EUR)';
+                              case 'GBP': return '? İngiliz Sterlini (GBP)';
+                              default: return '? Türk Lirası (TRY)';
                             }
                           })()}
                         </p>
@@ -474,7 +474,7 @@ export default function ProfilePage() {
               {stats && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
-                    📊 Seyahat İstatistiklerim
+                    Seyahat İstatistiklerim
                   </h3>
                   
                   <div className="space-y-4">
@@ -517,7 +517,7 @@ export default function ProfilePage() {
               {/* Quick Actions */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
-                  ⚡ Hızlı İşlemler
+                  ? Hızlı İşlemler
                 </h3>
                 
                 <div className="space-y-3">
@@ -525,21 +525,21 @@ export default function ProfilePage() {
                     onClick={() => router.push('/travel-mode')}
                     className="w-full bg-gradient-to-r from-green-500 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
                   >
-                    🌟 Yeni Plan Oluştur
+                    Yeni Plan Oluştur
                   </button>
                   
                   <button
                     onClick={() => router.push('/my-plans')}
                     className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors"
                   >
-                    📋 Planlarımı Görüntüle
+                    Planlarımı Görüntüle
                   </button>
                   
                   <button
                     onClick={() => router.push('/profile/my-trips')}
                     className="w-full bg-purple-500 text-white py-3 px-4 rounded-lg hover:bg-purple-600 transition-colors"
                   >
-                    🗂️ Seyahat Geçmişi
+                     Seyahat Geçmişi
                   </button>
                 </div>
               </div>
@@ -547,7 +547,7 @@ export default function ProfilePage() {
               {/* Account Actions */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
-                  ⚙️ Hesap İşlemleri
+                  Hesap İşlemleri
                 </h3>
                 
                 <div className="space-y-3">
@@ -559,7 +559,7 @@ export default function ProfilePage() {
                     }}
                     className="w-full bg-red-500 text-white py-3 px-4 rounded-lg hover:bg-red-600 transition-colors"
                   >
-                    🚪 Çıkış Yap
+                    Çıkış Yap
                   </button>
                 </div>
               </div>
@@ -570,3 +570,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+

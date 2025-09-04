@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
@@ -482,7 +482,7 @@ export default function MapPage() {
               onClick={getCurrentLocation}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 font-medium"
             >
-              <span>⌖</span>
+              <span>?</span>
               <span>Konumumu Bul</span>
             </button>
             
@@ -491,7 +491,7 @@ export default function MapPage() {
               disabled={loading || !map}
               className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
             >
-              <span>●</span>
+              <span>?</span>
               <span>{loading ? 'Yükleniyor...' : 'Turistik Yerler'}</span>
             </button>
             
@@ -500,7 +500,7 @@ export default function MapPage() {
               disabled={loading || !map}
               className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
             >
-              <span>🍽</span>
+              <span></span>
               <span>{loading ? 'Yükleniyor...' : 'Restoranlar'}</span>
             </button>
             
@@ -509,7 +509,7 @@ export default function MapPage() {
               disabled={loading || !map}
               className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
             >
-              <span>�</span>
+              <span></span>
               <span>{loading ? 'Yükleniyor...' : 'Oteller'}</span>
             </button>
             
@@ -529,7 +529,7 @@ export default function MapPage() {
                 }}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 font-medium"
               >
-                <span>✕</span>
+                <span>?</span>
                 <span>Temizle</span>
               </button>
             )}
@@ -565,7 +565,7 @@ export default function MapPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                ● Seçili Yerler ({selectedPois.length})
+                ? Seçili Yerler ({selectedPois.length})
               </h2>
               <div className="flex space-x-3">
                 <button
@@ -573,7 +573,7 @@ export default function MapPage() {
                   disabled={loading}
                   className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center space-x-2 font-medium"
                 >
-                  <span>▲</span>
+                  <span>^</span>
                   <span>{loading ? 'Hesaplanıyor...' : 'Rota Oluştur'}</span>
                 </button>
                 <button
@@ -583,7 +583,7 @@ export default function MapPage() {
                   }}
                   className="bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors"
                 >
-                  🗑️
+                  
                 </button>
               </div>
             </div>
@@ -592,7 +592,7 @@ export default function MapPage() {
             {routeInfo && (
               <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg mb-6 border border-green-200 dark:border-green-700">
                 <h3 className="text-lg font-semibold text-green-800 dark:text-green-300 mb-3">
-                  ✓ Rota Hesaplandı
+                  ? Rota Hesaplandı
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
@@ -638,7 +638,7 @@ export default function MapPage() {
                     </button>
                   </div>
                   <div className="flex items-center space-x-2 mb-3">
-                    <span className="text-blue-500">●</span>
+                    <span className="text-blue-500">?</span>
                     <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                       {poi.vicinity}
                     </p>
@@ -646,7 +646,7 @@ export default function MapPage() {
                   {poi.rating && (
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 py-1 rounded-full">
-                        <span className="text-yellow-500 text-sm">⭐</span>
+                        <span className="text-yellow-500 text-sm">?</span>
                         <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
                           {poi.rating.toFixed(1)}
                         </span>
@@ -665,7 +665,7 @@ export default function MapPage() {
           <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-6 mb-8 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center space-x-3 mb-8">
               <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                <span className="text-2xl">●</span>
+                <span className="text-2xl">?</span>
               </div>
               <div>
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
@@ -699,7 +699,7 @@ export default function MapPage() {
                             ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg scale-110' 
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
                         }`}>
-                          {isSelected ? '✓' : index + 1}
+                          {isSelected ? '?' : index + 1}
                         </div>
                         <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">
                           {poi.name}
@@ -707,7 +707,7 @@ export default function MapPage() {
                       </div>
                       {poi.rating && (
                         <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/20 px-3 py-2 rounded-full border border-yellow-200 dark:border-yellow-700 shadow-sm">
-                          <span className="text-yellow-500 text-lg">⭐</span>
+                          <span className="text-yellow-500 text-lg">?</span>
                           <span className="text-sm font-bold text-yellow-700 dark:text-yellow-400">
                             {poi.rating.toFixed(1)}
                           </span>
@@ -716,7 +716,7 @@ export default function MapPage() {
                     </div>
                   
                   <div className="flex items-center space-x-2 mb-4">
-                    <span className="text-blue-500 text-lg">●</span>
+                    <span className="text-blue-500 text-lg">?</span>
                     <p className="text-gray-600 dark:text-gray-300 font-medium">
                       {poi.vicinity}
                     </p>
@@ -746,21 +746,20 @@ export default function MapPage() {
                                 : 'text-gray-300 dark:text-gray-600'
                             }`}
                           >
-                            💰
-                          </span>
+                            </span>
                         ))}
                       </div>
                     </div>
                   )}
                   
                   <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 px-3 py-2 rounded-lg mb-4">
-                    🌍 {poi.geometry.location.lat().toFixed(4)}, {poi.geometry.location.lng().toFixed(4)}
+                    {poi.geometry.location.lat().toFixed(4)}, {poi.geometry.location.lng().toFixed(4)}
                   </div>
                   
                   {isSelected && (
                     <div className="text-center animate-pulse">
                       <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                        ✨ Rotaya Dahil ✨
+                        ? Rotaya Dahil ?
                       </span>
                     </div>
                   )}
@@ -782,14 +781,14 @@ export default function MapPage() {
                 href="/daily-planner"
                 className="group bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                <span className="text-2xl group-hover:scale-110 transition-transform">�</span>
+                <span className="text-2xl group-hover:scale-110 transition-transform"></span>
                 <span className="font-semibold text-lg">Günlük Planlayıcı</span>
               </a>
               <a
                 href="/my-plans"
                 className="group bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                <span className="text-2xl group-hover:scale-110 transition-transform">📋</span>
+                <span className="text-2xl group-hover:scale-110 transition-transform"></span>
                 <span className="font-semibold text-lg">Planlarım</span>
               </a>
             </div>
@@ -799,3 +798,5 @@ export default function MapPage() {
     </div>
   );
 }
+
+

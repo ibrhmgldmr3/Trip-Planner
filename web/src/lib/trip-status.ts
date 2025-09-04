@@ -1,4 +1,4 @@
-import { TripStatus } from '@prisma/client';
+﻿import { TripStatus } from '@prisma/client';
 
 export function getTripStatus(startDate?: Date | null, endDate?: Date | null, currentStatus?: TripStatus): TripStatus {
   if (!startDate || !endDate) return TripStatus.PLANNED;
@@ -7,18 +7,18 @@ export function getTripStatus(startDate?: Date | null, endDate?: Date | null, cu
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  // Tarihleri gün bazında karşılaştır (saat bilgisini göz ardı et)
+  // Tarihleri Gün baz�nda kar��la�t�r (saat bilgisini g�z ard� et)
   now.setHours(0, 0, 0, 0);
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
   
-  // Manuel olarak iptal edilmişse
+  // Manuel olarak iptal edilmi�se
   if (currentStatus === TripStatus.CANCELLED) return TripStatus.CANCELLED;
   
-  // Manuel olarak tamamlanmışsa (done)
+  // Manuel olarak tamamlanm��sa (done)
   if (currentStatus === TripStatus.DONE) return TripStatus.DONE;
   
-  // Henüz başlamamışsa
+  // Hen�z ba�lamam��sa
   if (now < start) return TripStatus.PLANNED;
   
   // Devam ediyorsa
@@ -75,3 +75,5 @@ export function canMarkAsDone(status: TripStatus): boolean {
 export function shouldShowInMyTrips(status: TripStatus): boolean {
   return status === TripStatus.DONE;
 }
+
+

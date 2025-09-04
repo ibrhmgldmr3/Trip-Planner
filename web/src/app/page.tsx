@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -132,7 +132,7 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">💰 Maliyet Analizi</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Maliyet Analizi</h3>
               <p className="text-gray-700 dark:text-gray-200 font-medium mb-6 leading-relaxed">Ulaşım, konaklama ve aktivite maliyetlerini detaylı analiz ederek bütçenizi optimize ediyoruz.</p>
               <Link href="/budget" className="inline-flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-all duration-300 hover-lift">
                 <span>Maliyet Planlayıcıya Git</span>
@@ -152,7 +152,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Günlük Planlama</h3>
               <p className="text-gray-800 dark:text-gray-200 font-medium">Sabah, öğlen ve akşam aktivitelerini içeren detaylı günlük gezi planları oluşturun.</p>
               <Link href="/daily-planner" className="mt-4 inline-block text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-medium">
-                Günlük Planlamaya Git →
+                Günlük Planlamaya Git ›
               </Link>
             </div>
             
@@ -170,7 +170,7 @@ export default function Home() {
                 onClick={() => handlePlanClick('/ai-planner')}
                 className="mt-4 inline-block text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium cursor-pointer"
               >
-                Planlayıcıya Git →
+                Planlayıcıya Git ›
               </button>
             </div>
             
@@ -184,7 +184,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Uygun Ulaşım Seçenekleri</h3>
               <p className="text-gray-800 dark:text-gray-200 font-medium">Uçak, otobüs ve diğer ulaşım seçeneklerinin fiyat karşılaştırması ve rezervasyon bağlantıları.</p>
               <Link href="/transportation" className="mt-4 inline-block text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 text-sm font-medium">
-                Ulaşım Seçeneklerine Git →
+                Ulaşım Seçeneklerine Git ›
               </Link>
             </div>
             
@@ -198,7 +198,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Konaklama Seçenekleri</h3>
               <p className="text-gray-800 dark:text-gray-200 font-medium">Bütçenize ve tercihlerinize göre en uygun konaklama seçeneklerini bulun ve rezervasyon yapın.</p>
               <Link href="/accommodation" className="mt-4 inline-block text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 text-sm font-medium">
-                Konaklama Seçeneklerine Git →
+                Konaklama Seçeneklerine Git ›
               </Link>
             </div>
           </div>
@@ -281,3 +281,5 @@ export default function Home() {
     </main>
   );
 }
+
+

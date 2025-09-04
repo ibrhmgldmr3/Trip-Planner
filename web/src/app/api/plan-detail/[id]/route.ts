@@ -10,7 +10,7 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const { id: planId } = await context.params;
-    console.log(`📋 Plan detayı getiriliyor: ${planId}`);
+    console.log(`Plan detayı getiriliyor: ${planId}`);
     
     // Session kontrolü
     const session = await getServerSession();
@@ -83,7 +83,7 @@ export async function GET(
       );
     }
 
-    console.log(`✅ Plan detayı başarıyla getirildi: ${plan.city}`);
+    console.log(`Plan detayı başarıyla getirildi: ${plan.city}`);
 
     return NextResponse.json({
       success: true,
@@ -91,7 +91,7 @@ export async function GET(
     });
 
   } catch (error: unknown) {
-    console.error("💥 Plan detayı getirme hatası:", error);
+    console.error("Plan detayı getirme hatası:", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -121,7 +121,7 @@ export async function PATCH(
     const { id: planId } = await context.params;
     const body = await request.json();
     
-    console.log(`💰 Plan maliyeti güncelleniyor: ${planId}`);
+    console.log(`Plan maliyeti güncelleniyor: ${planId}`);
     
     // Session kontrolü
     const session = await getServerSession();
@@ -197,7 +197,7 @@ export async function PATCH(
       }
     });
 
-    console.log(`✅ Plan maliyeti başarıyla güncellendi: ${planId}`);
+    console.log(`Plan maliyeti başarıyla güncellendi: ${planId}`);
 
     return NextResponse.json({
       success: true,
@@ -205,7 +205,7 @@ export async function PATCH(
     });
 
   } catch (error: unknown) {
-    console.error("💥 Plan maliyeti güncelleme hatası:", error);
+    console.error("Plan maliyeti güncelleme hatası:", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -235,7 +235,7 @@ export async function PUT(
     const { id: planId } = await context.params;
     const body = await request.json();
     
-    console.log(`📅 Günlük planlar güncelleniyor: ${planId}`);
+    console.log(`Günlük planlar güncelleniyor: ${planId}`);
     
     // Session kontrolü
     const session = await getServerSession();
@@ -299,7 +299,7 @@ export async function PUT(
       }
     });
 
-    console.log(`✅ Günlük planlar başarıyla güncellendi: ${planId}`);
+    console.log(`Günlük planlar başarıyla güncellendi: ${planId}`);
 
     return NextResponse.json({
       success: true,
@@ -307,7 +307,7 @@ export async function PUT(
     });
 
   } catch (error: unknown) {
-    console.error("💥 Günlük plan güncelleme hatası:", error);
+    console.error("Günlük plan güncelleme hatası:", error);
     
     const errorDetails = error instanceof Error 
       ? { 

@@ -152,6 +152,75 @@ export default function PlanDetailPage() {
       .replace(/\n/g, '<br />');
   };
 
+  // Render budget details as HTML string if JSON is provided; fallback to formatted content
+  const renderBudgetHtml = (raw: string | null) => {
+    if (!raw) return null;
+    try {
+      type BudgetItem = { description?: string; amount?: number; isPaid?: boolean };
+      type BudgetCategory = { items?: Array<BudgetItem>; total?: number };
+      type BudgetData = {
+        categories?: Record<string, BudgetCategory>;
+        Categories?: Record<string, BudgetCategory>;
+        totalCostWithExtras?: number;
+        extraItemsTotal?: number;
+        suggestedBudget?: number;
+      };
+      const data = JSON.parse(raw as string) as BudgetData;
+      const categories = (data && (data.categories || data.Categories)) as Record<string, BudgetCategory> | undefined;
+      const extraItemsTotal = Number(data?.totalCostWithExtras ?? data?.extraItemsTotal ?? 0) || 0;
+      const suggested = Number(data?.suggestedBudget ?? 0) || 0;
+
+      if (categories && typeof categories === 'object') {
+        const entries = Object.entries(categories) as Array<[string, { items?: Array<{ description?: string; amount?: number; isPaid?: boolean }>; total?: number }]>;
+        const sumFromCats = entries.reduce((acc, [, v]) => acc + Number(v?.total ?? 0), 0);
+        const grandTotal = extraItemsTotal > 0 ? extraItemsTotal : sumFromCats;
+
+        let html = '';
+        // Summary cards
+        html += '<div class="grid md:grid-cols-3 gap-6 mb-4">';
+        html += '<div class="p-4 rounded-lg border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">'
+              + '<div class="text-sm font-medium text-green-700 dark:text-green-300">Toplam</div>'
+              + '<div class="text-2xl font-bold text-green-800 dark:text-green-200">₺' + grandTotal.toLocaleString('tr-TR') + '</div>'
+              + '</div>';
+        if (suggested > 0) {
+          html += '<div class="p-4 rounded-lg border bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">'
+               + '<div class="text-sm font-medium text-purple-700 dark:text-purple-300">Önerilen Bütçe</div>'
+               + '<div class="text-2xl font-bold text-purple-800 dark:text-purple-200">₺' + suggested.toLocaleString('tr-TR') + '</div>'
+               + '</div>';
+        }
+        html += '</div>';
+
+        // Category breakdown
+        for (const [cat, details] of entries) {
+          const items = (details?.items ?? []) as Array<{ description?: string; amount?: number; isPaid?: boolean }>;
+          const total = Number(details?.total ?? 0) || items.reduce((s, it) => s + Number(it.amount ?? 0), 0);
+          html += '<div class="rounded-lg border border-gray-200 dark:border-gray-700 mb-3">';
+          html += '<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/40">'
+               +  '<div class="font-semibold text-gray-800 dark:text-white capitalize">' + cat + '</div>'
+               +  '<div class="text-sm font-bold text-gray-900 dark:text-gray-100">₺' + total.toLocaleString('tr-TR') + '</div>'
+               +  '</div>';
+          if (items.length > 0) {
+            html += '<div class="divide-y divide-gray-200 dark:divide-gray-700">';
+            for (const it of items) {
+              const amt = Number(it?.amount ?? 0);
+              html += '<div class="flex items-start justify-between p-3">'
+                   +   '<div class="text-sm text-gray-700 dark:text-gray-300">' + (it?.description || 'Kalem') + '</div>'
+                   +   '<div class="text-sm font-medium text-gray-900 dark:text-gray-100">₺' + amt.toLocaleString('tr-TR') + '</div>'
+                   + '</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+
+        return html;
+      }
+    } catch {}
+
+    // Fallback to original formatter (markdown/html)
+    return formatContent(raw);
+  };
+
   const parseDailyPlan = (content: string | null) => {
     if (!content) return [];
     
@@ -827,7 +896,7 @@ export default function PlanDetailPage() {
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Detaylı Maliyet Dağılımı</h3>
                   <div 
                     className="prose dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: formatContent(plan.butce_tahmini) || '' }}
+                    dangerouslySetInnerHTML={{ __html: renderBudgetHtml(plan.butce_tahmini) || '' }}
                   />
                   
                   <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">

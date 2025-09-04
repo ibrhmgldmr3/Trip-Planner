@@ -7,14 +7,14 @@ const prisma = new PrismaClient();
 
 export async function PUT(request: NextRequest) {
   try {
-    console.log("🔄 Plan statüsü güncelleme isteği alındı");
+    console.log("?? Plan statüsü güncelleme isteği alındı");
     
     // Session kontrolü
     const session = await getServerSession(authOptions);
-    console.log("🔑 Session kontrol edildi:", session ? "Mevcut" : "Yok");
+    console.log("?? Session kontrol edildi:", session ? "Mevcut" : "Yok");
     
     if (!session || !session.user?.email) {
-      console.log("❌ Session bulunamadı veya email eksik");
+      console.log("? Session bulunamadı veya email eksik");
       return NextResponse.json({ error: 'Giriş yapmanız gerekiyor' }, { status: 401 });
     }
 
@@ -32,7 +32,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const { planId, status } = await request.json();
-    console.log(`📝 Plan ID: ${planId}, Yeni Statü: ${status}`);
+    console.log(`?? Plan ID: ${planId}, Yeni Statü: ${status}`);
 
     if (!planId || !status) {
       return NextResponse.json(
@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    console.log(`🔍 Plan arama sonucu:`, {
+    console.log(`?? Plan arama sonucu:`, {
       planId,
       userId: user.id,
       found: !!existingPlan,
@@ -66,7 +66,7 @@ export async function PUT(request: NextRequest) {
     });
 
     if (!existingPlan) {
-      console.log(`❌ Plan bulunamadı: planId=${planId}, userId=${user.id}`);
+      console.log(`? Plan bulunamadı: planId=${planId}, userId=${user.id}`);
       return NextResponse.json(
         { error: 'Plan not found or unauthorized' },
         { status: 404 }
@@ -74,7 +74,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the plan status
-    console.log(`🔄 Plan statüsü güncelleniyor: ${existingPlan.status} → ${status}`);
+    console.log(`?? Plan statüsü güncelleniyor: ${existingPlan.status} › ${status}`);
     
     const updatedPlan = await prisma.tripPlan.update({
       where: {
@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    console.log(`✅ Plan statüsü başarıyla güncellendi:`, {
+    console.log(`? Plan statüsü başarıyla güncellendi:`, {
       planId: updatedPlan.id,
       oldStatus: existingPlan.status,
       newStatus: updatedPlan.status
@@ -97,10 +97,11 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('💥 Plan statüsü güncelleme hatası:', error);
+    console.error('?? Plan statüsü güncelleme hatası:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
+

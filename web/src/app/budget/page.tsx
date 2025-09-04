@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
@@ -133,28 +133,7 @@ export default function BudgetPage() {
     }
   };
 
-  // Update trip travelers function
-  const updateTripTravelers = async (tripId: string, travelers: number) => {
-    try {
-      const response = await fetch(`/api/trips/${tripId}/travelers`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ travelers }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Kişi sayısı güncellenemedi');
-      }
-
-      toast.success('Kişi sayısı güncellendi');
-    } catch (error) {
-      console.error('Error updating travelers:', error);
-      toast.error('Kişi sayısı güncellenirken hata oluştu');
-    }
-  };
-
+  
   // Değişiklikleri iptal etme fonksiyonu
   const cancelChanges = () => {
     setBudgetItems([...originalBudgetItems]);
@@ -168,7 +147,7 @@ export default function BudgetPage() {
     const items: Array<{ description: string; amount: number; category: string }> = [];
     
     // Basit regex ile fiyat bilgilerini çıkar
-    const priceRegex = /(\d+(?:\.\d+)?)\s*(?:TL|₺|TRY)/gi;
+    const priceRegex = /(\d+(?:\.\d+)?)\s*(?:TL|\u20BA|TRY)/gi;
     const lines = markdownText.split('\n');
     
     let currentCategory = 'genel';
@@ -594,7 +573,7 @@ export default function BudgetPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">●</div>
+          <div className="text-6xl mb-4">?</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -640,7 +619,7 @@ export default function BudgetPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            💰 Bütçe Planlayıcı
+             Bütçe Planlayıcı
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
             Seyahat bütçenizi planlayın ve harcamalarınızı takip edin
@@ -745,8 +724,8 @@ export default function BudgetPage() {
               
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                 <h3 className="text-lg font-medium mb-2 text-gray-800 dark:text-white">Önerilen Bütçe</h3>
-                <div className="text-3xl font-bold text-green-500">₺{suggestedBudget.toLocaleString('tr-TR')}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Günlük: ₺{dailySuggestedBudget.toLocaleString('tr-TR')}</div>
+                <div className="text-3xl font-bold text-green-500">{suggestedBudget.toLocaleString('tr-TR')}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Günlük: {dailySuggestedBudget.toLocaleString('tr-TR')}</div>
                 <div className="text-xs text-gray-400 mt-1">+25% rezerv dahil</div>
               </div>
               
@@ -757,37 +736,7 @@ export default function BudgetPage() {
               </div>
             </div>
 
-            {/* Travelers Section */}
-            {isPlanEditable(selectedTrip) && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
-                <h3 className="text-lg font-medium mb-4 text-gray-800 dark:text-white">Seyahat Eden Kişi Sayısı</h3>
-                <div className="flex items-center space-x-4">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Kişi Sayısı:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={travelers}
-                    onChange={async (e) => {
-                      const newTravelers = parseInt(e.target.value) || 1;
-                      setSelectedTrip(prev => prev ? { ...prev, travelers: newTravelers } : null);
-                      setHasChanges(true);
-                      
-                      // Immediate API call to save travelers count
-                      if (selectedTrip?.id) {
-                        await updateTripTravelers(selectedTrip.id, newTravelers);
-                      }
-                    }}
-                    className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Konaklama, yemek ve seyahat masrafları kişi başına hesaplanır
-                  </span>
-                </div>
-              </div>
-            )}
+
 
             {/* Category Distribution */}
             {/* Plan Base Cost */}
@@ -795,7 +744,7 @@ export default function BudgetPage() {
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">●</span>
+                    <span className="text-2xl">?</span>
                     <div>
                       <h4 className="font-semibold text-blue-800 dark:text-blue-200">Plan Temel Maliyeti</h4>
                       <p className="text-sm text-blue-600 dark:text-blue-400">AI tarafından oluşturulan plan maliyeti</p>
@@ -840,13 +789,13 @@ export default function BudgetPage() {
                         onClick={saveChanges}
                         className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
                       >
-                        💾 Kaydet
+                         Kaydet
                       </button>
                       <button
                         onClick={cancelChanges}
                         className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
                       >
-                        ✕ İptal
+                        ? İptal
                       </button>
                     </>
                   )}
@@ -919,7 +868,7 @@ export default function BudgetPage() {
               {/* Budget Items List */}
               {budgetItems.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-4">💳</div>
+                  <div className="text-4xl mb-4"></div>
                   <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Henüz Ekstra Maliyet Kalemi Yok</h3>
                   <p className="text-gray-600 dark:text-gray-300 mb-4">
                     Plan maliyetine ek olarak özel harcamalarınızı ekleyebilirsiniz.
@@ -927,7 +876,7 @@ export default function BudgetPage() {
                   {!isPlanEditable(selectedTrip) && (
                     <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mt-4">
                       <p className="text-orange-800 dark:text-orange-200 text-sm">
-                        ⚠️ Bu plan düzenlenebilir değil. Sadece &quot;PLANLANDI&quot; statusündeki ve gelecek tarihli planlar düzenlenebilir.
+                         Bu plan düzenlenebilir değil. Sadece &quot;PLANLANDI&quot; statusündeki ve gelecek tarihli planlar düzenlenebilir.
                       </p>
                     </div>
                   )}
@@ -974,7 +923,7 @@ export default function BudgetPage() {
                                 : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                             }`}
                           >
-                            {item.isPaid ? '✓ Ödendi' : '○ Ödenmedi'}
+                            {item.isPaid ? '? Ödendi' : '0 Ödenmedi'}
                           </button>
                         )}
                         {!isPlanEditable(selectedTrip) && (
@@ -983,7 +932,7 @@ export default function BudgetPage() {
                               ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
                               : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                           }`}>
-                            {item.isPaid ? '✓ Ödendi' : '○ Ödenmedi'}
+                            {item.isPaid ? '? Ödendi' : '0 Ödenmedi'}
                           </span>
                         )}
                         
@@ -1017,7 +966,7 @@ export default function BudgetPage() {
 
         {trips.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">💼</div>
+            <div className="text-6xl mb-4"></div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Henüz Gezi Yok</h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               Bütçe planlamak için önce bir gezi planı oluşturun.
@@ -1034,3 +983,6 @@ export default function BudgetPage() {
     </div>
   );
 }
+
+
+
