@@ -61,7 +61,20 @@ const timeColors: Record<string, string> = {
 
   // Plan düzenlenebilir mi kontrol et
   const isPlanEditable = (trip: Trip | null): boolean => {
-    return trip?.status === 'PLANLANDI';
+    if (!trip) return false;
+
+    // Sadece PLANNED durumundaki planlar düzenlenebilir
+    if (trip.status !== 'PLANNED') return false;
+    
+    // İleri tarihli planlar düzenlenebilir (başlangıç tarihi bugünden sonra)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Sadece tarih karşılaştırması için saati sıfırla
+    
+    const startDate = new Date(trip.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Plan başlangıç tarihi bugün veya gelecekte ise düzenlenebilir
+    return startDate >= today;
   };
 
 export default function DailyPlannerPage() {
@@ -237,7 +250,7 @@ export default function DailyPlannerPage() {
     }
 
     if (!isPlanEditable(selectedTrip)) {
-      toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki planlar düzenlenebilir.');
+      toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki ve gelecek tarihli planlar düzenlenebilir.');
       return;
     }
 
@@ -275,7 +288,7 @@ export default function DailyPlannerPage() {
   // Aktivite sil
   const deleteActivity = (activityId: string) => {
     if (!isPlanEditable(selectedTrip)) {
-      toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki planlar düzenlenebilir.');
+      toast.error('Bu plan düzenlenemez. Sadece "PLANLANDI" statusündeki ve gelecek tarihli planlar düzenlenebilir.');
       return;
     }
 
@@ -445,11 +458,11 @@ export default function DailyPlannerPage() {
               {selectedTrip && (
                 <div className="flex items-center space-x-2">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedTrip.status === 'PLANLANDI' 
+                    isPlanEditable(selectedTrip) 
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                       : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                   }`}>
-                    {selectedTrip.status === 'PLANLANDI' ? 'Düzenlenebilir' : 'Salt Okunur'}
+                    {isPlanEditable(selectedTrip) ? 'Düzenlenebilir' : 'Salt Okunur'}
                   </span>
                 </div>
               )}
@@ -488,11 +501,11 @@ export default function DailyPlannerPage() {
                       </p>
                     )}
                     <span className={`text-xs px-2 py-1 rounded ${
-                      trip.status === 'PLANLANDI' 
+                      isPlanEditable(trip) 
                         ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                     }`}>
-                      {trip.status || 'PLANLANDI'}
+                      {isPlanEditable(trip) ? 'Düzenlenebilir' : 'Salt Okunur'}
                     </span>
                   </div>
                 </button>

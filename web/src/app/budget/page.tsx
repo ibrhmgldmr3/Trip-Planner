@@ -28,6 +28,7 @@ interface Trip {
   travel_style?: string;
   duration?: number;
   status?: string;
+  travelers?: number;
 }
 
 export default function BudgetPage() {
@@ -56,7 +57,19 @@ export default function BudgetPage() {
   // Plan düzenlenebilirlik kontrolü
   const isPlanEditable = (trip: Trip | null) => {
     if (!trip) return false;
-    return trip.status === 'PLANLANDI' || !trip.status; // status yoksa da düzenlenebilir kabul et
+    
+    // Sadece PLANLANDI durumundaki planlar düzenlenebilir
+    if (trip.status !== 'PLANNED') return false;
+    
+    // İleri tarihli planlar düzenlenebilir (başlangıç tarihi bugünden sonra)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Sadece tarih karşılaştırması için saati sıfırla
+    
+    const startDate = new Date(trip.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Plan başlangıç tarihi bugün veya gelecekte ise düzenlenebilir
+    return startDate >= today;
   };
 
   // Değişiklikleri kaydetme fonksiyonu
@@ -117,6 +130,28 @@ export default function BudgetPage() {
 
     if (!response.ok) {
       throw new Error('Plan güncellenemedi');
+    }
+  };
+
+  // Update trip travelers function
+  const updateTripTravelers = async (tripId: string, travelers: number) => {
+    try {
+      const response = await fetch(`/api/trips/${tripId}/travelers`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ travelers }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Kişi sayısı güncellenemedi');
+      }
+
+      toast.success('Kişi sayısı güncellendi');
+    } catch (error) {
+      console.error('Error updating travelers:', error);
+      toast.error('Kişi sayısı güncellenirken hata oluştu');
     }
   };
 
@@ -287,10 +322,15 @@ export default function BudgetPage() {
           const data = await response.json();
           
           if (data.success && data.plans) {
-            setTrips(data.plans);
-            if (data.plans.length > 0) {
-              setSelectedTrip(data.plans[0]);
-              fetchBudgetItems(data.plans[0].id);
+            // Default travelers value set et
+            const processedTrips = data.plans.map((trip: Trip) => ({
+              ...trip,
+              travelers: trip.travelers || 1
+            }));
+            setTrips(processedTrips);
+            if (processedTrips.length > 0) {
+              setSelectedTrip(processedTrips[0]);
+              fetchBudgetItems(processedTrips[0].id);
             }
           } else {
             setTrips([]);
@@ -470,8 +510,20 @@ export default function BudgetPage() {
 
   // Hesaplamalar - Plan maliyeti + Ekstra kalemler mantığı
   const planBaseCost = selectedTrip?.total_cost || 0; // Planın temel maliyeti
-  const extraItems = budgetItems.reduce((sum, item) => sum + item.amount, 0); // Eklenen ekstra kalemler
-  const totalCost = planBaseCost + extraItems; // Toplam maliyet = Plan maliyeti + Ekstra kalemler
+  const travelers = selectedTrip?.travelers || 1; // Seyahat eden kişi sayısı
+  
+  // Kategori bazında per-person maliyetler (konaklama, yemek, seyahat)
+  const perPersonCostCategories = ['konaklama', 'yemek', 'seyahat', 'accommodation', 'food', 'travel'];
+  
+  // Ekstra kalemleri kategorilerine göre hesapla
+  const extraItemsTotal = budgetItems.reduce((sum, item) => {
+    const isPerPersonCategory = perPersonCostCategories.some(cat => 
+      item.category.toLowerCase().includes(cat.toLowerCase())
+    );
+    return sum + (isPerPersonCategory ? item.amount * travelers : item.amount);
+  }, 0);
+  
+  const totalCost = planBaseCost + extraItemsTotal; // Toplam maliyet = Plan maliyeti + Ekstra kalemler
   const suggestedBudget = Math.round(totalCost * 1.25); // %25 rezerv ile önerilen bütçe
 
   // Günlük hesaplamalar
@@ -499,6 +551,9 @@ export default function BudgetPage() {
     acc[item.category] = (acc[item.category] || 0) + item.amount;
     return acc;
   }, {} as Record<string, number>);
+  
+  // Raw ekstra kalemler toplamı (percentage hesaplama için)
+  const rawExtraItemsTotal = budgetItems.reduce((sum, item) => sum + item.amount, 0);
 
   const categoryColors: Record<string, string> = {
     'ulaşım': 'bg-blue-500',
@@ -678,8 +733,13 @@ export default function BudgetPage() {
                 <h3 className="text-lg font-medium mb-2 text-gray-800 dark:text-white">Toplam Maliyet</h3>
                 <div className="text-3xl font-bold text-blue-500">₺{totalCost.toLocaleString('tr-TR')}</div>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Günlük: ₺{dailyCost.toLocaleString('tr-TR')}</div>
+                {travelers > 1 && (
+                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    {travelers} kişi için hesaplanmış
+                  </div>
+                )}
                 <div className="text-xs text-gray-400 mt-1">
-                  Plan: ₺{planBaseCost.toLocaleString('tr-TR')} + Ekstra: ₺{extraItems.toLocaleString('tr-TR')}
+                  Plan: ₺{planBaseCost.toLocaleString('tr-TR')} + Ekstra: ₺{extraItemsTotal.toLocaleString('tr-TR')}
                 </div>
               </div>
               
@@ -696,6 +756,38 @@ export default function BudgetPage() {
                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Ekstra maliyet kalemi</div>
               </div>
             </div>
+
+            {/* Travelers Section */}
+            {isPlanEditable(selectedTrip) && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+                <h3 className="text-lg font-medium mb-4 text-gray-800 dark:text-white">Seyahat Eden Kişi Sayısı</h3>
+                <div className="flex items-center space-x-4">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Kişi Sayısı:
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={travelers}
+                    onChange={async (e) => {
+                      const newTravelers = parseInt(e.target.value) || 1;
+                      setSelectedTrip(prev => prev ? { ...prev, travelers: newTravelers } : null);
+                      setHasChanges(true);
+                      
+                      // Immediate API call to save travelers count
+                      if (selectedTrip?.id) {
+                        await updateTripTravelers(selectedTrip.id, newTravelers);
+                      }
+                    }}
+                    className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Konaklama, yemek ve seyahat masrafları kişi başına hesaplanır
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Category Distribution */}
             {/* Plan Base Cost */}
@@ -722,7 +814,7 @@ export default function BudgetPage() {
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Ekstra Kalemler - Kategori Dağılımı</h3>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(categoryTotals).map(([category, amount]) => {
-                    const percentage = extraItems > 0 ? (amount / extraItems * 100).toFixed(1) : 0;
+                    const percentage = rawExtraItemsTotal > 0 ? (amount / rawExtraItemsTotal * 100).toFixed(1) : 0;
                     return (
                       <div key={category} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <div className={`w-4 h-4 rounded-full ${categoryColors[category]}`}></div>
@@ -835,7 +927,7 @@ export default function BudgetPage() {
                   {!isPlanEditable(selectedTrip) && (
                     <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mt-4">
                       <p className="text-orange-800 dark:text-orange-200 text-sm">
-                        ⚠️ Bu plan düzenlenebilir değil. Sadece &quot;PLANLANDI&quot; statusündeki planlar düzenlenebilir.
+                        ⚠️ Bu plan düzenlenebilir değil. Sadece &quot;PLANLANDI&quot; statusündeki ve gelecek tarihli planlar düzenlenebilir.
                       </p>
                     </div>
                   )}
@@ -855,6 +947,19 @@ export default function BudgetPage() {
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
                           <div className="font-bold text-gray-800 dark:text-white">₺{item.amount.toLocaleString('tr-TR')}</div>
+                          {(() => {
+                            const isPerPersonCategory = perPersonCostCategories.some(cat => 
+                              item.category.toLowerCase().includes(cat.toLowerCase())
+                            );
+                            if (isPerPersonCategory && travelers > 1) {
+                              return (
+                                <div className="text-xs text-blue-600 dark:text-blue-400">
+                                  {travelers} kişi × ₺{item.amount.toLocaleString('tr-TR')} = ₺{(item.amount * travelers).toLocaleString('tr-TR')}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           <div className="text-sm text-gray-600 dark:text-gray-300">
                             {item.isEstimate ? 'Tahmini' : 'Kesin'}
                           </div>

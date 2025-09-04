@@ -84,7 +84,7 @@ export default function MapPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const mapInstance = new (window as any).google.maps.Map(mapRef.current, {
             zoom: 13,
-            center: { lat: 39.9334, lng: 32.8597 }, // Türkiye/Ankara
+            center: { lat: 41.0082, lng: 28.9784 }, // Türkiye/İstanbul
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mapTypeId: (window as any).google.maps.MapTypeId.ROADMAP,
           });
