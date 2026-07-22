@@ -10,6 +10,16 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    // Üretilen çıktılar lint'lenmez. (`next lint` bunları kendisi hariç
+    // tutuyordu; Next 16'da kaldırılacağı için `eslint .`e geçtik.)
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "src/generated/**",
+    ],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

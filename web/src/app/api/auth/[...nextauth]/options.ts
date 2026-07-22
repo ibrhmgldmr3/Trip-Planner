@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
@@ -24,21 +25,33 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Lütfen e-posta ve şifre giriniz");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
-        });
+        const email = credentials.email.trim().toLowerCase();
 
-        if (!user || !user.password) {
-          throw new Error("Kullanıcı bulunamadı");
+        // Deneme sayısını e-posta bazında sınırla (parola deneme saldırısı).
+        const quota = rateLimit(`login:${email}`, 10, 15 * 60 * 1000);
+        if (!quota.success) {
+          throw new Error(
+            "Çok fazla başarısız giriş denemesi. Lütfen biraz sonra tekrar deneyin"
+          );
         }
+
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        // "Kullanıcı yok" ile "şifre yanlış" ayrımı yapmıyoruz; ayrım
+        // saldırgana hangi e-postaların kayıtlı olduğunu söyler.
+        // Kullanıcı yoksa da bcrypt karşılaştırması yaparak yanıt süresini
+        // sabit tutuyoruz (timing üzerinden numaralandırma).
+        const passwordHash =
+          user?.password ??
+          "$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv";
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
-          user.password
+          passwordHash
         );
 
-        if (!isPasswordValid) {
-          throw new Error("Şifre yanlış");
+        if (!user?.password || !isPasswordValid) {
+          throw new Error("E-posta veya şifre hatalı");
         }
 
         return user;

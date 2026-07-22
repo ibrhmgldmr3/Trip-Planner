@@ -65,6 +65,12 @@ next-env.d.ts
 .directory
 .Trash-*
 
+# Local database dosyaları asla commit'lenmez
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
 # Logs
 logs
 *.log

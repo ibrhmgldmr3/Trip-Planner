@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 
 export default function TravelModePage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
 
   // Session kontrol
   if (status === 'loading') {

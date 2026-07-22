@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 
 export default function Home() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
 
   const handlePlanClick = (route: string) => {
     if (status === 'unauthenticated') {

@@ -5,6 +5,7 @@ import { useState, FormEvent, ChangeEvent, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface TripFormData {
   city: string;
@@ -862,7 +863,9 @@ export default function PlannerPage() {
                       color: #60a5fa;
                     }
                   `}</style>
-                  <div dangerouslySetInnerHTML={{ __html: tripPlan.plan.html }}></div>
+                  {/* API sanitize ediyor; burada da geçiriyoruz — eski
+                      kayıtlar sanitize edilmeden kaydedilmiş olabilir. */}
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(tripPlan.plan.html) }}></div>
                 </div>
               </div>
               

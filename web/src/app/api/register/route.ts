@@ -2,18 +2,34 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 // Schema for user registration
 const registerSchema = z.object({
-  name: z.string().min(2, "İsim en az 2 karakter olmalıdır"),
-  email: z.string().email("Geçerli bir e-posta giriniz"),
-  password: z.string().min(8, "Şifre en az 8 karakter olmalıdır"),
+  name: z.string().trim().min(2, "İsim en az 2 karakter olmalıdır").max(80),
+  email: z.string().trim().toLowerCase().email("Geçerli bir e-posta giriniz").max(200),
+  password: z
+    .string()
+    .min(8, "Şifre en az 8 karakter olmalıdır")
+    // bcrypt 72 byte'tan sonrasını sessizce yok sayar.
+    .max(72, "Şifre en fazla 72 karakter olabilir")
+    .regex(/[a-zA-Z]/, "Şifre en az bir harf içermelidir")
+    .regex(/[0-9]/, "Şifre en az bir rakam içermelidir"),
 });
 
 export async function POST(request: Request) {
   try {
+    // Toplu hesap açmayı yavaşlat.
+    const quota = rateLimit(`register:${clientIp(request)}`, 5, 60 * 60 * 1000);
+    if (!quota.success) {
+      return NextResponse.json(
+        { error: "Çok fazla kayıt denemesi yapıldı, daha sonra tekrar deneyin" },
+        { status: 429, headers: { "Retry-After": String(quota.retryAfter) } }
+      );
+    }
+
     const body = await request.json();
-    
+
     // Validate request body
     const result = registerSchema.safeParse(body);
     

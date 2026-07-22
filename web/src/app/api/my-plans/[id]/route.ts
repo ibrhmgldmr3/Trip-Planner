@@ -1,6 +1,6 @@
 // app/api/plan-detail/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 // NextAuth v4 ise:
 import { getServerSession } from "next-auth";
@@ -9,10 +9,6 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 // (Alternatif) NextAuth v5 (app router) kullanıyorsanız:
 // import { auth } from "@/auth";
 
-const prisma = new PrismaClient();
-// Geliştirme ortamında çoklu instance istemiyorsanız şu kalıbı da kullanabilirsiniz:
-// const prisma = globalThis.prisma ?? new PrismaClient();
-// if (process.env.NODE_ENV !== "production") globalThis.prisma = prisma;
 
 export async function DELETE(
   _request: NextRequest,

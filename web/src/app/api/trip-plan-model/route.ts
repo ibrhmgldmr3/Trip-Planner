@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { marked } from "marked";
+import { z } from "zod";
 import { env } from "@/env";
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { rateLimit } from "@/lib/rate-limit";
+import { sanitizeHtml } from "@/lib/sanitize";
 
-const prisma = new PrismaClient();
+const MODEL = "deepseek/deepseek-r1-0528-qwen3-8b:free";
+
+/**
+ * İstek gövdesi şeması. Uzunluk sınırları hem prompt injection yüzeyini
+ * hem de token maliyetini sınırlamak için var.
+ */
+const planRequestSchema = z.object({
+  city: z.string().trim().min(1, "Şehir bilgisi gereklidir").max(80),
+  country: z.string().trim().max(80).optional(),
+  startDate: z.string().max(40).optional(),
+  endDate: z.string().max(40).optional(),
+  budget: z.string().max(60).optional(),
+  transportation: z.union([z.array(z.string().max(60)).max(20), z.string().max(300)]).optional(),
+  interests: z.union([z.array(z.string().max(60)).max(20), z.string().max(300)]).optional(),
+  travelStyle: z.string().max(60).optional(),
+  accommodation: z.string().max(60).optional(),
+  specialRequirements: z.string().max(500).optional(),
+});
+
 
 // LLM yanıtını bölümlere ayırma fonksiyonu
 function parseTripPlanSections(markdownContent: string) {
@@ -214,64 +233,51 @@ async function saveTripPlanToDatabase(
   }
 }
 
-// Yanıt kaydetme yardımcı fonksiyonu
-function saveResponseToFile(content: string, type: 'success' | 'error' | 'html', city?: string): string | null {
-  try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const sanitizedCity = city?.replace(/[^a-zA-Z0-9]/g, '') || 'unknown';
-    const filename = `openrouter-response-${type}-${sanitizedCity}-${timestamp}.txt`;
-    const logsDir = join(process.cwd(), 'logs');
-    const filepath = join(logsDir, filename);
-    
-    // Logs klasörünü oluştur
-    try {
-      mkdirSync(logsDir, { recursive: true });
-    } catch {
-      // Klasör zaten var
-    }
-    
-    writeFileSync(filepath, content, 'utf8');
-    console.log(`?? Yanıt dosyaya kaydedildi: ${filename}`);
-    return filename;
-  } catch (error) {
-    console.error('? Dosyaya kaydetme hatası:', error);
-    return null;
-  }
-}
-
 // Ana POST handler
 export async function POST(request: NextRequest) {
   try {
-    console.log("?? Trip Plan API çağrısı başlatıldı");
-    
-    // İstek gövdesini al ve doğrula
-    const body = await request.json();
-    const { 
-      city, 
-      country, 
-      startDate, 
-      endDate, 
-      budget, 
-      transportation, 
-      interests,
-      travelStyle,
-      accommodation,
-      specialRequirements 
-    } = body;
-
-    // Debug: Gelen verilerin tiplerini kontrol et
-    console.log("?? Gelen veri tipleri:", {
-      interests: { type: typeof interests, isArray: Array.isArray(interests), value: interests },
-      transportation: { type: typeof transportation, isArray: Array.isArray(transportation), value: transportation }
-    });
-
-    // Şehir kontrolü
-    if (!city || typeof city !== 'string' || city.trim().length === 0) {
+    // Bu endpoint ücretli bir LLM çağrısı yapıyor: önce kimlik, sonra kota.
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: "Şehir bilgisi gereklidir" },
+        { error: "Plan oluşturmak için giriş yapmanız gerekiyor" },
+        { status: 401 }
+      );
+    }
+
+    const quota = rateLimit(`trip-plan:${session.user.email}`, 5, 60 * 60 * 1000);
+    if (!quota.success) {
+      return NextResponse.json(
+        {
+          error: `Saatlik plan oluşturma limitine ulaştınız. ${Math.ceil(
+            quota.retryAfter / 60
+          )} dakika sonra tekrar deneyin.`,
+        },
+        { status: 429, headers: { "Retry-After": String(quota.retryAfter) } }
+      );
+    }
+
+    // İstek gövdesini al ve doğrula
+    const parsed = planRequestSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Geçersiz istek" },
         { status: 400 }
       );
     }
+
+    const {
+      city,
+      country,
+      startDate,
+      endDate,
+      budget,
+      transportation,
+      interests,
+      travelStyle,
+      accommodation,
+      specialRequirements,
+    } = parsed.data;
 
     // Tarih doğrulaması
     if (startDate && endDate) {
@@ -293,6 +299,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Şema hem dizi hem virgüllü metin kabul ediyor; buradan sonrası dizi.
+    const toList = (value: string[] | string | undefined): string[] =>
+      Array.isArray(value)
+        ? value.map((v) => v.trim()).filter(Boolean)
+        : typeof value === "string"
+        ? value.split(",").map((v) => v.trim()).filter(Boolean)
+        : [];
+
+    const interestList = toList(interests);
+    const transportationList = toList(transportation);
+
     // Seyahat süresi hesaplama
     let durationText = "";
     if (startDate && endDate) {
@@ -309,11 +326,11 @@ export async function POST(request: NextRequest) {
 Benim için ${city.trim()}, ${country?.trim() || ''} için ${startDate ? `${startDate} ile ${endDate} tarihleri arasında (${durationText})` : ''} detaylı bir seyahat planı oluştur.
 
 ?? Tercihlerim:
-${interests && interests.length > 0 ? `• İlgi alanlarım: ${interests.join(', ')}` : '• İlgi alanlarım: Genel turistik yerler'}
+${interestList.length > 0 ? `• İlgi alanlarım: ${interestList.join(', ')}` : '• İlgi alanlarım: Genel turistik yerler'}
 ${travelStyle ? `• Seyahat tarzım: ${travelStyle}` : '• Seyahat tarzım: Standart'}
 ${budget ? `• Bütçem: ${budget}` : '• Bütçem: Orta'}
 ${accommodation ? `• Konaklama tercihi: ${accommodation}` : '• Konaklama tercihi: Otel'}
-${transportation && transportation.length > 0 ? `• Ulaşım tercihi: ${transportation.join(', ')}` : '• Ulaşım tercihi: Toplu taşıma'}
+${transportationList.length > 0 ? `• Ulaşım tercihi: ${transportationList.join(', ')}` : '• Ulaşım tercihi: Toplu taşıma'}
 ${specialRequirements ? `• Özel gereksinimler: ${specialRequirements}` : '• Özel gereksinimler: Yok'}
 
 ?? Lütfen şu konuları içeren kapsamlı bir plan hazırla:
@@ -346,11 +363,7 @@ ${specialRequirements ? `• Özel gereksinimler: ${specialRequirements}` : '•
 Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt ver.
 `;
 
-    console.log("?? OpenRouter API'sine istek gönderiliyor...");
-    console.log("?? API Key:", env.OPENROUTER_API_KEY ? "? Mevcut" : "? Eksik");
-    console.log("?? API URL:", "https://openrouter.ai/api/v1/chat/completions");
-    console.log("?? Model:", "openai/gpt-oss-20b:free");
-    console.log("??? Şehir:", city);
+    console.log(`OpenRouter isteği gönderiliyor (model: ${MODEL})`);
 
     // OpenRouter API çağrısı
     const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -358,11 +371,11 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
-        "HTTP-Referer": process.env.APP_URL || "http://localhost:3000",
+        "HTTP-Referer": env.APP_URL ?? "http://localhost:3000",
         "X-Title": "Trip Planner App"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.3-70b-instruct:free",
+        model: MODEL,
         messages: [
           { 
             role: "system", 
@@ -381,183 +394,112 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       })
     });
 
-    console.log("?? API Yanıtı alındı - Status:", openRouterResponse.status);
-
     // Yanıt içeriğini al
     let responseText = '';
     try {
       responseText = await openRouterResponse.text();
     } catch (error) {
-      console.error("? Yanıt okuma hatası:", error);
+      console.error("OpenRouter yanıtı okunamadı:", error);
       return NextResponse.json(
-        { 
-          error: "API yanıtı okunamadı",
-          details: { error: error instanceof Error ? error.message : String(error) }
-        },
-        { status: 500 }
+        { error: "AI servisinden yanıt alınamadı" },
+        { status: 502 }
       );
     }
 
-    // Content-Type kontrolü
     const contentType = openRouterResponse.headers.get('content-type') || '';
-    console.log("?? Content-Type:", contentType);
 
-    // Yanıtı dosyaya kaydet
-    const savedFile = saveResponseToFile(
-      `HTTP Status: ${openRouterResponse.status} ${openRouterResponse.statusText}\n` +
-      `Content-Type: ${contentType}\n` +
-      `Request Details:\n` +
-      `  - City: ${city}\n` +
-      `  - Country: ${country || 'N/A'}\n` +
-      `  - Date Range: ${startDate || 'N/A'} - ${endDate || 'N/A'}\n` +
-      `  - Interests: ${interests?.join(', ') || 'N/A'}\n` +
-      `  - Budget: ${budget || 'N/A'}\n\n` +
-      `Raw Response:\n` +
-      `${responseText}`,
-      contentType.includes('application/json') ? 'success' : 'html',
-      city
-    );
-
-    // Başarısız yanıt kontrolü
+    // Aşağıdaki hata dallarının ortak kuralı: ayrıntı yalnızca sunucu
+    // log'una yazılır, istemciye genel bir mesaj döner. Ham yanıt gövdesi
+    // sağlayıcı anahtarı/kota bilgisi içerebilir.
     if (!openRouterResponse.ok) {
-      let errorData;
-      
-      if (contentType.includes('application/json')) {
-        try {
-          errorData = JSON.parse(responseText);
-        } catch {
-          errorData = { 
-            error: "API JSON döndürmedi ancak JSON Content-Type belirtti",
-            rawResponse: responseText.substring(0, 500) 
-          };
-        }
-      } else {
-        errorData = {
-          error: "API başarısız HTTP status döndürdü",
-          contentType,
-          statusCode: openRouterResponse.status,
-          statusText: openRouterResponse.statusText,
-          responsePreview: responseText.substring(0, 500)
-        };
-      }
+      console.error("OpenRouter API hatası:", {
+        status: openRouterResponse.status,
+        contentType,
+        body: responseText.slice(0, 1000),
+      });
 
-      console.error("? OpenRouter API Hatası:", errorData);
-      
+      const status = openRouterResponse.status === 429 ? 429 : 502;
       return NextResponse.json(
-        { 
-          error: "AI seyahat planı oluşturulurken hata oluştu", 
-          details: {
-            ...errorData,
-            savedToFile: savedFile
-          }
+        {
+          error:
+            status === 429
+              ? "AI servisi şu an yoğun, birkaç dakika sonra tekrar deneyin"
+              : "AI seyahat planı oluşturulurken hata oluştu",
         },
-        { status: openRouterResponse.status }
+        { status }
       );
     }
 
-    // JSON parse kontrolü
     if (!contentType.includes('application/json')) {
-      console.error("? API JSON döndürmedi, Content-Type:", contentType);
-      
+      console.error("OpenRouter beklenmeyen içerik tipi:", contentType, responseText.slice(0, 1000));
       return NextResponse.json(
-        { 
-          error: "API beklenmeyen yanıt formatı döndürdü",
-          details: {
-            contentType,
-            responsePreview: responseText.substring(0, 500),
-            fullLength: responseText.length,
-            savedToFile: savedFile
-          }
-        },
-        { status: 500 }
+        { error: "AI servisinden beklenmeyen yanıt alındı" },
+        { status: 502 }
       );
     }
 
-    // JSON ayrıştırma
     let apiData;
     try {
       apiData = JSON.parse(responseText);
     } catch (parseError) {
-      console.error("? JSON ayrıştırma hatası:", parseError);
-      
+      console.error("OpenRouter JSON ayrıştırma hatası:", parseError, responseText.slice(0, 1000));
       return NextResponse.json(
-        { 
-          error: "API yanıtı geçersiz JSON formatında",
-          details: {
-            parseError: parseError instanceof Error ? parseError.message : String(parseError),
-            responsePreview: responseText.substring(0, 500),
-            savedToFile: savedFile
-          }
-        },
-        { status: 500 }
+        { error: "AI servisinden beklenmeyen yanıt alındı" },
+        { status: 502 }
       );
     }
 
     // Yanıt yapısı kontrolü
-    if (!apiData.choices || !apiData.choices[0] || !apiData.choices[0].message || !apiData.choices[0].message.content) {
-      console.error("? API yanıt yapısı beklenmeyen:", apiData);
-      
+    const planText: unknown = apiData?.choices?.[0]?.message?.content;
+    if (typeof planText !== "string" || planText.trim().length === 0) {
+      console.error("OpenRouter beklenmeyen yanıt yapısı:", JSON.stringify(apiData).slice(0, 1000));
       return NextResponse.json(
-        { 
-          error: "API beklenmeyen yanıt yapısı döndürdü",
-          details: {
-            receivedData: apiData,
-            savedToFile: savedFile
-          }
-        },
-        { status: 500 }
+        { error: "AI servisinden beklenmeyen yanıt alındı" },
+        { status: 502 }
       );
     }
 
-    const planText = apiData.choices[0].message.content;
-    console.log("? Seyahat planı başarıyla oluşturuldu, uzunluk:", planText.length);
+    console.log("Seyahat planı oluşturuldu, uzunluk:", planText.length);
 
-    // Markdown'ı HTML'e dönüştür
+    // Markdown'ı HTML'e dönüştür ve sanitize et.
+    // marked ham HTML'i escape etmez; model çıktısı güvenilmez girdidir.
     let htmlContent: string;
     try {
       const markdownResult = marked.parse(planText);
-      htmlContent = typeof markdownResult === 'string' ? markdownResult : await markdownResult;
+      const rawHtml = typeof markdownResult === 'string' ? markdownResult : await markdownResult;
+      htmlContent = sanitizeHtml(rawHtml);
     } catch (markdownError) {
-      console.warn("?? Markdown dönüştürme hatası:", markdownError);
-      htmlContent = `<pre>${planText}</pre>`;
+      console.warn("Markdown dönüştürme hatası:", markdownError);
+      htmlContent = sanitizeHtml(`<pre>${planText}</pre>`);
     }
 
     // Veritabanına kaydet
     const savedTripPlan = await saveTripPlanToDatabase(
-      { 
-      city: city.trim(),
-      country: country?.trim(),
-      duration: durationText
+      {
+        city: city.trim(),
+        country: country?.trim(),
+        duration: durationText,
       },
       {
-      city: city.trim(),
-      country: country?.trim(),
-      startDate,
-      endDate,
-      budget,
-      interests: Array.isArray(interests) 
-        ? interests.map((i: string) => i.trim()) 
-        : typeof interests === 'string' 
-        ? interests.split(',').map((i: string) => i.trim()) 
-        : [],
-      travelStyle,
-      accommodation,
-      transportation: Array.isArray(transportation) 
-        ? transportation.map((t: string) => t.trim()) 
-        : typeof transportation === 'string' 
-        ? transportation.split(',').map((t: string) => t.trim()) 
-        : []
+        city: city.trim(),
+        country: country?.trim(),
+        startDate,
+        endDate,
+        budget,
+        interests: interestList,
+        travelStyle,
+        accommodation,
+        transportation: transportationList,
       },
       planText,
       htmlContent,
-      "openai/gpt-oss-20b:free"
+      MODEL
     );
-  
 
-    console.log("?? Veritabanı kaydı:", savedTripPlan ? "Başarılı" : "Başarısız");
+    console.log("Veritabanı kaydı:", savedTripPlan ? "başarılı" : "başarısız");
 
     // Başarılı yanıt döndür
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       plan: {
         markdown: planText,
@@ -570,32 +512,18 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
         tripPlanId: savedTripPlan?.id,
         metadata: {
           generatedAt: new Date().toISOString(),
-          model: "openai/gpt-oss-20b:free",
-          savedToFile: savedFile,
+          model: MODEL,
           savedToDatabase: !!savedTripPlan
         }
       }
     });
 
   } catch (error: unknown) {
-    console.error("?? Genel hata:", error);
-    
-    const errorDetails = error instanceof Error 
-      ? { 
-          name: error.name, 
-          message: error.message,
-          stack: error.stack 
-        }
-      : { 
-          unknown: "Bilinmeyen hata tipi",
-          value: String(error)
-        };
-    
+    // Ayrıntı log'a; istemciye yalnızca genel mesaj (stack trace sızdırma).
+    console.error("Trip plan oluşturma hatası:", error);
+
     return NextResponse.json(
-      { 
-        error: "Seyahat planı oluşturulurken beklenmeyen bir hata oluştu",
-        details: errorDetails
-      },
+      { error: "Seyahat planı oluşturulurken beklenmeyen bir hata oluştu" },
       { status: 500 }
     );
   }

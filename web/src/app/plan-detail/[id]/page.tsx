@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { TripStatus } from '@prisma/client';
 import { getTripStatus, getStatusLabel, getStatusColor, canCancel, canMarkAsDone } from '@/lib/trip-status';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface DayActivity {
   id?: string;
@@ -141,15 +142,19 @@ export default function PlanDetailPage() {
 
   const formatContent = (content: string | null) => {
     if (!content) return null;
-    
-    // Markdown formatını basic HTML'e çevir
-    return content
+
+    // Markdown formatını basic HTML'e çevir.
+    const html = content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/###\s(.*?)\n/g, '<h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4 mb-2">$1</h3>')
       .replace(/##\s(.*?)\n/g, '<h2 class="text-xl font-bold text-gray-800 dark:text-white mt-6 mb-3">$1</h2>')
       .replace(/^\-\s(.*?)$/gm, '<li class="ml-4">• $1</li>')
       .replace(/\n/g, '<br />');
+
+    // İçerik LLM tarafından üretilip DB'ye yazılıyor; ham HTML'i asla
+    // doğrudan dangerouslySetInnerHTML'e vermiyoruz.
+    return sanitizeHtml(html);
   };
 
   // Render budget details as HTML string if JSON is provided; fallback to formatted content
@@ -213,7 +218,7 @@ export default function PlanDetailPage() {
           html += '</div>';
         }
 
-        return html;
+        return sanitizeHtml(html);
       }
     } catch {}
 
@@ -426,7 +431,7 @@ export default function PlanDetailPage() {
   };
 
   const formatDayContent = (content: string) => {
-    return content
+    return sanitizeHtml(content
       .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-600 dark:text-blue-400">$1</strong>')
       .replace(/\*(.*?)\*/g, '<em class="text-green-600 dark:text-green-400">$1</em>')
       .replace(/###\s(.*?)\n/g, '<h4 class="text-md font-semibold text-purple-600 dark:text-purple-400 mt-3 mb-2">$1</h4>')
@@ -434,7 +439,7 @@ export default function PlanDetailPage() {
       .replace(/^\-\s(.*?)$/gm, '<li class="flex items-start space-x-2 mb-1"><span class="text-blue-500 mt-1">•</span><span>$1</span></li>')
       .replace(/(\d{1,2}:\d{2})/g, '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 mr-2">$1</span>')
       .replace(/₺[\d,]+/g, '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">$&</span>')
-      .replace(/\n/g, '<br />');
+      .replace(/\n/g, '<br />'));
   };
 
   if (loading) {

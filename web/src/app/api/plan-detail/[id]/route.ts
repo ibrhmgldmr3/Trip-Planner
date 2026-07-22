@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
-const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +13,7 @@ export async function GET(
     console.log(`Plan detayı getiriliyor: ${planId}`);
     
     // Session kontrolü
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session || !session.user?.email) {
       return NextResponse.json(
@@ -124,7 +124,7 @@ export async function PATCH(
     console.log(`Plan maliyeti güncelleniyor: ${planId}`);
     
     // Session kontrolü
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session || !session.user?.email) {
       return NextResponse.json(
@@ -238,7 +238,7 @@ export async function PUT(
     console.log(`Günlük planlar güncelleniyor: ${planId}`);
     
     // Session kontrolü
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session || !session.user?.email) {
       return NextResponse.json(
