@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -24,7 +24,7 @@ export default function TravelModePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Plan oluşturmak için önce giriş yapmanız gerekiyor.
@@ -133,7 +133,7 @@ export default function TravelModePage() {
               </button>
               
               <div className="mt-4 text-center">
-                <span className="text-sm text-gray-500 dark:text-gray-400">⏱️ Yaklaşık 2-3 dakika</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Yaklaşık 2-3 dakika</span>
               </div>
             </div>
           </div>
@@ -199,7 +199,7 @@ export default function TravelModePage() {
               </button>
               
               <div className="mt-4 text-center">
-                <span className="text-sm text-gray-500 dark:text-gray-400">⏱️ Yaklaşık 10-15 dakika</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Yaklaşık 10-15 dakika</span>
               </div>
             </div>
           </div>
@@ -221,19 +221,19 @@ export default function TravelModePage() {
               </h4>
               <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   İlk kez seyahat planlıyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Hızlı plan istiyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Yeni öneriler keşfetmek istiyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Temel tercihleri belirtmek yeterliyse
                 </li>
               </ul>
@@ -248,19 +248,19 @@ export default function TravelModePage() {
               </h4>
               <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Deneyimli seyahat planlayıcısıysanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Her detayı kontrol etmek istiyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Bütçe konusunda titizseniz
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
+                  <span className="text-green-500 mr-2">?</span>
                   Özel gereksinimleriniz varsa
                 </li>
               </ul>
@@ -271,3 +271,5 @@ export default function TravelModePage() {
     </div>
   );
 }
+
+

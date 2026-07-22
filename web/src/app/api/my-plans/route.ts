@@ -7,15 +7,15 @@ const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    console.log("📋 Kaydedilmiş planlar getiriliyor...");
-    console.log("🔍 API endpoint çağrıldı - /api/my-plans");
+    console.log("?? Kaydedilmiş planlar getiriliyor...");
+    console.log("?? API endpoint çağrıldı - /api/my-plans");
     
     // Session kontrolü
     const session = await getServerSession(authOptions);
-    console.log("🔑 Session kontrol edildi:", session ? "Mevcut" : "Yok");
+    console.log("?? Session kontrol edildi:", session ? "Mevcut" : "Yok");
     
     if (!session || !session.user?.email) {
-      console.log("❌ Session bulunamadı veya email eksik");
+      console.log("? Session bulunamadı veya email eksik");
       return NextResponse.json(
         { error: "Giriş yapmanız gerekiyor" },
         { status: 401 }
@@ -52,14 +52,17 @@ export async function GET() {
         createdAt: true,
         travel_style: true,
         budget_level: true,
-        user_id: true
+        user_id: true,
+        status: true,
+        completedAt: true,
+        updatedAt: true
       },
       orderBy: {
         createdAt: 'desc'
       }
     });
 
-    console.log(`✅ Kullanıcı ${session.user.email} için ${plans.length} plan bulundu`);
+    console.log(`? Kullanıcı ${session.user.email} için ${plans.length} plan bulundu`);
 
     return NextResponse.json({
       success: true,
@@ -68,7 +71,7 @@ export async function GET() {
     });
 
   } catch (error: unknown) {
-    console.error("💥 Planları getirme hatası:", error);
+    console.error("?? Planları getirme hatası:", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -89,3 +92,4 @@ export async function GET() {
     );
   }
 }
+

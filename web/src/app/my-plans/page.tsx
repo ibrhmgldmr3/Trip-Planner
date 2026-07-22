@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
@@ -20,6 +20,8 @@ interface SavedPlan {
   travel_style: string | null;
   user_id: string | null;
   status: TripStatus;
+  completedAt: string | null;
+  updatedAt: string;
 }
 
 export default function MyPlansPage() {
@@ -28,6 +30,60 @@ export default function MyPlansPage() {
   const [plans, setPlans] = useState<SavedPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Tarihi geçmiş planları COMPLETED statüsüne geçir
+  const checkAndUpdateExpiredPlans = useCallback(async (planList: SavedPlan[]): Promise<SavedPlan[]> => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Bugünün başlangıcı
+    
+    const updatedPlans = [...planList];
+    
+    for (let i = 0; i < updatedPlans.length; i++) {
+      const plan = updatedPlans[i];
+      const endDate = new Date(plan.endDate);
+      endDate.setHours(23, 59, 59, 999); // Gün sonuna set et
+      
+      // Eğer plan PLANNED veya ACTIVE statüsünde ve bitiş tarihi geçmişse
+      if ((plan.status === 'PLANNED' || plan.status === 'ACTIVE') && endDate < today) {
+        try {
+          const response = await fetch('/api/plan-status', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ planId: plan.id, status: 'COMPLETED' }),
+          });
+
+          if (response.ok) {
+            updatedPlans[i] = { ...plan, status: 'COMPLETED' as TripStatus };
+          }
+        } catch (error) {
+          console.error('Error updating expired plan status:', error);
+        }
+      }
+    }
+    
+    return updatedPlans;
+  }, []);
+
+  const fetchPlans = useCallback(async () => {
+    try {
+      const response = await fetch('/api/my-plans');
+      if (response.ok) {
+        const data = await response.json();
+        // Tarih kontrolü yaparak expired planları COMPLETED statüsüne geçir
+        const updatedPlans = await checkAndUpdateExpiredPlans(data.plans);
+        setPlans(updatedPlans);
+      } else {
+        setError('Planlar yüklenemedi');
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Planlar yüklenemedi');
+    } finally {
+      setLoading(false);
+    }
+  }, [checkAndUpdateExpiredPlans]);
 
   useEffect(() => {
     if (status === 'loading') return; 
@@ -41,36 +97,27 @@ export default function MyPlansPage() {
     if (status === 'authenticated') {
       fetchPlans();
     }
-  }, [status, router]);
-
-  const fetchPlans = async () => {
-    try {
-      const response = await fetch('/api/my-plans');
-      if (response.ok) {
-        const data = await response.json();
-        setPlans(data.plans);
-      } else {
-        setError('Planlar yüklenemedi');
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Planlar yüklenemedi');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [status, router, fetchPlans]);
 
   const updatePlanStatus = async (planId: string, newStatus: TripStatus) => {
     try {
-      const response = await fetch(`/api/trip-plans/${planId}/status`, {
-        method: 'PATCH',
+      console.log('Plan statüsü güncelleme başlatıldı:', { planId, newStatus });
+      
+      const response = await fetch('/api/plan-status', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ planId, status: newStatus }),
       });
 
+      console.log('API Response Status:', response.status);
+      console.log('API Response OK:', response.ok);
+
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('? API Response Data:', responseData);
+        
         toast.success(
           newStatus === TripStatus.CANCELLED ? 'Plan iptal edildi' :
           newStatus === TripStatus.DONE ? 'Plan tamamlandı ve Gezilerim\'e eklendi' :
@@ -78,7 +125,9 @@ export default function MyPlansPage() {
         );
         fetchPlans(); // Refresh the list
       } else {
-        toast.error('Plan durumu güncellenemedi');
+        const errorData = await response.json();
+        console.error('? API Error Response:', errorData);
+        toast.error(errorData.error || 'Plan durumu güncellenemedi');
       }
     } catch (err) {
       console.error('Status update error:', err);
@@ -129,7 +178,7 @@ export default function MyPlansPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -155,7 +204,7 @@ export default function MyPlansPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
+          <div className="text-6xl mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <button
@@ -195,7 +244,7 @@ export default function MyPlansPage() {
         {/* Plans Grid */}
         {plans.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">✈️</div>
+            <div className="text-6xl mb-4"></div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
               Henüz Plan Yok
             </h2>
@@ -317,6 +366,24 @@ export default function MyPlansPage() {
                           Tamamlandı
                         </button>
                       )}
+                      
+                      {/* COMPLETED planlar için özel butonlar */}
+                      {currentStatus === TripStatus.COMPLETED && (
+                        <>
+                          <button
+                            onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
+                            className="flex-1 bg-green-500 text-white py-2 px-3 rounded-lg hover:bg-green-600 transition-colors duration-200 text-xs font-medium"
+                          >
+                            ? Uygulandı
+                          </button>
+                          <button
+                            onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
+                            className="flex-1 bg-red-500 text-white py-2 px-3 rounded-lg hover:bg-red-600 transition-colors duration-200 text-xs font-medium"
+                          >
+                            ? İptal
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -329,3 +396,6 @@ export default function MyPlansPage() {
     </div>
   );
 }
+
+
+

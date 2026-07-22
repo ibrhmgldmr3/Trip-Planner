@@ -41,12 +41,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Query conditions for budget items
-    const whereCondition: { tripId: string; category?: string } = { tripId };
-
-    // If category is provided, filter by category
-    if (category) {
-      whereCondition.category = category;
-    }
+    const whereCondition = category 
+      ? { tripId, category } 
+      : { tripId };
 
     // Get budget items for the trip
     const budgetItems = await prisma.budgetItem.findMany({
@@ -265,3 +262,4 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+

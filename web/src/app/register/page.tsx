@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -259,7 +259,7 @@ export default function RegisterPage() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-800">
-            Zaten hesabınız var mı?{" "}
+            Zaten hesabınız var mı₺{" "}
             <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
               Giriş Yap
             </Link>
@@ -269,3 +269,5 @@ export default function RegisterPage() {
     </main>
   );
 }
+
+

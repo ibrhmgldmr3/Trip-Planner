@@ -17,3 +17,4 @@ export const env = createEnv({
     NEXT_PUBLIC_OPENROUTER_API_KEY: process.env.NEXT_PUBLIC_OPENROUTER_API_KEY,
   },
 });
+

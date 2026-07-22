@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -168,7 +168,7 @@ function LoginForm() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-800">
-            Hesabınız yok mu?{" "}
+            Hesabınız yok mu₺{" "}
             <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
               Kayıt Ol
             </Link>
@@ -187,3 +187,4 @@ export default function LoginPage() {
     </Suspense>
   );
 }
+

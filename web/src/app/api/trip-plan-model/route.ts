@@ -92,13 +92,13 @@ function extractBudgetInfo(content: string) {
   let totalCost = 0;
   let dailyCost = 0;
 
-  // Türk Lirası formatındaki sayıları bul (₺, TL, lira)
-  const turkishLiraRegex = /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*[₺TL]/gi;
+  // Türk Lirası formatındaki sayıları bul (?, TL, lira)
+  const turkishLiraRegex = /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*[?TL]/gi;
   const matches = content.match(turkishLiraRegex);
   
   if (matches) {
     const amounts = matches.map(match => {
-      const numberStr = match.replace(/[₺TL\s]/g, '').replace(/\./g, '').replace(',', '.');
+      const numberStr = match.replace(/[?TL\s]/g, '').replace(/\./g, '').replace(',', '.');
       return parseFloat(numberStr) || 0;
     });
     
@@ -147,8 +147,8 @@ async function saveTripPlanToDatabase(
     const budgetInfo = extractBudgetInfo(sections.butce_tahmini || markdownContent);
 
     // Debug: Günlük plan içeriğini kontrol et
-    console.log("📅 Günlük plan uzunluğu:", sections.gun_plani?.length || 0);
-    console.log("📅 Günlük plan önizleme:", sections.gun_plani?.substring(0, 200) + "...");
+    console.log("?? Günlük plan uzunluğu:", sections.gun_plani?.length || 0);
+    console.log("?? Günlük plan önizleme:", sections.gun_plani?.substring(0, 200) + "...");
     
     // Get session bilgisini al
     let userId = null;
@@ -159,12 +159,12 @@ async function saveTripPlanToDatabase(
       if (session?.user) {
         userId = session.user.id || null;
         userEmail = session.user.email || null;
-        console.log("✅ Session bulundu:", { userId, userEmail });
+        console.log("? Session bulundu:", { userId, userEmail });
       } else {
-        console.log("ℹ️ Session bulunamadı - anonim kullanıcı");
+        console.log("?? Session bulunamadı - anonim kullanıcı");
       }
     } catch (sessionError) {
-      console.error("❌ Session alma hatası:", sessionError);
+      console.error("? Session alma hatası:", sessionError);
     }
 
     const tripPlan = await prisma.tripPlan.create({
@@ -206,10 +206,10 @@ async function saveTripPlanToDatabase(
       }
     });
 
-    console.log("✅ Plan veritabanına kaydedildi:", tripPlan.id);
+    console.log("? Plan veritabanına kaydedildi:", tripPlan.id);
     return tripPlan;
   } catch (error) {
-    console.error("❌ Veritabanı kaydetme hatası:", error);
+    console.error("? Veritabanı kaydetme hatası:", error);
     return null;
   }
 }
@@ -231,10 +231,10 @@ function saveResponseToFile(content: string, type: 'success' | 'error' | 'html',
     }
     
     writeFileSync(filepath, content, 'utf8');
-    console.log(`📄 Yanıt dosyaya kaydedildi: ${filename}`);
+    console.log(`?? Yanıt dosyaya kaydedildi: ${filename}`);
     return filename;
   } catch (error) {
-    console.error('❌ Dosyaya kaydetme hatası:', error);
+    console.error('? Dosyaya kaydetme hatası:', error);
     return null;
   }
 }
@@ -242,7 +242,7 @@ function saveResponseToFile(content: string, type: 'success' | 'error' | 'html',
 // Ana POST handler
 export async function POST(request: NextRequest) {
   try {
-    console.log("🚀 Trip Plan API çağrısı başlatıldı");
+    console.log("?? Trip Plan API çağrısı başlatıldı");
     
     // İstek gövdesini al ve doğrula
     const body = await request.json();
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Debug: Gelen verilerin tiplerini kontrol et
-    console.log("📊 Gelen veri tipleri:", {
+    console.log("?? Gelen veri tipleri:", {
       interests: { type: typeof interests, isArray: Array.isArray(interests), value: interests },
       transportation: { type: typeof transportation, isArray: Array.isArray(transportation), value: transportation }
     });
@@ -298,7 +298,9 @@ export async function POST(request: NextRequest) {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      const tripDuration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
+      const tripDuration = daysDiff === 0 ? 1 : daysDiff;
       durationText = `${tripDuration} gün`;
     }
 
@@ -306,7 +308,7 @@ export async function POST(request: NextRequest) {
     const prompt = `
 Benim için ${city.trim()}, ${country?.trim() || ''} için ${startDate ? `${startDate} ile ${endDate} tarihleri arasında (${durationText})` : ''} detaylı bir seyahat planı oluştur.
 
-🎯 Tercihlerim:
+?? Tercihlerim:
 ${interests && interests.length > 0 ? `• İlgi alanlarım: ${interests.join(', ')}` : '• İlgi alanlarım: Genel turistik yerler'}
 ${travelStyle ? `• Seyahat tarzım: ${travelStyle}` : '• Seyahat tarzım: Standart'}
 ${budget ? `• Bütçem: ${budget}` : '• Bütçem: Orta'}
@@ -314,7 +316,7 @@ ${accommodation ? `• Konaklama tercihi: ${accommodation}` : '• Konaklama ter
 ${transportation && transportation.length > 0 ? `• Ulaşım tercihi: ${transportation.join(', ')}` : '• Ulaşım tercihi: Toplu taşıma'}
 ${specialRequirements ? `• Özel gereksinimler: ${specialRequirements}` : '• Özel gereksinimler: Yok'}
 
-📋 Lütfen şu konuları içeren kapsamlı bir plan hazırla:
+?? Lütfen şu konuları içeren kapsamlı bir plan hazırla:
 
 1. **Şehir Hakkında Genel Bilgi**
    - Kısa tanıtım
@@ -344,11 +346,11 @@ ${specialRequirements ? `• Özel gereksinimler: ${specialRequirements}` : '•
 Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt ver.
 `;
 
-    console.log("📤 OpenRouter API'sine istek gönderiliyor...");
-    console.log("🔑 API Key:", env.OPENROUTER_API_KEY ? "✅ Mevcut" : "❌ Eksik");
-    console.log("🌐 API URL:", "https://openrouter.ai/api/v1/chat/completions");
-    console.log("🤖 Model:", "deepseek/deepseek-r1-0528-qwen3-8b:free");
-    console.log("🏙️ Şehir:", city);
+    console.log("?? OpenRouter API'sine istek gönderiliyor...");
+    console.log("?? API Key:", env.OPENROUTER_API_KEY ? "? Mevcut" : "? Eksik");
+    console.log("?? API URL:", "https://openrouter.ai/api/v1/chat/completions");
+    console.log("?? Model:", "openai/gpt-oss-20b:free");
+    console.log("??? Şehir:", city);
 
     // OpenRouter API çağrısı
     const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -360,7 +362,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
         "X-Title": "Trip Planner App"
       },
       body: JSON.stringify({
-        model: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        model: "meta-llama/llama-3.3-70b-instruct:free",
         messages: [
           { 
             role: "system", 
@@ -379,14 +381,14 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       })
     });
 
-    console.log("📡 API Yanıtı alındı - Status:", openRouterResponse.status);
+    console.log("?? API Yanıtı alındı - Status:", openRouterResponse.status);
 
     // Yanıt içeriğini al
     let responseText = '';
     try {
       responseText = await openRouterResponse.text();
     } catch (error) {
-      console.error("❌ Yanıt okuma hatası:", error);
+      console.error("? Yanıt okuma hatası:", error);
       return NextResponse.json(
         { 
           error: "API yanıtı okunamadı",
@@ -398,7 +400,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
 
     // Content-Type kontrolü
     const contentType = openRouterResponse.headers.get('content-type') || '';
-    console.log("📄 Content-Type:", contentType);
+    console.log("?? Content-Type:", contentType);
 
     // Yanıtı dosyaya kaydet
     const savedFile = saveResponseToFile(
@@ -439,7 +441,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
         };
       }
 
-      console.error("❌ OpenRouter API Hatası:", errorData);
+      console.error("? OpenRouter API Hatası:", errorData);
       
       return NextResponse.json(
         { 
@@ -455,7 +457,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
 
     // JSON parse kontrolü
     if (!contentType.includes('application/json')) {
-      console.error("❌ API JSON döndürmedi, Content-Type:", contentType);
+      console.error("? API JSON döndürmedi, Content-Type:", contentType);
       
       return NextResponse.json(
         { 
@@ -476,7 +478,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     try {
       apiData = JSON.parse(responseText);
     } catch (parseError) {
-      console.error("❌ JSON ayrıştırma hatası:", parseError);
+      console.error("? JSON ayrıştırma hatası:", parseError);
       
       return NextResponse.json(
         { 
@@ -493,7 +495,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
 
     // Yanıt yapısı kontrolü
     if (!apiData.choices || !apiData.choices[0] || !apiData.choices[0].message || !apiData.choices[0].message.content) {
-      console.error("❌ API yanıt yapısı beklenmeyen:", apiData);
+      console.error("? API yanıt yapısı beklenmeyen:", apiData);
       
       return NextResponse.json(
         { 
@@ -508,7 +510,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     }
 
     const planText = apiData.choices[0].message.content;
-    console.log("✅ Seyahat planı başarıyla oluşturuldu, uzunluk:", planText.length);
+    console.log("? Seyahat planı başarıyla oluşturuldu, uzunluk:", planText.length);
 
     // Markdown'ı HTML'e dönüştür
     let htmlContent: string;
@@ -516,7 +518,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       const markdownResult = marked.parse(planText);
       htmlContent = typeof markdownResult === 'string' ? markdownResult : await markdownResult;
     } catch (markdownError) {
-      console.warn("⚠️ Markdown dönüştürme hatası:", markdownError);
+      console.warn("?? Markdown dönüştürme hatası:", markdownError);
       htmlContent = `<pre>${planText}</pre>`;
     }
 
@@ -548,11 +550,11 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
       },
       planText,
       htmlContent,
-      "deepseek/deepseek-r1-0528-qwen3-8b:free"
+      "openai/gpt-oss-20b:free"
     );
   
 
-    console.log("💾 Veritabanı kaydı:", savedTripPlan ? "Başarılı" : "Başarısız");
+    console.log("?? Veritabanı kaydı:", savedTripPlan ? "Başarılı" : "Başarısız");
 
     // Başarılı yanıt döndür
     return NextResponse.json({ 
@@ -576,7 +578,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     });
 
   } catch (error: unknown) {
-    console.error("💥 Genel hata:", error);
+    console.error("?? Genel hata:", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -598,3 +600,4 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     );
   }
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -491,7 +491,7 @@ export default function TransportationPage() {
           <div className="space-y-4">
             {filteredTransportations.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">🚫</div>
+                <div className="text-6xl mb-4"></div>
                 <h3 className="text-xl font-semibold text-gray-300 mb-2">Sonuç Bulunamadı</h3>
                 <p className="text-gray-400 mb-4">
                   Seçtiğiniz tarih ve güzergah için ulaşım seçeneği bulunmuyor.
@@ -586,3 +586,5 @@ export default function TransportationPage() {
     </main>
   );
 }
+
+
