@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ trips });
   } catch (error) {
-    console.error("Error fetching trips:", error);
+    logger.error("Seyahatler getirilemedi", error);
     return NextResponse.json(
       { error: "Failed to fetch trips" },
       { status: 500 }
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ trip });
   } catch (error) {
-    console.error("Error creating trip:", error);
+    logger.error("Seyahat oluşturulamadı", error);
     return NextResponse.json(
       { error: "Failed to create trip" },
       { status: 500 }
@@ -164,7 +165,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ trip: updatedTrip });
   } catch (error) {
-    console.error("Error updating trip:", error);
+    logger.error("Seyahat güncellenemedi", error);
     return NextResponse.json(
       { error: "Failed to update trip" },
       { status: 500 }
@@ -212,7 +213,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting trip:", error);
+    logger.error("Seyahat silinemedi", error);
     return NextResponse.json(
       { error: "Failed to delete trip" },
       { status: 500 }

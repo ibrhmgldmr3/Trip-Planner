@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 // NextAuth v4 ise:
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 // (Alternatif) NextAuth v5 (app router) kullanıyorsanız:
 // import { auth } from "@/auth";
@@ -16,7 +17,6 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     const { id: planId } = await context.params;
-    console.log(`Plan siliniyor: ${planId}`);
 
     // Session kontrolü
     // NextAuth v4:
@@ -48,7 +48,7 @@ export async function DELETE(
     // Plan var mı ve sahibi mi?
     const plan = await prisma.tripPlan.findUnique({
       where: { id: planId },
-      select: { user_id: true, city: true },
+      select: { userId: true, city: true },
     });
 
     if (!plan) {
@@ -58,7 +58,7 @@ export async function DELETE(
       );
     }
 
-    if (plan.user_id !== user.id) {
+    if (plan.userId !== user.id) {
       return NextResponse.json(
         { error: "Bu planı silme yetkiniz yok" },
         { status: 403 }
@@ -68,14 +68,14 @@ export async function DELETE(
     // Sil
     await prisma.tripPlan.delete({ where: { id: planId } });
 
-    console.log(`Plan başarıyla silindi: ${plan.city}`);
+    logger.info("Plan silindi", { planId });
 
     return NextResponse.json({
       success: true,
       message: "Plan başarıyla silindi",
     });
   } catch (error: unknown) {
-    console.error("Plan silme hatası:", error);
+    logger.error("Plan silinemedi", error);
 
     const errorDetails =
       error instanceof Error

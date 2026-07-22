@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { updateTripWithAiData } from "@/lib/trip-services";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error applying AI data to trip:", error);
+    logger.error("AI verisi seyahate uygulanamadı", error);
     return NextResponse.json(
       { error: "Failed to apply AI data to trip" },
       { status: 500 }

@@ -31,6 +31,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Birim testler saf fonksiyonları kapsıyor; veritabanı ya da ağ istemiyor.
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
         env:

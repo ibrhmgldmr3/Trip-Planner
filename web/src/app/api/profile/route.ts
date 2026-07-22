@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 
 export async function GET(): Promise<NextResponse> {
@@ -63,14 +64,14 @@ export async function GET(): Promise<NextResponse> {
     // Kullanıcının seyahat istatistiklerini hesapla
     const tripStats = await prisma.tripPlan.groupBy({
       by: ['status'],
-      where: { user_id: user.id },
+      where: { userId: user.id },
       _count: { id: true },
       _sum: { total_cost: true },
     });
 
     // Toplam seyahat sayısı
     const totalTrips = await prisma.tripPlan.count({
-      where: { user_id: user.id },
+      where: { userId: user.id },
     });
 
     // Tamamlanan seyahatler
@@ -86,7 +87,7 @@ export async function GET(): Promise<NextResponse> {
     // En popüler destinasyon
     const popularDestination = await prisma.tripPlan.groupBy({
       by: ['city'],
-      where: { user_id: user.id },
+      where: { userId: user.id },
       _count: { city: true },
       orderBy: { _count: { city: 'desc' } },
       take: 1,
@@ -95,7 +96,7 @@ export async function GET(): Promise<NextResponse> {
     // Ortalama seyahat süresi (gün olarak)
     const tripDurations = await prisma.tripPlan.findMany({
       where: { 
-        user_id: user.id,
+        userId: user.id,
         startDate: { not: null },
         endDate: { not: null }
       },
@@ -131,7 +132,7 @@ export async function GET(): Promise<NextResponse> {
       stats,
     });
   } catch (error: unknown) {
-    console.error("Profile fetch hatası:", error);
+    logger.error("Profil getirilemedi", error);
     
     return NextResponse.json(
       { 

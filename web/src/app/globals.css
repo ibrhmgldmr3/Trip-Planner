@@ -1,6 +1,39 @@
 @import "tailwindcss";
 
+/* Tailwind v4'te 'dark' varyantı varsayılan olarak
+   @media (prefers-color-scheme: dark) üretir ve tailwind.config.js okunmaz.
+   Kullanıcının tema seçimine göre geçiş yapabilmek için varyantı .dark
+   sınıfına bağlıyoruz. :where() kullandığımız için özgüllük artmaz,
+   yani mevcut dark: sınıflarının sırası bozulmaz. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Açık tema (varsayılan palet) */
 :root {
+  color-scheme: light;
+
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --secondary: #10b981;
+  --secondary-dark: #059669;
+  --accent: #f97316;
+  --danger: #ef4444;
+  --danger-dark: #dc2626;
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --border: #e5e7eb;
+  --input: #f3f4f6;
+  --radius: 0.5rem;
+  --gradient-from: #dbeafe;
+  --gradient-to: #e0e7ff;
+  --scrollbar-track: #f1f5f9;
+}
+
+/* Koyu tema: <html> üzerindeki .dark sınıfı ile devreye girer */
+.dark {
+  color-scheme: dark;
+
   --primary: #3b82f6;
   --primary-dark: #60a5fa;
   --secondary: #10b981;
@@ -14,13 +47,15 @@
   --card-foreground: #e2e8f0;
   --border: #334155;
   --input: #1e293b;
-  --radius: 0.5rem;
   --gradient-from: #1e3a8a;
   --gradient-to: #312e81;
+  --scrollbar-track: #1e293b;
 }
 
 body {
-  background: var(--background);
+  /* Kısayol (background) yerine background-color: aksi halde katmansız olan
+     bu kural, @layer utilities içindeki Tailwind gradient sınıflarını eziyor. */
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), var(--font-roboto), Arial, sans-serif;
   scroll-behavior: smooth;
@@ -33,7 +68,8 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  /* Medya sorgusu yerine değişken: tema kullanıcı seçimiyle değişiyor */
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -43,13 +79,6 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #2563eb, #7c3aed);
-}
-
-/* Dark mode scrollbar */
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-track {
-    background: #1e293b;
-  }
 }
 
 /* Animated Route */
@@ -101,6 +130,11 @@ body {
 .hover-lift:hover {
   transform: translateY(-6px);
   box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.15), 0 10px 15px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Koyu zeminde açık gölge kaybolduğu için opaklık artırılıyor */
+.dark .hover-lift:hover {
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.5), 0 10px 15px -5px rgba(0, 0, 0, 0.4);
 }
 
 .hover-glow {
@@ -160,6 +194,10 @@ body {
 .card-hover:hover {
   transform: translateY(-8px) scale(1.02);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.dark .card-hover:hover {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
 }
 
 /* Glowing Border Animation */

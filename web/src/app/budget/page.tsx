@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { logger } from "@/lib/logger";
 
 interface BudgetItem {
   id: string;
@@ -86,7 +87,7 @@ export default function BudgetPage() {
       setHasChanges(false);
       toast.success('Değişiklikler kaydedildi');
     } catch (error) {
-      console.error('Kaydetme hatası:', error);
+      logger.error("Bütçe kaydedilemedi", error);
       toast.error('Değişiklikler kaydedilemedi');
     }
   };
@@ -271,7 +272,7 @@ export default function BudgetPage() {
                 setOriginalBudgetItems([...items]);
                 setHasChanges(false);
               } catch (parseError) {
-                console.error('Bütçe verisi parse edilemedi:', parseError);
+                logger.warn("Bütçe verisi ayrıştırılamadı", parseError);
                 setBudgetItems([]);
                 setOriginalBudgetItems([]);
                 setHasChanges(false);
@@ -283,7 +284,7 @@ export default function BudgetPage() {
             }
           }
         } catch (err) {
-          console.error('Budget fetch error:', err);
+          logger.error("Bütçe yüklenemedi", err);
           setBudgetItems([]);
           setOriginalBudgetItems([]);
           setHasChanges(false);
@@ -315,7 +316,7 @@ export default function BudgetPage() {
             setTrips([]);
           }
         } catch (err) {
-          console.error('Fetch error:', err);
+          logger.error("Veriler yüklenemedi", err);
           setError('Geziler yüklenemedi');
           setTrips([]);
         } finally {
@@ -408,7 +409,7 @@ export default function BudgetPage() {
               setOriginalBudgetItems([...items]);
               setHasChanges(false);
             } catch (parseError) {
-              console.error('Bütçe verisi parse edilemedi:', parseError);
+              logger.warn("Bütçe verisi ayrıştırılamadı", parseError);
               setBudgetItems([]);
               setOriginalBudgetItems([]);
               setHasChanges(false);
@@ -420,7 +421,7 @@ export default function BudgetPage() {
           }
         }
       } catch (err) {
-        console.error('Budget fetch error:', err);
+        logger.error("Bütçe yüklenemedi", err);
         setBudgetItems([]);
         setOriginalBudgetItems([]);
         setHasChanges(false);
@@ -573,7 +574,6 @@ export default function BudgetPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">?</div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
             Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
@@ -744,7 +744,6 @@ export default function BudgetPage() {
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">?</span>
                     <div>
                       <h4 className="font-semibold text-blue-800 dark:text-blue-200">Plan Temel Maliyeti</h4>
                       <p className="text-sm text-blue-600 dark:text-blue-400">AI tarafından oluşturulan plan maliyeti</p>
@@ -923,7 +922,7 @@ export default function BudgetPage() {
                                 : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                             }`}
                           >
-                            {item.isPaid ? '? Ödendi' : '0 Ödenmedi'}
+                            {item.isPaid ? 'Ödendi' : 'Ödenmedi'}
                           </button>
                         )}
                         {!isPlanEditable(selectedTrip) && (
@@ -932,7 +931,7 @@ export default function BudgetPage() {
                               ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
                               : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                           }`}>
-                            {item.isPaid ? '? Ödendi' : '0 Ödenmedi'}
+                            {item.isPaid ? 'Ödendi' : 'Ödenmedi'}
                           </span>
                         )}
                         

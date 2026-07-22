@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 
 interface ManualTravelPlan {
@@ -52,8 +53,6 @@ interface ManualTravelPlan {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log(" Manuel seyahat planı kaydediliyor...");
-    
     const planData: ManualTravelPlan = await request.json();
     
     // Veri doğrulaması
@@ -64,21 +63,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get session bilgisini al
-    let userId = null;
-    let userEmail = null;
-    
+    // Session'daki id bayat bir JWT'den gelebilir; TripPlan.user_id'ye FK
+    // eklendiği için kullanıcıyı veritabanından doğruluyoruz.
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+
     try {
       const session = await getServerSession(authOptions);
-      if (session?.user) {
-        userId = session.user.id || null;
-        userEmail = session.user.email || null;
-        console.log("? Session bulundu:", { userId, userEmail });
-      } else {
-        console.log("?? Session bulunamadı - anonim kullanıcı");
+      if (session?.user?.email) {
+        const user = await prisma.user.findUnique({
+          where: { email: session.user.email },
+          select: { id: true, email: true },
+        });
+        userId = user?.id ?? null;
+        userEmail = user?.email ?? null;
       }
     } catch (sessionError) {
-      console.error("? Session alma hatası:", sessionError);
+      logger.error("Oturum bilgisi alınamadı", sessionError);
     }
 
     // Günlük planları JSON string'e çevir
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
         
         // Meta veriler
         ai_model: "manual_planning",
-        raw_markdown: `# ${planData.basicInfo.destination} Seyahat Planı\n\n## Tarih: ${planData.basicInfo.startDate} - ${planData.basicInfo.endDate}\n\n## Kişi Sayısı: ${planData.basicInfo.travelers}\n\n## Toplam Maliyet: ?${planData.budget.estimatedTotal}`,
+        raw_markdown: `# ${planData.basicInfo.destination} Seyahat Planı\n\n## Tarih: ${planData.basicInfo.startDate} - ${planData.basicInfo.endDate}\n\n## Kişi Sayısı: ${planData.basicInfo.travelers}\n\n## Toplam Maliyet: ₺${planData.budget.estimatedTotal}`,
         
         // Diğer alanlar
         travel_style: planData.basicInfo.travelStyle,
@@ -134,13 +135,14 @@ export async function POST(request: NextRequest) {
         pratik_bilgiler: `${planData.basicInfo.travelers} kişi için ${duration} günlük plan`,
         butce_tahmini: JSON.stringify(planData.budget.breakdown),
         
-        // Kullanıcı bilgileri - hem ID hem email ile ilişki kur
-        user_id: userId || null,
-        userEmail: userEmail || null,
+        // Sahiplik userId üzerinden. userEmail geçiş süresince yazılmaya
+        // devam ediyor; ayrı bir migration'da düşürülecek.
+        userId: userId,
+        userEmail: userEmail,
       }
     });
 
-    console.log("? Manuel plan kaydedildi:", savedPlan.id);
+    logger.info("Manuel plan kaydedildi", { planId: savedPlan.id });
 
     return NextResponse.json({
       success: true,
@@ -156,7 +158,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error("?? Manuel plan kaydetme hatası:", error);
+    logger.error("Manuel plan kaydedilemedi", error);
     
     const errorDetails = error instanceof Error 
       ? { 

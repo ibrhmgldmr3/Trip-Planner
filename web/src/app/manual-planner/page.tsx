@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { useSession } from "next-auth/react";
+import { logger } from "@/lib/logger";
 
 // TypeScript interfaces
 interface BasicInfo {
@@ -144,7 +145,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
                       onClick={() => onRemoveActivity(dayIndex, actIndex)}
                       className="text-red-500 hover:text-red-700 ml-2"
                     >
-                      ?
+                      Sil
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-sm text-blue-700 dark:text-blue-300">
@@ -193,7 +194,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Maliyet (?) *
+                    Maliyet (₺) *
                   </label>
                   <input
                     type="number"
@@ -328,12 +329,12 @@ export default function ManualPlannerPage() {
   const [accommodationOptions, setAccommodationOptions] = useState<AccommodationOption[]>([]);
 
   const steps = [
-    { id: 1, title: 'Temel Bilgiler', icon: '?' },
-    { id: 2, title: 'Ulaşım', icon: '?' },
+    { id: 1, title: 'Temel Bilgiler', icon: '' },
+    { id: 2, title: 'Ulaşım', icon: '' },
     { id: 3, title: 'Konaklama', icon: '' },
     { id: 4, title: 'Günlük Planlar', icon: '' },
-    { id: 5, title: 'Maliyet Analizi', icon: '?' },
-    { id: 6, title: 'Özet & Kaydet', icon: '?' }
+    { id: 5, title: 'Maliyet Analizi', icon: '' },
+    { id: 6, title: 'Özet & Kaydet', icon: '' }
   ];
 
   // Calculate trip duration
@@ -694,7 +695,7 @@ export default function ManualPlannerPage() {
         toast.error('Plan kaydedilirken bir hata oluştu');
       }
     } catch (error) {
-      console.error('Save error:', error);
+      logger.error("Plan kaydedilemedi", error);
       toast.error('Plan kaydedilirken bir hata oluştu');
     }
   };
@@ -708,10 +709,10 @@ export default function ManualPlannerPage() {
   // Session kontrol için UI
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-xl text-white">Oturum kontrol ediliyor...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 dark:border-white mx-auto mb-4"></div>
+          <p className="text-xl text-gray-900 dark:text-white">Oturum kontrol ediliyor...</p>
         </div>
       </div>
     );
@@ -719,11 +720,11 @@ export default function ManualPlannerPage() {
 
   if (status === 'unauthenticated') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-300 mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
             Manuel plan oluşturmak için önce giriş yapmanız gerekiyor.
           </p>
           <button
@@ -803,7 +804,7 @@ export default function ManualPlannerPage() {
               {/* Mevcut seçim göster */}
               {travelPlan.transport && (
                 <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">? Seçili Ulaşım:</h3>
+                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">Seçili Ulaşım:</h3>
                   <p className="text-green-700 dark:text-green-300">
                     {travelPlan.transport.type} - {travelPlan.transport.provider} (₺{travelPlan.transport.price})
                   </p>
@@ -899,7 +900,7 @@ export default function ManualPlannerPage() {
                             i < option.rating ? 'text-yellow-400' : 'text-gray-300'
                           }`}
                         >
-                          ?
+                          ★
                         </span>
                       ))}
                     </div>
@@ -957,7 +958,7 @@ export default function ManualPlannerPage() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Mevcut Bütçeniz (?)
+                    Mevcut Bütçeniz (₺)
                   </label>
                   <input
                     type="number"
@@ -1066,7 +1067,7 @@ export default function ManualPlannerPage() {
                         <p><strong>Otel:</strong> {travelPlan.accommodation.name}</p>
                         <p><strong>Tip:</strong> {travelPlan.accommodation.type}</p>
                         <p><strong>Konum:</strong> {travelPlan.accommodation.location}</p>
-                        <p><strong>Puan:</strong> {'?'.repeat(travelPlan.accommodation.rating)} ({travelPlan.accommodation.rating}/5)</p>
+                        <p><strong>Puan:</strong> {'★'.repeat(travelPlan.accommodation.rating)} ({travelPlan.accommodation.rating}/5)</p>
                         <p><strong>Gecelik:</strong> ₺{travelPlan.accommodation.price}</p>
                         <p><strong>Toplam ({getTripDuration() - 1} gece):</strong> ₺{travelPlan.budget.breakdown.accommodation}</p>
                         <div className="mt-2">

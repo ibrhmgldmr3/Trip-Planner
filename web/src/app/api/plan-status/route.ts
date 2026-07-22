@@ -2,18 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 
 export async function PUT(request: NextRequest) {
   try {
-    console.log("?? Plan statüsü güncelleme isteği alındı");
-    
     // Session kontrolü
     const session = await getServerSession(authOptions);
-    console.log("?? Session kontrol edildi:", session ? "Mevcut" : "Yok");
-    
+
     if (!session || !session.user?.email) {
-      console.log("? Session bulunamadı veya email eksik");
       return NextResponse.json({ error: 'Giriş yapmanız gerekiyor' }, { status: 401 });
     }
 
@@ -31,7 +28,6 @@ export async function PUT(request: NextRequest) {
     }
 
     const { planId, status } = await request.json();
-    console.log(`?? Plan ID: ${planId}, Yeni Statü: ${status}`);
 
     if (!planId || !status) {
       return NextResponse.json(
@@ -53,19 +49,16 @@ export async function PUT(request: NextRequest) {
     const existingPlan = await prisma.tripPlan.findFirst({
       where: {
         id: planId,
-        user_id: user.id,
+        userId: user.id,
       },
     });
 
-    console.log(`?? Plan arama sonucu:`, {
-      planId,
-      userId: user.id,
-      found: !!existingPlan,
-      currentStatus: existingPlan?.status
-    });
-
     if (!existingPlan) {
-      console.log(`? Plan bulunamadı: planId=${planId}, userId=${user.id}`);
+      // Yetkisiz erişim denemesi olabilir; güvenlik açısından iz bırakıyoruz.
+      logger.warn("Plan bulunamadı veya yetkisiz erişim", undefined, {
+        planId,
+        userId: user.id,
+      });
       return NextResponse.json(
         { error: 'Plan not found or unauthorized' },
         { status: 404 }
@@ -73,8 +66,6 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the plan status
-    console.log(`?? Plan statüsü güncelleniyor: ${existingPlan.status} › ${status}`);
-    
     const updatedPlan = await prisma.tripPlan.update({
       where: {
         id: planId,
@@ -84,7 +75,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    console.log(`? Plan statüsü başarıyla güncellendi:`, {
+    logger.info("Plan statüsü güncellendi", {
       planId: updatedPlan.id,
       oldStatus: existingPlan.status,
       newStatus: updatedPlan.status
@@ -96,7 +87,7 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('?? Plan statüsü güncelleme hatası:', error);
+    logger.error("Plan statüsü güncellenemedi", error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

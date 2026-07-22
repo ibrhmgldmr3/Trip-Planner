@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
       budgetByCategory,
     });
   } catch (error) {
-    console.error("Error fetching budget:", error);
+    logger.error("Bütçe getirilemedi", error);
     return NextResponse.json(
       { error: "Failed to fetch budget" },
       { status: 500 }
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ budgetItem });
   } catch (error) {
-    console.error("Error creating budget item:", error);
+    logger.error("Bütçe kalemi oluşturulamadı", error);
     return NextResponse.json(
       { error: "Failed to create budget item" },
       { status: 500 }
@@ -196,7 +197,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ budgetItem: updatedItem });
   } catch (error) {
-    console.error("Error updating budget item:", error);
+    logger.error("Bütçe kalemi güncellenemedi", error);
     return NextResponse.json(
       { error: "Failed to update budget item" },
       { status: 500 }
@@ -255,7 +256,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting budget item:", error);
+    logger.error("Bütçe kalemi silinemedi", error);
     return NextResponse.json(
       { error: "Failed to delete budget item" },
       { status: 500 }

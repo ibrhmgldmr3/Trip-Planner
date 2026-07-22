@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -221,19 +221,19 @@ export default function TravelModePage() {
               </h4>
               <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   İlk kez seyahat planlıyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Hızlı plan istiyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Yeni öneriler keşfetmek istiyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Temel tercihleri belirtmek yeterliyse
                 </li>
               </ul>
@@ -248,19 +248,19 @@ export default function TravelModePage() {
               </h4>
               <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Deneyimli seyahat planlayıcısıysanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Her detayı kontrol etmek istiyorsanız
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Bütçe konusunda titizseniz
                 </li>
                 <li className="flex items-start">
-                  <span className="text-green-500 mr-2">?</span>
+                  <span className="text-green-500 mr-2">✓</span>
                   Özel gereksinimleriniz varsa
                 </li>
               </ul>

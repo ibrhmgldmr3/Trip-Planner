@@ -23,5 +23,11 @@ export function sanitizeHtml(dirty: string): string {
     ALLOWED_ATTR: ["href", "title", "target", "rel", "colspan", "rowspan", "align", "class"],
     // javascript:, data: gibi şemaları engelle.
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#)/i,
+    // DİKKAT: DOMPurify, ALLOWED_URI_REGEXP'i URL taşımayan izinli
+    // attribute'ların DEĞERİNE de uyguluyor. Bunlar listelenmezse
+    // `colspan="2"`, `align="center"`, `target="_blank"` gibi değerler
+    // desene uymadığı için sessizce düşüyor ve tablolar bozuluyor.
+    // `href` bilinçli olarak listede yok — şema denetimi onun için sürsün.
+    ADD_URI_SAFE_ATTR: ["colspan", "rowspan", "align", "target", "rel"],
   });
 }

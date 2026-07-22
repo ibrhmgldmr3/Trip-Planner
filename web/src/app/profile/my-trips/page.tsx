@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { toast } from "react-hot-toast";
+import { Toaster, toast } from "react-hot-toast";
+import { logger } from "@/lib/logger";
 
 interface Trip {
   id: string;
@@ -30,7 +31,6 @@ export default function MyTripsPage() {
   // Seyahatleri getir (sadece DONE statusündekiler)
   const fetchTrips = async () => {
     try {
-      console.log("My-Trips: API çağrısı başlatılıyor - sadece DONE planlar");
       const response = await fetch('/api/my-trips?status=DONE');
       
       if (!response.ok) {
@@ -38,22 +38,16 @@ export default function MyTripsPage() {
       }
       
       const data = await response.json();
-      console.log("My-Trips: API'den gelen data:", data);
       
       if (data.success && data.trips) {
         // Ekstra güvenlik için client-side'da da DONE olanları filtrele
         const doneTrips = data.trips.filter((trip: Trip) => trip.status === 'DONE');
-        console.log("? My-Trips: Filtrelenmiş DONE planlar:", {
-          toplamGelenPlan: data.trips.length,
-          doneOlanPlan: doneTrips.length,
-          planStatusleri: data.trips.map((t: Trip) => ({ city: t.city, status: t.status }))
-        });
         setTrips(doneTrips);
       } else {
         setTrips([]);
       }
     } catch (err) {
-      console.error('My-Trips fetch error:', err);
+      logger.error("Seyahatler yüklenemedi", err);
       setError('Seyahatler yüklenemedi');
       setTrips([]);
     } finally {
@@ -163,6 +157,7 @@ export default function MyTripsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
+      <Toaster position="top-right" />
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <div className="text-center mb-12">
@@ -282,11 +277,11 @@ export default function MyTripsPage() {
                       </div>
                     )}
 
-                    {/* Completion Date */}
-                    {trip.status.toLowerCase() === 'completed' && trip.completedAt && (
+                    {/* Completion Date - liste yalnızca DONE planları içerdiği için
+                        tek koşul completedAt alanının dolu olması */}
+                    {trip.completedAt && (
                       <div className="mb-4">
                         <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-                          <span className="mr-2">?</span>
                           <span>Tamamlandı: {formatDate(trip.completedAt)}</span>
                         </div>
                       </div>
@@ -300,14 +295,6 @@ export default function MyTripsPage() {
                       >
                         Detay Görüntüle
                       </button>
-                      {trip.status.toLowerCase() === 'planned' && (
-                        <button
-                          onClick={() => router.push(`/daily-planner?plan=${trip.id}`)}
-                          className="flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors text-sm"
-                        >
-                          Planla
-                        </button>
-                      )}
                     </div>
                   </div>
 

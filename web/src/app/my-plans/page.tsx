@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 import { TripStatus } from '@prisma/client';
 import { getTripStatus, getStatusLabel, getStatusColor, canCancel, canMarkAsDone } from '@/lib/trip-status';
+import { logger } from "@/lib/logger";
 
 interface SavedPlan {
   id: string;
@@ -58,7 +59,7 @@ export default function MyPlansPage() {
             updatedPlans[i] = { ...plan, status: 'COMPLETED' as TripStatus };
           }
         } catch (error) {
-          console.error('Error updating expired plan status:', error);
+          logger.error("Süresi geçmiş plan statüsü güncellenemedi", error);
         }
       }
     }
@@ -78,7 +79,7 @@ export default function MyPlansPage() {
         setError('Planlar yüklenemedi');
       }
     } catch (err) {
-      console.error('Fetch error:', err);
+      logger.error("Planlar yüklenemedi", err);
       setError('Planlar yüklenemedi');
     } finally {
       setLoading(false);
@@ -101,7 +102,6 @@ export default function MyPlansPage() {
 
   const updatePlanStatus = async (planId: string, newStatus: TripStatus) => {
     try {
-      console.log('Plan statüsü güncelleme başlatıldı:', { planId, newStatus });
       
       const response = await fetch('/api/plan-status', {
         method: 'PUT',
@@ -111,13 +111,8 @@ export default function MyPlansPage() {
         body: JSON.stringify({ planId, status: newStatus }),
       });
 
-      console.log('API Response Status:', response.status);
-      console.log('API Response OK:', response.ok);
 
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('? API Response Data:', responseData);
-        
         toast.success(
           newStatus === TripStatus.CANCELLED ? 'Plan iptal edildi' :
           newStatus === TripStatus.DONE ? 'Plan tamamlandı ve Gezilerim\'e eklendi' :
@@ -126,11 +121,11 @@ export default function MyPlansPage() {
         fetchPlans(); // Refresh the list
       } else {
         const errorData = await response.json();
-        console.error('? API Error Response:', errorData);
+        logger.error("Plan durumu güncellenemedi", undefined, { status: response.status });
         toast.error(errorData.error || 'Plan durumu güncellenemedi');
       }
     } catch (err) {
-      console.error('Status update error:', err);
+      logger.error("Plan durumu güncellenemedi", err);
       toast.error('Plan durumu güncellenemedi');
     }
   };
@@ -150,7 +145,7 @@ export default function MyPlansPage() {
         toast.error('Plan silinemedi');
       }
     } catch (err) {
-      console.error('Delete error:', err);
+      logger.error("Plan silinemedi", err);
       toast.error('Plan silinemedi');
     }
   };

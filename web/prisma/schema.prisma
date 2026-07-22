@@ -25,10 +25,17 @@ model User {
   sessions           Session[]
   trips              Trip[]
 
-  // Back-relations (email üzerinden)
+  // Sahiplik için tek gerçek kaynak: id üzerinden bağ.
+  tripPlans               TripPlan[]       @relation("UserToTripPlan")
+
+  // Back-relations (email üzerinden) - KULLANIMDAN KALDIRILDI
+  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
   aiConversationsByEmail  AiConversation[] @relation("UserToAiConversationByEmail")
+  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
   accommodationsByEmail   Accommodation[]  @relation("UserToAccommodationByEmail")
+  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
   transportationsByEmail  Transportation[] @relation("UserToTransportationByEmail")
+  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
   tripPlansByEmail        TripPlan[]       @relation("UserToTripPlanByEmail")
 }
 
@@ -119,8 +126,10 @@ model AiConversation {
 
   trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  // Email ile User'a bağ
+  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI (sahiplik tripId -> Trip.userId üzerinden)
+  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu sütun ayrı bir migration'da düşürülecek.
   userEmail  String?
+  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu ilişki ayrı bir migration'da düşürülecek.
   userByEmail User?   @relation("UserToAiConversationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
 
   @@index([userEmail])
@@ -149,8 +158,10 @@ model Accommodation {
 
   trip          Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  // Email ile User'a bağ
+  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI (sahiplik tripId -> Trip.userId üzerinden)
+  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu sütun ayrı bir migration'da düşürülecek.
   userEmail     String?
+  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu ilişki ayrı bir migration'da düşürülecek.
   userByEmail   User?    @relation("UserToAccommodationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
 
   @@index([userEmail])
@@ -176,8 +187,10 @@ model Transportation {
 
   trip               Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  // Email ile User'a bağ
+  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI (sahiplik tripId -> Trip.userId üzerinden)
+  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu sütun ayrı bir migration'da düşürülecek.
   userEmail          String?
+  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu ilişki ayrı bir migration'da düşürülecek.
   userByEmail        User?    @relation("UserToTransportationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
 
   @@index([userEmail])
@@ -228,7 +241,8 @@ model TripPlan {
   raw_html         String?
   ai_model         String?
   generated_at     DateTime    @default(now())
-  user_id          String?
+  /// Sahiplik için tek gerçek kaynak. DB sütunu geriye uyumluluk için "user_id" kalıyor.
+  userId           String?     @map("user_id")
   total_cost       Float?
   daily_cost       Float?
   interests        String?
@@ -241,15 +255,24 @@ model TripPlan {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  // Yapılandırılmış plan (LLM'den JSON olarak alınıp Zod ile doğrulanmış hâli).
+  // Eski markdown satırlarında null kalır; plan_schema_version bunu ayırt eder.
+  plan_json           Json?
+  /// null = eski (markdown) satır. 1 = tripPlanStructuredSchema v1.
+  plan_schema_version Int?
 
-  // Email ile User'a bağ
+  trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user             User?       @relation("UserToTripPlan", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI
+  /// @deprecated userId kullanın. Bu sütun ayrı bir migration'da düşürülecek.
   userEmail        String?
+  /// @deprecated userId kullanın. Bu ilişki ayrı bir migration'da düşürülecek.
   userByEmail      User?     @relation("UserToTripPlanByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
 
   @@index([city, country])
   @@index([generated_at])
-  @@index([user_id])
+  @@index([userId])
   @@index([userEmail])
 }
 

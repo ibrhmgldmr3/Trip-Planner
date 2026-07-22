@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
+import { logger } from "@/lib/logger";
 
 interface POI {
   id: string;
@@ -37,7 +38,6 @@ export default function MapPage() {
       // Google Maps API zaten yüklü mü kontrol et
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).google && (window as any).google.maps) {
-        console.log('Google Maps API zaten yüklü, haritayı oluşturuluyor...');
         // API zaten yüklü, doğrudan haritayı oluştur
         initializeMap();
         return;
@@ -46,13 +46,11 @@ export default function MapPage() {
       // Script zaten eklendi mi kontrol et
       const existingScript = document.getElementById('google-maps-script');
       if (existingScript) {
-        console.log('Google Maps script zaten eklendi, yüklenmesini bekleniyor...');
         // Script eklendi ama henüz yüklenmedi, onload event'ini bekle
         existingScript.addEventListener('load', initializeMap);
         return;
       }
 
-      console.log('Google Maps API yükleniyor...');
       
       // Google Maps API'yi yükle
       const script = document.createElement('script');
@@ -62,12 +60,11 @@ export default function MapPage() {
       script.defer = true;
       
       script.onload = () => {
-        console.log('Google Maps API başarıyla yüklendi');
         initializeMap();
       };
 
       script.onerror = () => {
-        console.error('Google Maps API yüklenirken hata oluştu');
+        logger.error("Google Maps API yüklenemedi");
         toast.error('Harita yüklenirken hata oluştu');
       };
       
@@ -75,9 +72,6 @@ export default function MapPage() {
     };
 
     const initializeMap = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      console.log('Harita oluşturuluyor...', { mapRef: !!mapRef.current, google: !!(window as any).google });
-      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (mapRef.current && (window as any).google && (window as any).google.maps) {
         try {
@@ -89,7 +83,6 @@ export default function MapPage() {
             mapTypeId: (window as any).google.maps.MapTypeId.ROADMAP,
           });
           
-          console.log('Harita başarıyla oluşturuldu');
           setMap(mapInstance);
           setCurrentLocation({ lat: 39.9334, lng: 32.8597 });
           
@@ -111,11 +104,11 @@ export default function MapPage() {
           setDirectionsService(directionsServiceInstance);
           setDirectionsRenderer(directionsRendererInstance);
         } catch (error) {
-          console.error('Harita oluşturulurken hata:', error);
+          logger.error("Harita oluşturulamadı", error);
           toast.error('Harita oluşturulamadı');
         }
       } else {
-        console.warn('Harita oluşturulamadı - gerekli elemanlar eksik');
+        logger.warn("Harita oluşturulamadı - gerekli elemanlar eksik");
       }
     };
 
@@ -130,7 +123,6 @@ export default function MapPage() {
     }
 
     setLoading(true);
-    console.log('POI aranıyor...', currentLocation);
     
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,11 +135,9 @@ export default function MapPage() {
         types: ['tourist_attraction'] // Sadece turistik yerler
       };
 
-      console.log('Places API isteği:', request);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       service.nearbySearch(request, (results: any[], status: any) => {
-        console.log('Places API yanıtı:', status, results);
         setLoading(false);
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,7 +173,7 @@ export default function MapPage() {
         } else if (status === PlacesServiceStatus.REQUEST_DENIED) {
           toast.error('API erişimi reddedildi!');
         } else {
-          console.error('Places API hatası:', status);
+          logger.warn("Places API beklenmeyen durum döndürdü", undefined, { status });
           toast.error('Yerler yüklenirken hata oluştu!');
         }
       });
@@ -197,7 +187,7 @@ export default function MapPage() {
       }, 10000);
       
     } catch (error) {
-      console.error('POI getirme hatası:', error);
+      logger.error("Yakındaki yerler getirilemedi", error);
       setLoading(false);
       toast.error('Bir hata oluştu!');
     }
@@ -211,7 +201,6 @@ export default function MapPage() {
     }
 
     setLoading(true);
-    console.log('Belirli türde POI aranıyor...', types, currentLocation);
     
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,11 +213,9 @@ export default function MapPage() {
         types: types
       };
 
-      console.log('Places API isteği (tür):', request);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       service.nearbySearch(request, (results: any[], status: any) => {
-        console.log('Places API yanıtı (tür):', status, results);
         setLoading(false);
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -264,7 +251,7 @@ export default function MapPage() {
         } else if (status === PlacesServiceStatus.REQUEST_DENIED) {
           toast.error('API erişimi reddedildi!');
         } else {
-          console.error('Places API hatası:', status);
+          logger.warn("Places API beklenmeyen durum döndürdü", undefined, { status });
           toast.error('Yerler yüklenirken hata oluştu!');
         }
       });
@@ -278,7 +265,7 @@ export default function MapPage() {
       }, 10000);
       
     } catch (error) {
-      console.error('POI getirme hatası:', error);
+      logger.error("Yakındaki yerler getirilemedi", error);
       setLoading(false);
       toast.error('Bir hata oluştu!');
     }
@@ -438,13 +425,13 @@ export default function MapPage() {
 
           toast.success(`Rota oluşturuldu! ${selectedPois.length} POI için en kısa yol hesaplandı.`);
         } else {
-          console.error('Directions request failed:', status);
+          logger.warn("Rota isteği başarısız", undefined, { status });
           toast.error('Rota hesaplanamadı. Lütfen farklı POIler seçin.');
         }
       });
 
     } catch (error) {
-      console.error('Route calculation error:', error);
+      logger.error("Rota hesaplanamadı", error);
       toast.error('Rota hesaplama hatası');
       setLoading(false);
     }
@@ -482,7 +469,6 @@ export default function MapPage() {
               onClick={getCurrentLocation}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 font-medium"
             >
-              <span>?</span>
               <span>Konumumu Bul</span>
             </button>
             
@@ -491,7 +477,6 @@ export default function MapPage() {
               disabled={loading || !map}
               className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
             >
-              <span>?</span>
               <span>{loading ? 'Yükleniyor...' : 'Turistik Yerler'}</span>
             </button>
             
@@ -529,7 +514,6 @@ export default function MapPage() {
                 }}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 font-medium"
               >
-                <span>?</span>
                 <span>Temizle</span>
               </button>
             )}
@@ -638,7 +622,6 @@ export default function MapPage() {
                     </button>
                   </div>
                   <div className="flex items-center space-x-2 mb-3">
-                    <span className="text-blue-500">?</span>
                     <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                       {poi.vicinity}
                     </p>
@@ -646,7 +629,7 @@ export default function MapPage() {
                   {poi.rating && (
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 py-1 rounded-full">
-                        <span className="text-yellow-500 text-sm">?</span>
+                        <span className="text-yellow-500 text-sm">★</span>
                         <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
                           {poi.rating.toFixed(1)}
                         </span>
@@ -665,7 +648,6 @@ export default function MapPage() {
           <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-6 mb-8 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center space-x-3 mb-8">
               <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                <span className="text-2xl">?</span>
               </div>
               <div>
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
@@ -699,7 +681,7 @@ export default function MapPage() {
                             ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg scale-110' 
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
                         }`}>
-                          {isSelected ? '?' : index + 1}
+                          {isSelected ? '✓' : index + 1}
                         </div>
                         <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">
                           {poi.name}
@@ -707,7 +689,7 @@ export default function MapPage() {
                       </div>
                       {poi.rating && (
                         <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/20 px-3 py-2 rounded-full border border-yellow-200 dark:border-yellow-700 shadow-sm">
-                          <span className="text-yellow-500 text-lg">?</span>
+                          <span className="text-yellow-500 text-lg">★</span>
                           <span className="text-sm font-bold text-yellow-700 dark:text-yellow-400">
                             {poi.rating.toFixed(1)}
                           </span>
@@ -716,7 +698,6 @@ export default function MapPage() {
                     </div>
                   
                   <div className="flex items-center space-x-2 mb-4">
-                    <span className="text-blue-500 text-lg">?</span>
                     <p className="text-gray-600 dark:text-gray-300 font-medium">
                       {poi.vicinity}
                     </p>
@@ -759,7 +740,7 @@ export default function MapPage() {
                   {isSelected && (
                     <div className="text-center animate-pulse">
                       <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                        ? Rotaya Dahil ?
+                        Rotaya Dahil
                       </span>
                     </div>
                   )}

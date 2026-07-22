@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useState, FormEvent, ChangeEvent, useCallback } from "react";
@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { logger } from "@/lib/logger";
 
 interface TripFormData {
   city: string;
@@ -58,7 +59,7 @@ export default function PlannerPage() {
     accommodation: "",
   });
 
-  // BuGün�n tarihini al (YYYY-MM-DD format�nda)
+  // Bugünün tarihini al (YYYY-MM-DD formatında)
   const today = new Date().toISOString().split('T')[0];
 
   const handleCheckboxChange = useCallback((type: "transportation" | "interests", value: string) => {
@@ -73,10 +74,10 @@ export default function PlannerPage() {
   // Session kontrol
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-indigo-100 dark:from-purple-900 dark:via-blue-900 dark:to-indigo-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-xl text-white">Oturum kontrol ediliyor...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 dark:border-white mx-auto mb-4"></div>
+          <p className="text-xl text-gray-900 dark:text-white">Oturum kontrol ediliyor...</p>
         </div>
       </div>
     );
@@ -84,18 +85,18 @@ export default function PlannerPage() {
 
   if (status === 'unauthenticated') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-indigo-100 dark:from-purple-900 dark:via-blue-900 dark:to-indigo-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-white mb-2">giriş Gerekli</h2>
-          <p className="text-gray-300 mb-6">
-            Plan oluşturmak için �nce giriş yapman�z gerekiyor.
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Plan oluşturmak için önce giriş yapmanız gerekiyor.
           </p>
           <button
             onClick={() => router.push('/login')}
             className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
           >
-            giriş Yap
+            Giriş Yap
           </button>
           <button
             onClick={() => router.push('/')}
@@ -108,7 +109,7 @@ export default function PlannerPage() {
     );
   }
 
-  // Form kontrollerini Güncelleme fonksiyonlar�
+  // Form kontrollerini güncelleme fonksiyonları
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData({
@@ -117,29 +118,29 @@ export default function PlannerPage() {
     });
   };
 
-  // Form Günderme i�lemi
+  // Form gönderme işlemi
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     // Form validasyonu
     if (!formData.city) {
-      toast.error("Lütfen en az�ndan Şehir bilgisini girin");
+      toast.error("Lütfen en azından şehir bilgisini girin");
       return;
     }
 
-    // Tarih kontrol�
+    // Tarih kontrolü
     if (formData.startDate && formData.endDate) {
       const start = new Date(formData.startDate);
       const end = new Date(formData.endDate);
       const todayDate = new Date(today);
       
       if (start < todayDate) {
-        toast.error("Başlangıç tarihi buGünden �nce olamaz");
+        toast.error("Başlangıç tarihi bugünden önce olamaz");
         return;
       }
       
       if (end < todayDate) {
-        toast.error("Bitiş tarihi buGünden �nce olamaz");
+        toast.error("Bitiş tarihi bugünden önce olamaz");
         return;
       }
       
@@ -152,7 +153,7 @@ export default function PlannerPage() {
       const todayDate = new Date(today);
       
       if (start < todayDate) {
-        toast.error("Başlangıç tarihi buGünden �nce olamaz");
+        toast.error("Başlangıç tarihi bugünden önce olamaz");
         return;
       }
     } else if (formData.endDate) {
@@ -160,7 +161,7 @@ export default function PlannerPage() {
       const todayDate = new Date(today);
       
       if (end < todayDate) {
-        toast.error("Bitiş tarihi buGünden �nce olamaz");
+        toast.error("Bitiş tarihi bugünden önce olamaz");
         return;
       }
     }
@@ -178,7 +179,7 @@ export default function PlannerPage() {
         } : null
       };
 
-      // Chat API'yi kullan�yoruz
+      // Chat API'yi kullanıyoruz
       const response = await fetch("/api/trip-plan-model", {
         method: "POST",
         headers: {
@@ -194,70 +195,70 @@ export default function PlannerPage() {
       }
       
       setTripPlan(data);
-      toast.success("Seyahat plan�n�z haz�rland�!");
+      toast.success("Seyahat planınız hazırlandı!");
       
-      // Otomatik olarak sonuç b�l�m�ne kayd�r
+      // Otomatik olarak sonuç bölümüne kaydır
       document.getElementById("trip-plan-result")?.scrollIntoView({ behavior: "smooth" });
     } catch (error) {
-      console.error("Seyahat plan� oluşturma hatas�:", error);
+      logger.error("Seyahat planı oluşturulamadı", error);
       toast.error(error instanceof Error ? error.message : "Plan oluşturulurken bir Hata oluştu");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Plan� PDF olarak indir (basit bir y�ntem)
+  // Planı PDF olarak indir (basit bir yöntem)
   const handleDownloadPDF = () => {
-    // Bu ger�ek bir PDF oluşturma i�lemi değil, ger�ek bir uygulamada PDF oluşturma k�t�phanesi kullan�lmal�d�r
-    toast.error("Bu �zellik hen�z geli�tirilme a�amas�ndad�r");
+    // Bu gerçek bir PDF oluşturma işlemi değil, gerçek bir uygulamada PDF oluşturma kütüphanesi kullanılmalıdır
+    toast.error("Bu özellik henüz geliştirilme aşamasındadır");
   };
 
-  // Plan� kaydet
+  // Planı kaydet
   const handleSavePlan = () => {
     if (!session) {
-      toast.error("Plan� kaydetmek için giriş yapmal�s�n�z");
+      toast.error("Planı kaydetmek için giriş yapmalısınız");
       router.push("/login?callbackUrl=/ai-planner");
       return;
     }
     
-    toast.success("Plan kaydedildi! Yak�nda profil sayfan�zdan eri�ebileceksiniz.");
+    toast.success("Plan kaydedildi! Yakında profil sayfanızdan erişebileceksiniz.");
   };
 
-  // Plan� kopyala
+  // Planı kopyala
   const handleCopyPlan = async () => {
     if (!tripPlan) return;
     
     try {
       await navigator.clipboard.writeText(tripPlan.plan.markdown);
-      toast.success("Plan panoya kopyaland�!");
+      toast.success("Plan panoya kopyalandı!");
     } catch (error) {
-      console.error('Kopyalama hatas�:', error);
-      toast.error("Plan kopyalan�rken bir Hata oluştu");
+      logger.warn("Plan panoya kopyalanamadı", error);
+      toast.error("Plan kopyalanırken bir hata oluştu");
     }
   };
 
-  // Plan� payla�
+  // Planı paylaş
   const handleSharePlan = async () => {
     if (!tripPlan) return;
     
     const shareData = {
-      title: `${tripPlan.plan.city} Seyahat Plan�`,
-      text: `${tripPlan.plan.city}${tripPlan.plan.country ? ', ' + tripPlan.plan.country : ''} için oluşturdu�um seyahat plan�`,
+      title: `${tripPlan.plan.city} Seyahat Planı`,
+      text: `${tripPlan.plan.city}${tripPlan.plan.country ? ', ' + tripPlan.plan.country : ''} için oluşturduğum seyahat planı`,
       url: window.location.href
     };
 
     try {
       if (navigator.share) {
         await navigator.share(shareData);
-        toast.success("Plan payla��ld�!");
+        toast.success("Plan paylaşıldı!");
       } else {
         // Fallback: URL'yi kopyala
         await navigator.clipboard.writeText(window.location.href);
-        toast.success("Plan linki panoya kopyaland�!");
+        toast.success("Plan linki panoya kopyalandı!");
       }
     } catch (error) {
-      console.error('Payla�ma hatas�:', error);
-      toast.error("Plan payla��l�rken bir Hata oluştu");
+      logger.warn("Plan paylaşılamadı", error);
+      toast.error("Plan paylaşılırken bir hata oluştu");
     }
   };
 
@@ -279,10 +280,10 @@ export default function PlannerPage() {
               </div>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
-              ? Seyahat Plan�n�z Haz�rlan�yor
+              Seyahat Planınız Hazırlanıyor
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              AI en iyi rotalar� ve Önerileri sizin için ara�t�r�yor...
+              AI en iyi rotaları ve önerileri sizin için araştırıyor...
             </p>
             <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
@@ -297,10 +298,10 @@ export default function PlannerPage() {
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 dark:text-blue-300">
-              Seyahat Planlamas�
+              Seyahat Planlaması
             </h1>
             <p className="text-gray-800 dark:text-gray-300 mt-2 max-w-2xl">
-              Tarihinizi, Bütçenizi ve tercihlerinizi belirleyerek Kişiselle�tirilmi� seyahat plan�n�z� oluşturun.
+              Tarihinizi, bütçenizi ve tercihlerinizi belirleyerek kişiselleştirilmiş seyahat planınızı oluşturun.
             </p>
           </div>
           <Link 
@@ -324,7 +325,7 @@ export default function PlannerPage() {
                   type="text" 
                   id="city" 
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
-                  placeholder="�rn: İstanbul"
+                  placeholder="Örn: İstanbul"
                   value={formData.city}
                   onChange={handleInputChange}
                   required
@@ -337,7 +338,7 @@ export default function PlannerPage() {
                   type="text" 
                   id="country" 
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
-                  placeholder="�rn: T�rkiye"
+                  placeholder="Örn: Türkiye"
                   value={formData.country}
                   onChange={handleInputChange}
                 />
@@ -374,7 +375,7 @@ export default function PlannerPage() {
             {/* Travel Style & Budget */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="travelStyle" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Seyahat Tarz�</label>
+                <label htmlFor="travelStyle" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Seyahat Tarzı</label>
                 <select
                   id="travelStyle"
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
@@ -382,10 +383,10 @@ export default function PlannerPage() {
                   onChange={handleInputChange}
                 >
                   <option value="Standart">Standart</option>
-                  <option value="L�ks">L�ks</option>
+                  <option value="Lüks">Lüks</option>
                   <option value="Ekonomik">Ekonomik</option>
                   <option value="Macera">Macera</option>
-                  <option value="K�lt�rel">K�lt�rel</option>
+                  <option value="Kültürel">Kültürel</option>
                 </select>
               </div>
               
@@ -399,8 +400,8 @@ export default function PlannerPage() {
                 >
                   <option value="Ekonomik">Ekonomik</option>
                   <option value="Orta">Orta</option>
-                  <option value="L�ks">L�ks</option>
-                  <option value="S�n�rs�z">S�n�rs�z</option>
+                  <option value="Lüks">Lüks</option>
+                  <option value="Sınırsız">Sınırsız</option>
                 </select>
               </div>
             </div>
@@ -419,14 +420,14 @@ export default function PlannerPage() {
                   <option value="Hostel">Hostel</option>
                   <option value="Apart">Apart</option>
                   <option value="Airbnb">Airbnb</option>
-                  <option value="L�ks Otel">L�ks Otel</option>
+                  <option value="Lüks Otel">Lüks Otel</option>
                 </select>
               </div>
               
               <div>
                 <span className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Ulaşım Tercihleri</span>
                 <div className="flex flex-wrap gap-4">
-                  {["U�ak", "Otob�s", "Tren", "Araba", "Toplu Ta��ma"].map((item) => (
+                  {["Uçak", "Otobüs", "Tren", "Araba", "Toplu Taşıma"].map((item) => (
                     <label key={item} className="inline-flex items-center">
                       <input 
                         type="checkbox" 
@@ -445,7 +446,7 @@ export default function PlannerPage() {
             <div>
               <span className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">İlgi Alanları</span>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {["Tarihi Yerler", "M�zeler", "Do�a", "Gastronomi", "Al��veri�", "E�lence", "Plajlar", "Foto�raf��l�k", "Yerel K�lt�r"].map((item) => (
+                {["Tarihi Yerler", "Müzeler", "Doğa", "Gastronomi", "Alışveriş", "Eğlence", "Plajlar", "Fotoğrafçılık", "Yerel Kültür"].map((item) => (
                   <label key={item} className="inline-flex items-center">
                     <input 
                       type="checkbox" 
@@ -461,12 +462,12 @@ export default function PlannerPage() {
 
             {/* Special Requirements */}
             <div>
-              <label htmlFor="specialRequirements" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">�zel Gereksinimler</label>
+              <label htmlFor="specialRequirements" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Özel Gereksinimler</label>
               <textarea 
                 id="specialRequirements" 
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
-                placeholder="Seyahatinizle ilgili �zel gereksinimler veya notlar..."
+                placeholder="Seyahatinizle ilgili özel gereksinimler veya notlar..."
                 value={formData.specialRequirements}
                 onChange={handleInputChange}
               ></textarea>
@@ -485,14 +486,14 @@ export default function PlannerPage() {
                       <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       <div className="absolute inset-0 w-6 h-6 border-2 border-transparent border-t-blue-200 rounded-full animate-pulse"></div>
                     </div>
-                    <span className="animate-pulse">? AI Seyahat Plan�n�z� oluşturuyor...</span>
+                    <span className="animate-pulse">AI Seyahat Planınızı oluşturuyor...</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                     AI ile Kişisel Plan�m� oluştur
+                     AI ile Kişisel Planımı oluştur
                   </>
                 )}
               </button>
@@ -500,7 +501,7 @@ export default function PlannerPage() {
           </form>
         </div>
         
-        {/* AI Seyahat Plan� Sonucu */}
+        {/* AI Seyahat Planı Sonucu */}
         {tripPlan && (
           <div id="trip-plan-result" className="space-y-6">
             {/* Plan Header Card */}
@@ -516,7 +517,7 @@ export default function PlannerPage() {
                   <div>
                     <h2 className="text-2xl font-bold mb-2">
                        {tripPlan.plan.city}
-                      {tripPlan.plan.country && <span className="text-blue-100"> � {tripPlan.plan.country}</span>}
+                      {tripPlan.plan.country && <span className="text-blue-100"> · {tripPlan.plan.country}</span>}
                     </h2>
                     {tripPlan.plan.startDate && tripPlan.plan.endDate && (
                       <p className="text-blue-100 mb-1">
@@ -542,7 +543,7 @@ export default function PlannerPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
-                    Plan� Kaydet
+                    Planı Kaydet
                   </button>
                   
                   <button
@@ -552,7 +553,7 @@ export default function PlannerPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    PDF �ndir
+                    PDF İndir
                   </button>
                 </div>
               </div>
@@ -590,7 +591,7 @@ export default function PlannerPage() {
                       align-items: center;
                     }
                     .prose h3:before {
-                      content: "�";
+                      content: "•";
                       margin-right: 0.5rem;
                     }
                     .prose ul {
@@ -606,7 +607,7 @@ export default function PlannerPage() {
                       padding-left: 1rem;
                     }
                     .prose li:before {
-                      content: "?";
+                      content: "•";
                       position: absolute;
                       left: 0;
                       top: 0;
@@ -760,7 +761,7 @@ export default function PlannerPage() {
                       font-size: 0.875rem;
                     }
                     .prose table li:before {
-                      content: "�";
+                      content: "•";
                       color: #3b82f6;
                       font-weight: bold;
                       margin-right: 0.5rem;
@@ -778,7 +779,7 @@ export default function PlannerPage() {
                         font-size: 0.8rem;
                       }
                     }
-                    /* Tablo ba�l�k ikonlar� */
+                    /* Tablo başlık ikonları */
                     .prose th:nth-child(1)::after { content: " "; }
                     .prose th:nth-child(2)::after { content: " "; }
                     .prose th:nth-child(3)::after { content: " "; }
@@ -955,7 +956,7 @@ export default function PlannerPage() {
 
         
         
-        {/* sonuç B�l�m� */}
+        {/* Sonuç Bölümü */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-blue-900/60 p-6 rounded-xl shadow-md mb-8">
           <h2 className="text-xl font-semibold mb-4 text-blue-700 dark:text-blue-300">Sonuç</h2>
           <p className="text-gray-800 dark:text-gray-300 font-medium mb-4">

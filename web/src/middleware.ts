@@ -5,10 +5,10 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   
-  // Define protected routes
+  // Korumalı rotalar. "/profile" girdisi startsWith kontrolü sayesinde
+  // /profile/my-trips gibi alt yolları da kapsıyor.
   const protectedPaths = [
     "/profile",
-    "/my-trips",
   ];
 
   const path = request.nextUrl.pathname;
@@ -32,7 +32,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/profile/:path*",
-    "/my-trips/:path*",
   ],
 };
 

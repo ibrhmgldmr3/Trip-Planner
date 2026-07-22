@@ -21,6 +21,20 @@ const eslintConfig = [
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    // Loglama tek kapıdan geçer: `@/lib/logger`. Doğrudan `console.*`
+    // kullanımı hem PII maskelemesini hem de seviye filtresini atlıyor.
+    rules: {
+      "no-console": "error",
+    },
+  },
+  {
+    // Tek istisna: logger'ın kendisi, altında console'a yazmak zorunda.
+    files: ["src/lib/logger.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
 ];
 
 export default eslintConfig;

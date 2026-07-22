@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // Schema for form validation
 const registerSchema = z.object({
@@ -86,7 +87,7 @@ export default function RegisterPage() {
         });
       }, 2000);
     } catch (err: unknown) {
-      console.error("Registration error:", err);
+      logger.error("Kayıt oluşturulamadı", err);
       setError(err instanceof Error ? err.message : "Bir hata oluştu. Lütfen tekrar deneyin.");
     } finally {
       setIsLoading(false);
@@ -94,32 +95,32 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-md p-8 text-gray-800">
+    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-blue-900 flex items-center justify-center">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 text-gray-800 dark:text-gray-200">
         <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 dark:text-blue-300 mb-2">
             Kayıt Ol
           </h1>
-          <p className="text-gray-800">
+          <p className="text-gray-800 dark:text-gray-300">
             Trip Planner&apos;a hoş geldiniz
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4" role="alert">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4" role="alert">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4" role="alert">
+          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded mb-4" role="alert">
             {success}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-blue-700 mb-1">
+            <label htmlFor="name" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
               İsim
             </label>
             <input
@@ -130,13 +131,13 @@ export default function RegisterPage() {
               required
               value={formData.name}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 "
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Adınız"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-blue-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
               E-posta
             </label>
             <input
@@ -147,13 +148,13 @@ export default function RegisterPage() {
               required
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="E-posta adresiniz"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-blue-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
               Şifre
             </label>
             <input
@@ -164,13 +165,13 @@ export default function RegisterPage() {
               required
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="En az 8 karakter"
             />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-blue-700 mb-1">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
               Şifre Tekrar
             </label>
             <input
@@ -181,7 +182,7 @@ export default function RegisterPage() {
               required
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Şifrenizi tekrar girin"
             />
           </div>
@@ -192,15 +193,15 @@ export default function RegisterPage() {
               name="terms"
               type="checkbox"
               required
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+              className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded"
             />
-            <label htmlFor="terms" className="ml-2 block text-sm text-gray-800">
+            <label htmlFor="terms" className="ml-2 block text-sm text-gray-800 dark:text-gray-300">
               <span>
-                <Link href="/terms" className="text-blue-600 hover:text-blue-700">
+                <Link href="/terms" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
                   Kullanım şartlarını
                 </Link>{" "}
                 ve{" "}
-                <Link href="/privacy" className="text-blue-600 hover:text-blue-700">
+                <Link href="/privacy" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
                   Gizlilik politikasını
                 </Link>{" "}
                 kabul ediyorum
@@ -222,17 +223,18 @@ export default function RegisterPage() {
         <div className="mt-6">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">veya</span>
+              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">veya</span>
             </div>
           </div>
 
           <div className="mt-6">
             <button
               onClick={() => signIn("google", { callbackUrl: "/" })}
-              className="w-full px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-800 shadow-sm hover:bg-gray-50 transition flex items-center justify-center gap-2"
+              type="button"
+              className="w-full px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-800 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -258,9 +260,9 @@ export default function RegisterPage() {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-sm text-gray-800">
-            Zaten hesabınız var mı₺{" "}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+          <p className="text-sm text-gray-800 dark:text-gray-300">
+            Zaten hesabınız var mı?{" "}
+            <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
               Giriş Yap
             </Link>
           </p>

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { TripStatus } from '@prisma/client';
 import { getTripStatus, getStatusLabel, getStatusColor, canCancel, canMarkAsDone } from '@/lib/trip-status';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { logger } from "@/lib/logger";
 
 interface DayActivity {
   id?: string;
@@ -80,7 +81,7 @@ export default function PlanDetailPage() {
       const data = await response.json();
       setPlan(data.plan);
     } catch (err) {
-      console.error('Plan detayları yüklenirken hata:', err);
+      logger.error("Plan detayları yüklenemedi", err);
       setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
     } finally {
       setLoading(false);
@@ -109,7 +110,7 @@ export default function PlanDetailPage() {
         toast.error('Plan durumu güncellenemedi');
       }
     } catch (err) {
-      console.error('Status update error:', err);
+      logger.error("Plan durumu güncellenemedi", err);
       toast.error('Plan durumu güncellenemedi');
     }
   };
@@ -135,7 +136,7 @@ export default function PlanDetailPage() {
         toast.error('Plan silinemedi');
       }
     } catch (err) {
-      console.error('Delete error:', err);
+      logger.error("Plan silinemedi", err);
       toast.error('Plan silinemedi');
     }
   };
@@ -229,7 +230,6 @@ export default function PlanDetailPage() {
   const parseDailyPlan = (content: string | null) => {
     if (!content) return [];
     
-    console.log("🔍 Ham günlük plan verisi:", content.substring(0, 300) + "...");
     
     // "### Günlük Detaylı Program" başlığından sonrasını al
     let actualContent = content;
@@ -241,7 +241,6 @@ export default function PlanDetailPage() {
       const firstNewlineIndex = afterTitle.indexOf('\n');
       if (firstNewlineIndex !== -1) {
         actualContent = afterTitle.substring(firstNewlineIndex + 1);
-        console.log("✂️ '### Günlük Detaylı Program' başlığından sonrası alındı");
       }
     }
     
@@ -253,12 +252,10 @@ export default function PlanDetailPage() {
         const firstNewlineIndex = afterTitle.indexOf('\n');
         if (firstNewlineIndex !== -1) {
           actualContent = afterTitle.substring(firstNewlineIndex + 1);
-          console.log("✂️ '## Günlük Program' başlığından sonrası alındı");
         }
       }
     }
 
-    console.log("🎯 İşlenecek içerik:", actualContent.substring(0, 300) + "...");
     
     // Önce JSON formatında olup olmadığını kontrol et
     try {
@@ -271,20 +268,19 @@ export default function PlanDetailPage() {
             
             // Aktiviteleri formatla
             if (day.activities && Array.isArray(day.activities) && day.activities.length > 0) {
-              dayContent += '<h4 class="text-md font-semibold text-purple-600 dark:text-purple-400 mb-3">📋 Aktiviteler</h4>';
+              dayContent += '<h4 class="text-md font-semibold text-purple-600 dark:text-purple-400 mb-3">Aktiviteler</h4>';
               dayContent += '<ul class="space-y-2 mb-4">';
               day.activities.forEach((activity: DayActivity) => {
                 if (activity && typeof activity === 'object') {
                   dayContent += '<li class="flex items-start space-x-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">';
-                  dayContent += '<span class="text-blue-500 mt-1">📍</span>';
-                  dayContent += '<div class="flex-1">';
+                                    dayContent += '<div class="flex-1">';
                   if (activity.name) {
                     dayContent += `<h5 class="font-semibold text-gray-800 dark:text-white">${activity.name}</h5>`;
                   }
                   if (activity.startTime || activity.endTime) {
                     dayContent += '<div class="text-sm text-gray-600 dark:text-gray-300 mt-1">';
                     if (activity.startTime) {
-                      dayContent += `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 mr-2">🕐 ${activity.startTime}</span>`;
+                      dayContent += `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 mr-2">${activity.startTime}</span>`;
                     }
                     if (activity.endTime) {
                       dayContent += `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">${activity.endTime}</span>`;
@@ -295,7 +291,7 @@ export default function PlanDetailPage() {
                     dayContent += `<p class="text-gray-600 dark:text-gray-300 mt-2">${activity.description}</p>`;
                   }
                   if (activity.cost && activity.cost > 0) {
-                    dayContent += `<div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">💰 ${activity.cost}₺</span></div>`;
+                    dayContent += `<div class="mt-2"><span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">${activity.cost}₺</span></div>`;
                   }
                   dayContent += '</div></li>';
                 }
@@ -303,14 +299,13 @@ export default function PlanDetailPage() {
               dayContent += '</ul>';
             } else {
               dayContent += '<div class="text-center py-8 text-gray-500 dark:text-gray-400">';
-              dayContent += '<div class="text-4xl mb-3">📝</div>';
-              dayContent += '<p>Bu gün için henüz aktivite planlanmamış</p>';
+                            dayContent += '<p>Bu gün için henüz aktivite planlanmamış</p>';
               dayContent += '</div>';
             }
             
             // Notları formatla
             if (day.notes && day.notes.trim()) {
-              dayContent += '<h4 class="text-md font-semibold text-green-600 dark:text-green-400 mb-2 mt-4">📝 Notlar</h4>';
+              dayContent += '<h4 class="text-md font-semibold text-green-600 dark:text-green-400 mb-2 mt-4">Notlar</h4>';
               dayContent += `<div class="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border-l-4 border-yellow-400"><p class="text-gray-700 dark:text-gray-300">${day.notes}</p></div>`;
             }
             
@@ -348,7 +343,6 @@ export default function PlanDetailPage() {
       const matches = [...normalizedContent.matchAll(pattern)];
       
       if (matches.length > 0) {
-        console.log(`✅ Pattern ${i + 1} başarılı - ${matches.length} gün bulundu`);
         
         days = matches.map(match => {
           let dayNumber = 1;
@@ -364,7 +358,6 @@ export default function PlanDetailPage() {
           }
           
           const dayContent = match[2].trim();
-          console.log(`📅 Gün ${dayNumber}: ${dayContent.substring(0, 100)}...`);
           
           return {
             day: dayNumber,
@@ -379,14 +372,12 @@ export default function PlanDetailPage() {
     
     // Eğer hiçbir pattern çalışmazsa, alternatif yöntemler dene
     if (days.length === 0) {
-      console.log("⚠️ Standart patternler çalışmadı, alternatif yöntemler deneniyor...");
       
       // --- ayırıcılarını kullanarak böl
       if (normalizedContent.includes('---')) {
         const sections = normalizedContent.split(/\n?\s*---\s*\n?/).filter(section => section.trim());
         
         if (sections.length > 1) {
-          console.log(`📋 --- ayırıcısı ile ${sections.length} bölüm bulundu`);
           
           days = sections.map((section, index) => {
             // Bölümde gün numarası var mı kontrol et
@@ -409,7 +400,6 @@ export default function PlanDetailPage() {
           .filter(p => p.trim().length > 50); // Çok kısa paragrafları atla
         
         if (paragraphs.length > 0) {
-          console.log(`📝 ${paragraphs.length} büyük paragraf gün olarak kabul edildi`);
           
           days = paragraphs.map((paragraph, index) => ({
             day: index + 1,
@@ -425,7 +415,6 @@ export default function PlanDetailPage() {
       .filter(day => day.content && day.content.trim().length > 0)
       .sort((a, b) => a.day - b.day);
     
-    console.log(`📊 Toplam ${sortedDays.length} gün ayrıştırıldı`);
     
     return sortedDays;
   };
@@ -457,8 +446,7 @@ export default function PlanDetailPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
           <div className="space-x-4">
             <button
@@ -480,12 +468,12 @@ export default function PlanDetailPage() {
   }
 
   const tabs = [
-    { id: 'overview', label: 'Genel Bakış', icon: '📋' },
-    { id: 'city-info', label: 'Şehir Bilgisi', icon: '🏙️' },
-    { id: 'daily-plan', label: 'Günlük Plan', icon: '📅' },
-    { id: 'food-guide', label: 'Yemek Rehberi', icon: '🍽️' },
-    { id: 'practical-info', label: 'Pratik Bilgiler', icon: '💡' },
-    { id: 'budget', label: 'Maliyet', icon: '💰' }
+    { id: 'overview', label: 'Genel Bakış', icon: '' },
+    { id: 'city-info', label: 'Şehir Bilgisi', icon: '' },
+    { id: 'daily-plan', label: 'Günlük Plan', icon: '' },
+    { id: 'food-guide', label: 'Yemek Rehberi', icon: '' },
+    { id: 'practical-info', label: 'Pratik Bilgiler', icon: '' },
+    { id: 'budget', label: 'Maliyet', icon: '' }
   ];
 
   return (
@@ -786,7 +774,7 @@ export default function PlanDetailPage() {
                             <div 
                               className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
                               dangerouslySetInnerHTML={{ __html: dayPlan.isEmpty ? 
-                                '<div class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="text-4xl mb-3">📝</div><p>Bu gün için henüz plan yapılmamış</p></div>' :
+                                '<div class="text-center py-8 text-gray-500 dark:text-gray-400"><p>Bu gün için henüz plan yapılmamış</p></div>' :
                                 formatDayContent(dayPlan.content) 
                               }}
                             />
@@ -816,8 +804,7 @@ export default function PlanDetailPage() {
                 })()
               ) : (
                 <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📅</div>
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">Bu plan için günlük plan mevcut değil.</p>
+                                    <p className="text-gray-500 dark:text-gray-400 text-lg">Bu plan için günlük plan mevcut değil.</p>
                 </div>
               )}
             </div>
@@ -865,8 +852,7 @@ export default function PlanDetailPage() {
                         ₺{plan.total_cost ? plan.total_cost.toLocaleString('tr-TR') : '0'}
                       </p>
                     </div>
-                    <div className="text-green-500 text-3xl">💰</div>
-                  </div>
+                                      </div>
                 </div>
                 
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6 rounded-xl border border-blue-200 dark:border-blue-800">
@@ -877,8 +863,7 @@ export default function PlanDetailPage() {
                         ₺{plan.daily_cost ? plan.daily_cost.toLocaleString('tr-TR') : '0'}
                       </p>
                     </div>
-                    <div className="text-blue-500 text-3xl">📅</div>
-                  </div>
+                                      </div>
                 </div>
                 
                 <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-6 rounded-xl border border-purple-200 dark:border-purple-800">
@@ -890,8 +875,7 @@ export default function PlanDetailPage() {
                       </p>
                       <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">%20 rezerv ile</p>
                     </div>
-                    <div className="text-purple-500 text-3xl">🎯</div>
-                  </div>
+                                      </div>
                 </div>
               </div>
 
@@ -906,8 +890,7 @@ export default function PlanDetailPage() {
                   
                   <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                     <div className="flex items-start space-x-3">
-                      <div className="text-yellow-500 text-xl">💡</div>
-                      <div>
+                                            <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
                           Maliyet Düzenleme
                         </p>
@@ -927,8 +910,7 @@ export default function PlanDetailPage() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="text-6xl mb-4">💰</div>
-                  <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Maliyet Detayı Yok</h3>
+                                    <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Maliyet Detayı Yok</h3>
                   <p className="text-gray-600 dark:text-gray-300 mb-4">
                     Bu plan için detaylı maliyet bilgisi mevcut değil.
                   </p>

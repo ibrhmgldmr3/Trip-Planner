@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 
 export async function GET(
@@ -54,7 +55,7 @@ export async function GET(
       trip: trip,
     });
   } catch (error: unknown) {
-    console.error("Trip detail fetch hatası:", error);
+    logger.error("Seyahat detayı getirilemedi", error);
     
     return NextResponse.json(
       { error: "Yapılmış geziler getirilemedi" },
@@ -116,7 +117,7 @@ export async function DELETE(
       message: "Tamamlanmış gezi başarıyla silindi",
     });
   } catch (error: unknown) {
-    console.error("Trip delete hatası:", error);
+    logger.error("Seyahat silinemedi", error);
     
     return NextResponse.json(
       { error: "Yapılmış gezi silinemedi" },

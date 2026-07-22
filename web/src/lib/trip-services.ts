@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 export type ExtractedTripData = {
   accommodation?: {
@@ -143,7 +144,7 @@ export async function updateTripWithAiData(
       return { success: true };
     });
   } catch (error) {
-    console.error("Error updating trip with AI data:", error);
+    logger.error("Seyahat AI verisiyle güncellenemedi", error);
     throw error;
   }
 }

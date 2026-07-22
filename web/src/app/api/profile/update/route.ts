@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // Schema for profile update
 const profileUpdateSchema = z.object({
@@ -123,7 +124,7 @@ export async function PUT(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Profile update error:", error);
+    logger.error("Profil güncellenemedi", error);
     return NextResponse.json(
       { 
         success: false,

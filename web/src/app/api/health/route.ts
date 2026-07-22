@@ -7,7 +7,7 @@ export interface HealthCheckResponse {
     environment?: string;
 }
 
-// Bu fonksiyonu art�k export etmiyoruz, sadece dahili olarak kullan�yoruz
+// Bu fonksiyonu artık export etmiyoruz, sadece dahili olarak kullanıyoruz
 async function getHealthStatus(): Promise<HealthCheckResponse> {
     return {
         status: 'ok',
@@ -17,7 +17,7 @@ async function getHealthStatus(): Promise<HealthCheckResponse> {
     };
 }
 
-// GET iste�i i�leyicisi
+// GET isteği işleyicisi
 export async function GET() {
     const healthData = await getHealthStatus();
     

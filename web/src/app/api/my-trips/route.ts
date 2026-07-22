@@ -3,6 +3,7 @@ import { TripStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -20,11 +21,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status');
     
-    console.log("?? My-trips API çağrısı:", {
-      statusFilter,
-      requestUrl: request.url
-    });
-
     // Kullanıcıyı email ile bul
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -39,16 +35,14 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     // Where clause'unu hazırla
-    const whereClause: { user_id: string; status?: TripStatus } = { 
-      user_id: user.id
+    const whereClause: { userId: string; status?: TripStatus } = {
+      userId: user.id
     };
 
     // Eğer status filtresi varsa ekle
     if (statusFilter) {
       whereClause.status = statusFilter as TripStatus;
     }
-    
-    console.log("?? Where clause:", whereClause);
 
     // TripPlan tablosundan kullanıcının seyahatlerini getir
     const trips = await prisma.tripPlan.findMany({
@@ -90,10 +84,9 @@ export async function GET(request: Request): Promise<NextResponse> {
       createdAt: trip.createdAt.toISOString(),
     }));
 
-    console.log("?? Bulunan planlar:", {
+    logger.debug("Kullanıcının seyahatleri getirildi", {
       toplamPlan: trips.length,
       statusFilter,
-      planStatusleri: trips.map(t => ({ id: t.id, city: t.city, status: t.status }))
     });
 
     return NextResponse.json({
@@ -102,8 +95,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       count: formattedTrips.length
     });
   } catch (error: unknown) {
-    console.error("My trips fetch hatası:", error);
-    
+    logger.error("Seyahatler getirilemedi", error);
+
     return NextResponse.json(
       { 
         success: false,

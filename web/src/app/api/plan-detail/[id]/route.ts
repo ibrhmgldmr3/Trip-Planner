@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 
 export async function GET(
@@ -10,7 +11,6 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const { id: planId } = await context.params;
-    console.log(`Plan detayı getiriliyor: ${planId}`);
     
     // Session kontrolü
     const session = await getServerSession(authOptions);
@@ -63,7 +63,8 @@ export async function GET(
         butce_tahmini: true,
         raw_markdown: true,
         raw_html: true,
-        user_id: true,
+        // Yalnızca yetkilendirme için okunuyor; yanıttan çıkarılıyor.
+        userId: true,
         status: true
       }
     });
@@ -76,22 +77,25 @@ export async function GET(
     }
 
     // Kullanıcının kendi planı olup olmadığını kontrol et
-    if (plan.user_id !== user.id) {
+    if (plan.userId !== user.id) {
       return NextResponse.json(
         { error: "Bu plana erişim yetkiniz yok" },
         { status: 403 }
       );
     }
 
-    console.log(`Plan detayı başarıyla getirildi: ${plan.city}`);
+
+    // Sahip id'si yanıtta yer almıyor; istemci için bir faydası yok.
+    const { userId: _sahipId, ...planResponse } = plan;
+    void _sahipId;
 
     return NextResponse.json({
       success: true,
-      plan: plan
+      plan: planResponse
     });
 
   } catch (error: unknown) {
-    console.error("Plan detayı getirme hatası:", error);
+    logger.error("Plan detayı getirilemedi", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -121,7 +125,6 @@ export async function PATCH(
     const { id: planId } = await context.params;
     const body = await request.json();
     
-    console.log(`Plan maliyeti güncelleniyor: ${planId}`);
     
     // Session kontrolü
     const session = await getServerSession(authOptions);
@@ -149,7 +152,7 @@ export async function PATCH(
     // Plan varlığını ve kullanıcı yetkisini kontrol et
     const existingPlan = await prisma.tripPlan.findUnique({
       where: { id: planId },
-      select: { user_id: true }
+      select: { userId: true }
     });
 
     if (!existingPlan) {
@@ -159,7 +162,7 @@ export async function PATCH(
       );
     }
 
-    if (existingPlan.user_id !== user.id) {
+    if (existingPlan.userId !== user.id) {
       return NextResponse.json(
         { error: "Bu plana erişim yetkiniz yok" },
         { status: 403 }
@@ -197,7 +200,7 @@ export async function PATCH(
       }
     });
 
-    console.log(`Plan maliyeti başarıyla güncellendi: ${planId}`);
+    logger.info("Plan maliyeti güncellendi", { planId });
 
     return NextResponse.json({
       success: true,
@@ -205,7 +208,7 @@ export async function PATCH(
     });
 
   } catch (error: unknown) {
-    console.error("Plan maliyeti güncelleme hatası:", error);
+    logger.error("Plan maliyeti güncellenemedi", error);
     
     const errorDetails = error instanceof Error 
       ? { 
@@ -235,7 +238,6 @@ export async function PUT(
     const { id: planId } = await context.params;
     const body = await request.json();
     
-    console.log(`Günlük planlar güncelleniyor: ${planId}`);
     
     // Session kontrolü
     const session = await getServerSession(authOptions);
@@ -263,7 +265,7 @@ export async function PUT(
     // Plan varlığını ve kullanıcı yetkisini kontrol et
     const existingPlan = await prisma.tripPlan.findUnique({
       where: { id: planId },
-      select: { user_id: true }
+      select: { userId: true }
     });
 
     if (!existingPlan) {
@@ -273,7 +275,7 @@ export async function PUT(
       );
     }
 
-    if (existingPlan.user_id !== user.id) {
+    if (existingPlan.userId !== user.id) {
       return NextResponse.json(
         { error: "Bu plana erişim yetkiniz yok" },
         { status: 403 }
@@ -299,7 +301,7 @@ export async function PUT(
       }
     });
 
-    console.log(`Günlük planlar başarıyla güncellendi: ${planId}`);
+    logger.info("Günlük planlar güncellendi", { planId });
 
     return NextResponse.json({
       success: true,
@@ -307,7 +309,7 @@ export async function PUT(
     });
 
   } catch (error: unknown) {
-    console.error("Günlük plan güncelleme hatası:", error);
+    logger.error("Günlük planlar güncellenemedi", error);
     
     const errorDetails = error instanceof Error 
       ? { 

@@ -125,10 +125,10 @@ Trip-Planner/
     │   │   ├── daily-planner/
     │   │   ├── budget/
     │   │   ├── map/           # Google Maps + POI
-    │   │   ├── my-plans/  my-trips/  plan-detail/[id]/
+    │   │   ├── my-plans/  plan-detail/[id]/
     │   │   └── profile/
     │   ├── components/        # paylaşılan bileşenler
-    │   ├── lib/               # prisma, rate-limit, sanitize, trip-status
+    │   ├── lib/               # logger, prisma, rate-limit, sanitize, trip-status
     │   ├── middleware.ts      # korumalı rotalar
     │   └── env.ts             # doğrulanmış ortam değişkenleri
     └── package.json

@@ -2,19 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { logger } from "@/lib/logger";
 
 
 export async function GET() {
   try {
-    console.log("?? Kaydedilmiş planlar getiriliyor...");
-    console.log("?? API endpoint çağrıldı - /api/my-plans");
-    
     // Session kontrolü
     const session = await getServerSession(authOptions);
-    console.log("?? Session kontrol edildi:", session ? "Mevcut" : "Yok");
-    
+
     if (!session || !session.user?.email) {
-      console.log("? Session bulunamadı veya email eksik");
       return NextResponse.json(
         { error: "Giriş yapmanız gerekiyor" },
         { status: 401 }
@@ -37,7 +33,7 @@ export async function GET() {
     // Kullanıcının kendi planlarını getir
     const plans = await prisma.tripPlan.findMany({
       where: {
-        user_id: user.id
+        userId: user.id
       },
       select: {
         id: true,
@@ -51,7 +47,7 @@ export async function GET() {
         createdAt: true,
         travel_style: true,
         budget_level: true,
-        user_id: true,
+        // Sahip id'si istemciye gönderilmiyor; yetkilendirme zaten where ile yapıldı.
         status: true,
         completedAt: true,
         updatedAt: true
@@ -61,7 +57,7 @@ export async function GET() {
       }
     });
 
-    console.log(`? Kullanıcı ${session.user.email} için ${plans.length} plan bulundu`);
+    logger.debug("Kullanıcının planları getirildi", { planSayisi: plans.length });
 
     return NextResponse.json({
       success: true,
@@ -70,8 +66,8 @@ export async function GET() {
     });
 
   } catch (error: unknown) {
-    console.error("?? Planları getirme hatası:", error);
-    
+    logger.error("Planlar getirilemedi", error);
+
     const errorDetails = error instanceof Error 
       ? { 
           name: error.name, 

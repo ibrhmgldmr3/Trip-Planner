@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import UserNav from "./UserNav";
+import ThemeToggle from "./ThemeToggle";
 import { useSession } from "next-auth/react";
 
 export default function MobileMenu() {
@@ -68,17 +69,20 @@ export default function MobileMenu() {
           </nav>
           
           <div className="hidden md:flex items-center space-x-3">
+            <ThemeToggle />
             <Link href="/travel-mode" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200">
               Yeni Plan
             </Link>
             <UserNav />
           </div>
           
-          <div className="md:hidden flex items-center">
-            <button 
+          <div className="md:hidden flex items-center space-x-1">
+            <ThemeToggle />
+            <button
               className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition-colors duration-200"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Ana menüyü aç/kapat"
+              aria-expanded={isMenuOpen}
             >
               {isMenuOpen ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

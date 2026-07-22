@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { prisma } from '@/lib/prisma';
 import { TripStatus } from '@prisma/client';
+import { logger } from "@/lib/logger";
 
 export async function PATCH(
   request: NextRequest,
@@ -21,10 +22,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
+    // Sahiplik userId üzerinden doğrulanır; userEmail kullanımdan kaldırıldı.
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 404 });
+    }
+
     const tripPlan = await prisma.tripPlan.findFirst({
       where: {
         id: id,
-        userEmail: session.user.email
+        userId: user.id
       }
     });
 
@@ -41,37 +52,32 @@ export async function PATCH(
     });
 
     // Eğer DONE olarak işaretlendiyse, Trip tablosuna da ekle
+    // (kullanıcı yukarıda sahiplik kontrolü sırasında zaten çözüldü)
     if (status === TripStatus.DONE && !tripPlan.tripId) {
-      const user = await prisma.user.findUnique({
-        where: { email: session.user.email }
+      const trip = await prisma.trip.create({
+        data: {
+          title: `${tripPlan.city} Gezisi`,
+          description: tripPlan.sehir_bilgisi || '',
+          startDate: tripPlan.startDate || new Date(),
+          endDate: tripPlan.endDate || new Date(),
+          userId: user.id,
+          city: tripPlan.city,
+          country: tripPlan.country || '',
+          budget: tripPlan.total_cost,
+          status: TripStatus.DONE
+        }
       });
 
-      if (user) {
-        const trip = await prisma.trip.create({
-          data: {
-            title: `${tripPlan.city} Gezisi`,
-            description: tripPlan.sehir_bilgisi || '',
-            startDate: tripPlan.startDate || new Date(),
-            endDate: tripPlan.endDate || new Date(),
-            userId: user.id,
-            city: tripPlan.city,
-            country: tripPlan.country || '',
-            budget: tripPlan.total_cost,
-            status: TripStatus.DONE
-          }
-        });
-
-        // TripPlan'ı Trip'e bağla
-        await prisma.tripPlan.update({
-          where: { id: id },
-          data: { tripId: trip.id }
-        });
-      }
+      // TripPlan'ı Trip'e bağla
+      await prisma.tripPlan.update({
+        where: { id: id },
+        data: { tripId: trip.id }
+      });
     }
 
     return NextResponse.json(updatedPlan);
   } catch (error) {
-    console.error('Status update error:', error);
+    logger.error("Plan statüsü güncellenemedi", error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

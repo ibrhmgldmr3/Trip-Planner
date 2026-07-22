@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Image from "next/image";
+import { logger } from "@/lib/logger";
 
 interface UserProfile {
   id: string;
@@ -77,7 +78,7 @@ export default function ProfilePage() {
         });
       }
     } catch (err) {
-      console.error('Profile fetch error:', err);
+      logger.error("Profil yüklenemedi", err);
       toast.error('Profil bilgileri yüklenemedi');
     } finally {
       setLoading(false);
@@ -106,7 +107,7 @@ export default function ProfilePage() {
         toast.success('Profil başarıyla güncellendi');
       }
     } catch (err) {
-      console.error('Profile update error:', err);
+      logger.error("Profil güncellenemedi", err);
       toast.error('Profil güncellenirken hata oluştu');
     } finally {
       setSaving(false);
@@ -398,7 +399,7 @@ export default function ProfilePage() {
                               case 'bus': return 'Otobüs';
                               case 'train': return 'Tren';
                               case 'boat': return 'Gemi';
-                              default: return '? Hepsi';
+                              default: return 'Hepsi';
                             }
                           })()}
                         </p>
@@ -415,20 +416,20 @@ export default function ProfilePage() {
                           onChange={(e) => setEditForm({...editForm, preferredCurrency: e.target.value})}
                           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
                         >
-                          <option value="TRY">? Türk Lirası (TRY)</option>
-                          <option value="USD">? Amerikan Doları (USD)</option>
-                          <option value="EUR">? Euro (EUR)</option>
-                          <option value="GBP">? İngiliz Sterlini (GBP)</option>
+                          <option value="TRY">Türk Lirası (TRY)</option>
+                          <option value="USD">Amerikan Doları (USD)</option>
+                          <option value="EUR">Euro (EUR)</option>
+                          <option value="GBP">İngiliz Sterlini (GBP)</option>
                         </select>
                       ) : (
                         <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
                           {(() => {
                             const currency = profile?.preferredCurrency || 'TRY';
                             switch(currency) {
-                              case 'USD': return '? Amerikan Doları (USD)';
-                              case 'EUR': return '? Euro (EUR)';
-                              case 'GBP': return '? İngiliz Sterlini (GBP)';
-                              default: return '? Türk Lirası (TRY)';
+                              case 'USD': return 'Amerikan Doları (USD)';
+                              case 'EUR': return 'Euro (EUR)';
+                              case 'GBP': return 'İngiliz Sterlini (GBP)';
+                              default: return 'Türk Lirası (TRY)';
                             }
                           })()}
                         </p>
