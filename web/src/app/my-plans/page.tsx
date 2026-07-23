@@ -19,7 +19,6 @@ interface SavedPlan {
   ai_model: string;
   createdAt: string;
   travel_style: string | null;
-  user_id: string | null;
   status: TripStatus;
   completedAt: string | null;
   updatedAt: string;

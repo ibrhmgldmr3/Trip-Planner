@@ -5,12 +5,8 @@ import { env } from "@/env";
  *
  * Model kimliği eskiden route dosyasına sabit yazılıydı ve seçilen model
  * (`deepseek/deepseek-r1-0528-qwen3-8b:free`) katalogdan kalktığı için endpoint
- * 502 dönüyordu. Artık model env'den okunuyor ve bir yedeği var.
- *
- * NOT: `OPENROUTER_MODEL` / `OPENROUTER_MODEL_FALLBACK` bilerek `src/env.ts`
- * şemasına eklenmedi (o dosya bu görevin kapsamı dışında). Eklenmesi önerilir:
- *   OPENROUTER_MODEL: z.string().optional(),
- *   OPENROUTER_MODEL_FALLBACK: z.string().optional(),
+ * 502 dönüyordu. Artık model env'den okunuyor (env.ts'te doğrulanıyor) ve bir
+ * yedeği var.
  */
 
 /** Varsayılan model: yapılandırılmış çıktı (structured outputs) destekliyor. */
@@ -19,8 +15,8 @@ const VARSAYILAN_MODEL = "openai/gpt-oss-20b:free";
 const VARSAYILAN_YEDEK_MODEL = "nvidia/nemotron-nano-9b-v2:free";
 
 export function openRouterModels(): string[] {
-  const birincil = process.env.OPENROUTER_MODEL?.trim() || VARSAYILAN_MODEL;
-  const yedek = process.env.OPENROUTER_MODEL_FALLBACK?.trim() || VARSAYILAN_YEDEK_MODEL;
+  const birincil = env.OPENROUTER_MODEL?.trim() || VARSAYILAN_MODEL;
+  const yedek = env.OPENROUTER_MODEL_FALLBACK?.trim() || VARSAYILAN_YEDEK_MODEL;
 
   // Aynı model iki kez denenmesin.
   return birincil === yedek ? [birincil] : [birincil, yedek];
