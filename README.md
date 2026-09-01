@@ -22,9 +22,13 @@ yönetimini üstüne kuruyor.
 - Kategorik harcama takibi (ulaşım, konaklama, yemek, aktivite, alışveriş, eğlence)
 - Tahmini/gerçekleşen ve ödendi/ödenmedi ayrımı
 - Toplam ve günlük bütçe özeti
+- Bütçe toplamları **sunucuda** kategori kalemlerinden türetilir; günlük plandaki
+  aktivite maliyetleri bütçenin "aktiviteler" kategorisine otomatik yansır
 
 **Plan yönetimi**
 - Plan durumları: `PLANNED`, `ACTIVE`, `COMPLETED`, `CANCELLED`, `DONE`
+- Durum geçişleri sunucuda kural tablosuyla doğrulanır (`src/lib/trip-status.ts`);
+  `CANCELLED` ve `DONE` uç durumdur
 - Kaydedilmiş planların listelenmesi, detay görüntüleme ve silme
 - Konaklama ve ulaşım kayıtları
 
@@ -46,6 +50,8 @@ yönetimini üstüne kuruyor.
 | AI | OpenRouter (`deepseek/deepseek-r1-0528-qwen3-8b:free`) |
 | Harita | Google Maps JavaScript API |
 | Bildirim | react-hot-toast |
+| Test | Vitest (birim + handler), Playwright (e2e) |
+| Dağıtım | Docker (standalone çıktı) |
 
 ---
 
@@ -85,6 +91,11 @@ npx prisma migrate dev
 npm run dev
 ```
 
+> **Mevcut kurulumdan yükseltiyorsanız:** `20260831090000` migration'ı terk
+> edilmiş `userEmail` sütunlarını **düşürür** (geri alınamaz) ve `DailyPlan`
+> üzerinde tarih başına tek plan kısıtı kurar. Uygulamadan önce yedek alın;
+> migration, sahipsiz kalmış planları e-postadan kurtarma adımıyla başlıyor.
+
 [http://localhost:3000](http://localhost:3000) adresini açın.
 
 > **Güvenlik notu:** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` tarayıcı bundle'ına gömülür —
@@ -102,6 +113,16 @@ npm run build      # üretim derlemesi
 npm run start      # üretim sunucusu
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
+npm test           # Vitest: birim + route handler testleri
+npm run test:e2e   # Playwright uçtan uca testler (çalışan PostgreSQL ister)
+```
+
+Docker ile:
+
+```bash
+docker build -t trip-planner ./web
+docker run --rm --env-file .env trip-planner npx prisma migrate deploy
+docker run -p 3000:3000 --env-file .env trip-planner
 ```
 
 ---
@@ -128,9 +149,26 @@ Trip-Planner/
     │   │   ├── my-plans/  plan-detail/[id]/
     │   │   └── profile/
     │   ├── components/        # paylaşılan bileşenler
-    │   ├── lib/               # logger, prisma, rate-limit, sanitize, trip-status
-    │   ├── middleware.ts      # korumalı rotalar
+    │   ├── lib/
+    │   │   ├── auth-session.ts        # requireUser() — tek kimlik giriş noktası
+    │   │   ├── trip-ownership.ts      # Trip ve alt kayıt sahipliği
+    │   │   ├── trip-dates.ts          # gün/gece sayısı (kapsayıcı)
+    │   │   ├── plan-budget.ts         # butce_tahmini / gun_plani çözümleme + toplama
+    │   │   ├── plan-generation.ts     # AI üretim zinciri (HTTP'den bağımsız)
+    │   │   ├── plan-job.ts            # arka plan üretim işlerinin yaşam döngüsü
+    │   │   ├── plan-migration.ts      # JSON → ilişkisel dönüşüm (saf)
+    │   │   ├── plan-migration-runner.ts # dönüşümün veritabanı tarafı
+    │   │   ├── plan-status-service.ts # durum geçişinin tek uygulaması
+    │   │   ├── trip-status.ts         # durum enum'u, etiketler, geçiş kuralları
+    │   │   └── logger, prisma, rate-limit, sanitize, openrouter, api-schemas
+    │   ├── middleware.ts      # korumalı rotalar + nonce tabanlı CSP
     │   └── env.ts             # doğrulanmış ortam değişkenleri
+    ├── tests/
+    │   ├── *.test.ts          # saf fonksiyonlar ve şemalar
+    │   ├── routes/            # route handler testleri (Prisma taklit ediliyor)
+    │   └── helpers/           # sahte Prisma istemcisi ve istek yardımcıları
+    ├── e2e/                   # Playwright uçtan uca testler
+    ├── Dockerfile
     └── package.json
 ```
 
@@ -142,21 +180,39 @@ Trip-Planner/
 |---|---|---|
 | `POST` | `/api/register` | Kullanıcı kaydı (IP başına saatte 5) |
 | `*` | `/api/auth/[...nextauth]` | NextAuth (giriş/çıkış/oturum) |
-| `POST` | `/api/trip-plan-model` | AI plan üretimi — **giriş zorunlu**, kullanıcı başına saatte 5 |
-| `POST` | `/api/manual-travel-plan` | Manuel plan kaydı |
-| `GET` | `/api/my-plans` | Kullanıcının AI planları |
+| `POST` | `/api/trip-plan-model` | AI plan üretimini **başlatır** — 202 + `jobId` döner; giriş zorunlu, saatte 5 |
+| `GET` | `/api/plan-jobs/[id]` | Üretim işinin durumu; bittiğinde planı da döner |
+| `POST` | `/api/manual-travel-plan` | Manuel plan kaydı — **giriş zorunlu**, saatte 30 |
+| `GET` | `/api/my-plans` | Kullanıcının planları |
 | `DELETE` | `/api/my-plans/[id]` | Plan silme |
 | `GET` | `/api/plan-detail/[id]` | Plan detayı |
+| `PATCH` | `/api/plan-detail/[id]` | Bütçe güncelleme (toplamlar sunucuda hesaplanır) |
+| `PUT` | `/api/plan-detail/[id]` | Günlük plan güncelleme (bütçeyi de senkronlar) |
 | `PATCH` | `/api/trip-plans/[id]/status` | Plan durumu güncelleme |
-| `GET/POST/PUT/DELETE` | `/api/trip` | Seyahat CRUD |
-| `GET/POST/PUT/DELETE` | `/api/trip/budget` | Bütçe kalemleri |
-| `GET/POST` | `/api/trip/daily-plans` | Günlük planlar |
-| `GET/POST` | `/api/trip/accommodations` | Konaklama kayıtları |
-| `GET/POST` | `/api/trip/transportations` | Ulaşım kayıtları |
-| `GET/PUT` | `/api/profile`, `/api/profile/update` | Profil |
+| `GET` | `/api/my-trips`, `/api/my-trips/[id]` | Gerçekleşmiş geziler |
+| `DELETE` | `/api/my-trips/[id]` | Gerçekleşmiş gezi silme |
+| `GET/POST/PUT/DELETE` | `/api/trip` | Seyahat CRUD (ilişkisel model) |
+| `GET/POST/PUT/DELETE` | `/api/trip/budget` | Bütçe kalemleri (ilişkisel model) |
+| `GET` | `/api/trip/budget/[id]` | Tek bütçe kalemi |
+| `GET/POST/PUT/DELETE` | `/api/trip/daily-plans` | Günlük planlar (ilişkisel model) |
+| `GET/POST/PUT/DELETE` | `/api/trip/accommodations` | Konaklama kayıtları |
+| `GET/POST/PUT/DELETE` | `/api/trip/transportations` | Ulaşım kayıtları |
+| `GET/POST` | `/api/my-plans/migrate` | JSON planları ilişkisel modele taşır (GET = kuru çalışma) |
+| `POST` | `/api/trip/apply-ai-data` | AI çıktısını ilişkisel modele yazma |
+| `GET/POST` | `/api/conversation/save` | AI konuşma geçmişi |
+| `GET` | `/api/profile` | Profil ve istatistikler |
+| `PUT` | `/api/profile/update` | Profil güncelleme |
 | `GET` | `/api/health` | Sağlık kontrolü |
 
-Tüm veri uçları oturum doğrulaması ve kayıt sahipliği kontrolü yapar.
+Tüm veri uçları `requireUser()` ile oturum doğrulaması ve kayıt sahipliği kontrolü yapar
+(`src/lib/auth-session.ts`). Kimlik **yalnızca oturumdan** çözülür; istek gövdesinden
+gelen kullanıcı bilgisi hiçbir uçta okunmaz.
+
+> **İki veri modeli, tek hedef.** `TripPlan` yapay zekânın ürettiği ham çıktının
+> kaydı; `Trip` + `BudgetItem` + `DailyPlan` + `Accommodation` + `Transportation`
+> ise ilişkisel hedef model. İlişkisel tarafın tam CRUD'u ve
+> `POST /api/my-plans/migrate` ile taşıma yolu hazır. Arayüzün bu uçlara
+> bağlanması yol haritasında.
 
 ---
 
@@ -164,16 +220,28 @@ Tüm veri uçları oturum doğrulaması ve kayıt sahipliği kontrolü yapar.
 
 Henüz yapılmamış, planlanan işler:
 
-- [ ] Otomatik test altyapısı (Vitest birim testleri + Playwright e2e)
-- [ ] LLM çıktısının yapılandırılmış JSON olarak alınması (şu an markdown ayrıştırılıyor)
-- [ ] `TripPlan` sahipliğinin tek bir `userId` alanına indirgenmesi (`userEmail` ikilemi)
+Tamamlananlar (Aşama 1–3):
+
+- [x] `userEmail` sütunlarının düşürülmesi — sahiplik tek kaynak: `userId`
+- [x] İlişkisel modelin tam CRUD'u (günlük plan, konaklama, ulaşım)
+- [x] `TripPlan` JSON → ilişkisel taşıma yolu (`/api/my-plans/migrate`)
+- [x] Yinelenen durum ucunun kaldırılması (tek kanonik uç)
+- [x] Route handler testleri + her uç için yetkilendirme testi
+- [x] Playwright uçtan uca testler ve veritabanlı CI işi
+- [x] Plan üretiminin arka plana alınması (`PlanJob` + durum sorgulama)
+- [x] Dağıtık rate limit (Upstash Redis; yoksa süreç-içi)
+- [x] `/api/health`'in gerçek veritabanı yoklaması
+- [x] Nonce tabanlı CSP (varsayılan rapor modu)
+- [x] Dockerfile ve standalone çıktı
+
+Kalanlar:
+
+- [ ] Arayüzün ilişkisel uçlara bağlanması (bütçe ve günlük plan sayfaları)
 - [ ] Şifre sıfırlama akışı ve e-posta doğrulama
-- [ ] Tema seçici (arayüz şu an tek temaya sabit)
-- [ ] `/terms` ve `/privacy` sayfaları
 - [ ] Çok dilli arayüz (i18n)
 - [ ] Plan paylaşımı ve PDF çıktısı
-- [ ] Dağıtık rate limit (mevcut limiter süreç-içi, tek instance varsayar)
-- [ ] Docker ile dağıtım
+- [ ] Gerçek POI / otel / uçuş entegrasyonu (manuel planlayıcı şu an sahte veri kullanıyor)
+- [ ] Harita ile günlük planın birleştirilmesi (gün bazlı rota optimizasyonu)
 
 ---
 

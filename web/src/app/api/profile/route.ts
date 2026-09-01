@@ -1,24 +1,50 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
+import { gunSayisi } from "@/lib/trip-dates";
 import { logger } from "@/lib/logger";
+
+/**
+ * `preferences` sütununu güvenle objeye çevirir.
+ *
+ * Sütun `Json` tipinde ama eski satırlar JSON.stringify edilmiş METİN
+ * taşıyor (profile/update eskiden öyle yazıyordu). İki biçimi de okumak
+ * zorundayız; aksi halde eski profillerdeki telefon/bio/konum kayboluyor.
+ */
+function tercihleriCoz(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+/** Serbest metin alanını güvenle string'e indirger. */
+function metin(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
 
 
 export async function GET(): Promise<NextResponse> {
   try {
-    // Session kontrolü
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Giriş yapmanız gerekiyor" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
-    // Kullanıcıyı email ile bul
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: auth.user.id },
       select: {
         id: true,
         name: true,
@@ -41,22 +67,22 @@ export async function GET(): Promise<NextResponse> {
     }
 
     // Preferences JSON'dan ek bilgileri al
-    const preferences = user.preferences as Record<string, unknown> || {};
-    
+    const preferences = tercihleriCoz(user.preferences);
+
     // Profile objesini oluştur
     const profile = {
       id: user.id,
       name: user.name,
       email: user.email,
       image: user.image,
-      phone: preferences.phone as string || null,
-      bio: preferences.bio as string || null,
-      location: preferences.location as string || null,
-      birthDate: preferences.birthDate as string || null,
+      phone: metin(preferences.phone),
+      bio: metin(preferences.bio),
+      location: metin(preferences.location),
+      birthDate: metin(preferences.birthDate),
       preferredTransport: user.preferredTransport,
       preferredCurrency: user.preferredCurrency,
       interests: user.interests,
-      preferences: user.preferences,
+      preferences,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
@@ -103,20 +129,19 @@ export async function GET(): Promise<NextResponse> {
       select: { startDate: true, endDate: true },
     });
 
-    let averageTripDuration = 0;
-    if (tripDurations.length > 0) {
-      const totalDays = tripDurations.reduce((sum, trip) => {
-        if (trip.startDate && trip.endDate) {
-          const days = Math.ceil(
-            (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 
-            (1000 * 60 * 60 * 24)
-          );
-          return sum + days;
-        }
-        return sum;
-      }, 0);
-      averageTripDuration = Math.round(totalDays / tripDurations.length);
-    }
+    // Gün sayısı KAPSAYICI hesaplanıyor (bkz. src/lib/trip-dates.ts);
+    // eskiden 1-5 Ocak seyahati 4 gün sayılıyordu. Ayrıca tarihleri ters
+    // girilmiş satırlar ortalamayı bozmasın diye eleniyor.
+    const gecerliSureler = tripDurations
+      .map((trip) => gunSayisi(trip.startDate, trip.endDate))
+      .filter((gun) => gun > 0);
+
+    const averageTripDuration =
+      gecerliSureler.length > 0
+        ? Math.round(
+            gecerliSureler.reduce((sum, gun) => sum + gun, 0) / gecerliSureler.length
+          )
+        : 0;
 
     const stats = {
       totalTrips,
@@ -134,12 +159,9 @@ export async function GET(): Promise<NextResponse> {
   } catch (error: unknown) {
     logger.error("Profil getirilemedi", error);
     
+    // Hata ayrıntısı yalnızca sunucu log'una; istemciye genel mesaj.
     return NextResponse.json(
-      { 
-        success: false,
-        error: "Profil bilgileri getirilemedi",
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: "Profil bilgileri getirilemedi" },
       { status: 500 }
     );
   }

@@ -1,39 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
 import { logger } from "@/lib/logger";
 
 
 export async function GET() {
   try {
-    // Session kontrolü
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Giriş yapmanız gerekiyor" },
-        { status: 401 }
-      );
-    }
-
-    // Kullanıcıyı email ile bul ve ID'sini al
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Kullanıcı bulunamadı" },
-        { status: 404 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     // Kullanıcının kendi planlarını getir
     const plans = await prisma.tripPlan.findMany({
       where: {
-        userId: user.id
+        userId: auth.user.id
       },
       select: {
         id: true,
@@ -67,21 +46,10 @@ export async function GET() {
 
   } catch (error: unknown) {
     logger.error("Planlar getirilemedi", error);
-
-    const errorDetails = error instanceof Error 
-      ? { 
-          name: error.name, 
-          message: error.message
-        }
-      : { 
-          unknown: "Bilinmeyen hata tipi",
-          value: String(error)
-        };
     
     return NextResponse.json(
       { 
-        error: "Planlar yüklenemedi",
-        details: errorDetails
+        error: "Planlar yüklenemedi"
       },
       { status: 500 }
     );

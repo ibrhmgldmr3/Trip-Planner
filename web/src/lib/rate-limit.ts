@@ -1,12 +1,22 @@
 /**
- * Basit, süreç-içi (in-memory) sliding window rate limiter.
+ * Hız sınırlayıcı.
  *
- * UYARI: Sayaç process belleğinde tutulur. Tek instance'lı bir dağıtımda
- * (tek Node sunucusu, tek container) doğru çalışır; birden fazla instance
- * veya serverless (her invocation ayrı process) altında sınır instance
- * başına uygulanır. Yatay ölçeklemeye geçildiğinde burayı Redis tabanlı
- * bir limiter ile (ör. @upstash/ratelimit) değiştirin — çağıran taraf
- * imzayı korurken sadece bu dosya değişir.
+ * İKİ ARKA UÇ, TEK ARAYÜZ:
+ *
+ *   - **Süreç-içi (varsayılan.)** Tek instance'lı dağıtımda doğru çalışır.
+ *   - **Upstash Redis (REST).** `UPSTASH_REDIS_REST_URL` ve
+ *     `UPSTASH_REDIS_REST_TOKEN` tanımlıysa devreye girer; sınır tüm
+ *     instance'lar arasında paylaşılır.
+ *
+ * NEDEN REST: Redis'in TCP protokolü Edge runtime'da ve serverless'ta
+ * bağlantı havuzu sorunları çıkarıyor. REST API'si `fetch` ile çalıştığı
+ * için her iki ortamda da sorunsuz ve ek bağımlılık gerektirmiyor.
+ *
+ * NEDEN AYNI İMZA: `rateLimit()` senkron olarak kalamazdı (ağ çağrısı
+ * asenkron), bu yüzden `rateLimitAsync()` eklendi. Senkron sürüm hâlâ
+ * duruyor çünkü NextAuth'un `authorize()` fonksiyonu içinde kullanılıyor ve
+ * orada süreç-içi sayaç yeterli (giriş denemeleri zaten instance başına
+ * anlamlı). Yeni çağrı yerleri asenkron sürümü kullanmalı.
  */
 
 type Hit = { count: number; resetAt: number };
@@ -32,6 +42,8 @@ export type RateLimitResult = {
 };
 
 /**
+ * Süreç-içi sliding window sayacı.
+ *
  * @param key    Sayaç kimliği — kullanıcı id'si, e-posta veya IP.
  * @param limit  Pencere başına izin verilen istek sayısı.
  * @param windowMs Pencere uzunluğu (ms).
@@ -62,6 +74,104 @@ export function rateLimit(
   }
 
   return { success: true, remaining: limit - hit.count, retryAfter: 0 };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dağıtık arka uç                                                            */
+/* -------------------------------------------------------------------------- */
+
+function upstashYapilandirmasi(): { url: string; token: string } | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!url || !token) return null;
+  return { url: url.replace(/\/$/, ""), token };
+}
+
+/** Dağıtık sayaç açık mı? Log ve teşhis için dışa açık. */
+export function dagitikSayacAktifMi(): boolean {
+  return upstashYapilandirmasi() !== null;
+}
+
+/**
+ * Upstash üzerinde tek bir pencerelik sayaç.
+ *
+ * `INCR` + ilk artışta `EXPIRE` deseni: atomik, tek turda iki komut.
+ * Pipeline kullanılıyor ki iki ağ turu olmasın.
+ */
+async function upstashSay(
+  yapilandirma: { url: string; token: string },
+  key: string,
+  windowMs: number
+): Promise<{ count: number; ttlMs: number }> {
+  const saniye = Math.max(1, Math.ceil(windowMs / 1000));
+
+  const response = await fetch(`${yapilandirma.url}/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${yapilandirma.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      ["INCR", key],
+      // NX: yalnızca TTL yoksa kur. Böylece pencere ilk istekle başlıyor ve
+      // her istekte yeniden uzamıyor (uzasaydı sürekli trafik altında sayaç
+      // hiç sıfırlanmazdı).
+      ["EXPIRE", key, String(saniye), "NX"],
+      ["PTTL", key],
+    ]),
+    // Sayaç yüzünden isteği bekletmiyoruz.
+    signal: AbortSignal.timeout(2000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upstash yanıtı: ${response.status}`);
+  }
+
+  const sonuc = (await response.json()) as Array<{ result?: unknown; error?: string }>;
+  const sayi = Number(sonuc[0]?.result ?? 0);
+  const ttl = Number(sonuc[2]?.result ?? -1);
+
+  return {
+    count: Number.isFinite(sayi) ? sayi : 0,
+    ttlMs: ttl > 0 ? ttl : windowMs,
+  };
+}
+
+/**
+ * Hız sınırı kontrolü — yapılandırılmışsa dağıtık, değilse süreç-içi.
+ *
+ * HATA DAVRANIŞI: Redis'e ulaşılamazsa süreç-içi sayaca DÜŞÜLÜR, istek
+ * reddedilmez. Sınırlayıcının kendisi bir kesinti kaynağı olmamalı; en
+ * kötü durumda koruma tek instance seviyesine iner, uygulama ayakta kalır.
+ */
+export async function rateLimitAsync(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const yapilandirma = upstashYapilandirmasi();
+
+  if (!yapilandirma) {
+    return rateLimit(key, limit, windowMs);
+  }
+
+  try {
+    const { count, ttlMs } = await upstashSay(yapilandirma, `rl:${key}`, windowMs);
+
+    if (count > limit) {
+      return {
+        success: false,
+        remaining: 0,
+        retryAfter: Math.ceil(ttlMs / 1000),
+      };
+    }
+
+    return { success: true, remaining: Math.max(0, limit - count), retryAfter: 0 };
+  } catch {
+    // Bilinçli olarak sessiz: sınırlayıcı hatası isteği düşürmemeli.
+    // Süreç-içi sayaç devreye giriyor.
+    return rateLimit(key, limit, windowMs);
+  }
 }
 
 /**

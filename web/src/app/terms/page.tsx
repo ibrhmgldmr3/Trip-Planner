@@ -13,26 +13,26 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen p-4 md:p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 md:p-10">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">
+    <main className="min-h-screen bg-[var(--bg)] px-4 md:px-8 py-12 md:py-16">
+      <div className="mx-auto max-w-[68ch]">
+        <div>
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-2">
             Kullanım Şartları
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-sm text-[var(--fg-muted)] mb-8">
             Son güncelleme: [doldurulacak] &middot; Yürürlük tarihi: [doldurulacak]
           </p>
 
-          <div className="rounded-lg border border-yellow-300 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/30 p-4 mb-8">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="rounded-[var(--radius)] bg-[var(--warn-soft)] p-4 mb-8">
+            <p className="text-sm text-[var(--warn)] leading-relaxed">
               <strong>Taslak metin.</strong> Bu sayfa henüz hukuki incelemeden geçmemiştir.
               Köşeli parantez içindeki alanlar doldurulmadan yayına alınmamalıdır.
             </p>
           </div>
 
-          <section className="space-y-8 text-gray-700 dark:text-gray-300 leading-relaxed">
+          <section className="space-y-8 text-[var(--fg-muted)] leading-relaxed">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 1. Taraflar ve Kapsam
               </h2>
               <p>
@@ -44,7 +44,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 2. Hizmetin Tanımı
               </h2>
               <p>
@@ -61,7 +61,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 3. Hesap ve Güvenlik
               </h2>
               <ul className="list-disc pl-5 space-y-2">
@@ -73,7 +73,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 4. Kabul Edilebilir Kullanım
               </h2>
               <p>Hizmeti kullanırken aşağıdakileri yapmamayı kabul edersiniz:</p>
@@ -86,7 +86,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 5. İçerik ve Yapay Zekâ Üretimi Uyarısı
               </h2>
               <p>
@@ -100,7 +100,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 6. Üçüncü Taraf Hizmetleri
               </h2>
               <p>
@@ -112,7 +112,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 7. Fikri Mülkiyet
               </h2>
               <p>
@@ -123,7 +123,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 8. Sorumluluğun Sınırlandırılması
               </h2>
               <p>
@@ -136,14 +136,14 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 9. Hesabın Sonlandırılması
               </h2>
               <p>
                 Hesabınızı dilediğiniz zaman kapatabilirsiniz. Bu şartların ağır ihlali
                 hâlinde hesabınızı askıya alabilir veya kapatabiliriz. Hesap kapatıldığında
                 verilerinizin ne kadar süre saklandığı{" "}
-                <Link href="/privacy" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
+                <Link href="/privacy" className="text-[var(--accent)] hover:opacity-80 font-medium">
                   Gizlilik Politikası
                 </Link>{" "}
                 sayfasında açıklanmıştır.
@@ -151,7 +151,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 10. Değişiklikler
               </h2>
               <p>
@@ -163,7 +163,7 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 11. Uygulanacak Hukuk ve İletişim
               </h2>
               <p>
@@ -180,16 +180,16 @@ export default function TermsPage() {
             </div>
           </section>
 
-          <div className="mt-10 pt-6 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-4">
+          <div className="mt-10 pt-6 border-t border-[var(--line)] flex flex-wrap gap-4">
             <Link
               href="/privacy"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
             >
               Gizlilik Politikası
             </Link>
             <Link
               href="/"
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 border border-[var(--line-strong)] text-[var(--fg-muted)] rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-[var(--surface-2)] transition-colors"
             >
               Ana Sayfaya Dön
             </Link>

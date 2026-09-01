@@ -3,11 +3,9 @@ import type { NextConfig } from "next";
 /**
  * Uygulama genelinde uygulanan güvenlik başlıkları.
  *
- * CSP burada bilinçli olarak tanımlı DEĞİL: harita sayfaları Google Maps JS
- * API'sini runtime'da <script> enjekte ederek yüklüyor ve inline style
- * kullanıyor. Anlamlı bir CSP için önce nonce tabanlı bir script yükleme
- * stratejisine geçilmeli — aksi halde 'unsafe-inline' içeren, koruma
- * sağlamayan bir CSP yazmış oluruz.
+ * CSP BURADA DEĞİL: nonce her istekte değiştiği için politika statik
+ * olamaz; `src/middleware.ts` üretiyor. Buradakiler istekten bağımsız,
+ * sabit başlıklar.
  */
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -23,6 +21,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Sunucu sürüm bilgisini sızdırma.
   poweredByHeader: false,
+
+  // Docker imajı için: node_modules'ün tamamı yerine yalnızca gereken
+  // dosyaları içeren, kendi kendine yeten bir çıktı üretir.
+  output: "standalone",
 
   // Repo kökünde başka bir lockfile varsa Next yanlış kökü seçebiliyor.
   outputFileTracingRoot: __dirname,

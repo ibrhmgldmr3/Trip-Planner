@@ -7,12 +7,24 @@ import { env } from "@/env";
  * (`deepseek/deepseek-r1-0528-qwen3-8b:free`) katalogdan kalktığı için endpoint
  * 502 dönüyordu. Artık model env'den okunuyor (env.ts'te doğrulanıyor) ve bir
  * yedeği var.
+ *
+ * ÜCRETSİZ MODELLER KALICI DEĞİL — bu üçüncü kez yaşandı. 31 Ağustos 2026'da
+ * yapılan gerçek çağrılarda ÖNCEKİ iki varsayılan da ölmüştü:
+ *   openai/gpt-oss-20b:free        → 404 "unavailable for free"
+ *   nvidia/nemotron-nano-9b-v2:free → 404 "No endpoints found"
+ * Yani agentic yol devreye girmeden önce bu zincirin tamamı kırıktı.
+ *
+ * Aşağıdaki varsayılanlar aynı gün gerçek isteklerle doğrulandı (strict
+ * `json_schema` ile geçerli JSON döndürdüler). Yine de KALICI ÇÖZÜM DEĞİL:
+ * üretimde `OPENROUTER_MODEL` ile ücretli, kalıcı bir model tanımlayın.
+ * Yeniden kontrol: `GET /api/v1/models` → `supported_parameters` içinde
+ * "structured_outputs" olan `:free` modelleri süz, birer istek at.
  */
 
 /** Varsayılan model: yapılandırılmış çıktı (structured outputs) destekliyor. */
-const VARSAYILAN_MODEL = "openai/gpt-oss-20b:free";
+const VARSAYILAN_MODEL = "dots-studio/dots-3-note-preview:free";
 /** Yedek model: birincil model hata verirse denenir. */
-const VARSAYILAN_YEDEK_MODEL = "nvidia/nemotron-nano-9b-v2:free";
+const VARSAYILAN_YEDEK_MODEL = "z-ai/glm-5.2:free";
 
 export function openRouterModels(): string[] {
   const birincil = env.OPENROUTER_MODEL?.trim() || VARSAYILAN_MODEL;
@@ -36,7 +48,21 @@ export interface ChatRequest {
   responseFormat?: Record<string, unknown>;
   /** `json_schema` kullanılırken şemayı destekleyen sağlayıcıya yönlendirir. */
   requireParameters?: boolean;
+  /** Tek çağrı için üst sınır (ms). Aşılırsa istek iptal edilir. */
+  timeoutMs?: number;
+  /** Dışarıdan gelen iptal sinyali; toplam bütçe dolduğunda tetiklenir. */
+  signal?: AbortSignal;
 }
+
+/**
+ * Tek bir OpenRouter çağrısının varsayılan zaman aşımı.
+ *
+ * NEDEN GEREKLİ: bu istemci `fetch`i zaman aşımsız çağırıyordu. Plan üretimi
+ * en kötü durumda 2 model × 3 strateji + 1 onarım = 7 ardışık çağrı yapıyor;
+ * sağlayıcı yanıt vermezse istek süresiz asılı kalıyor, Node tarafında
+ * bağlantı, kullanıcı tarafında dönen spinner birikiyordu.
+ */
+export const VARSAYILAN_ZAMAN_ASIMI_MS = 60_000;
 
 export interface ChatResult {
   ok: boolean;
@@ -74,6 +100,14 @@ export async function chatCompletion(request: ChatRequest): Promise<ChatResult> 
     body.provider = { require_parameters: true };
   }
 
+  // Zaman aşımı ve dış iptal sinyali birleştiriliyor: hangisi önce
+  // tetiklenirse istek düşüyor.
+  const controller = new AbortController();
+  const zamanAsimi = request.timeoutMs ?? VARSAYILAN_ZAMAN_ASIMI_MS;
+  const timer = setTimeout(() => controller.abort(), zamanAsimi);
+  const disIptal = () => controller.abort();
+  request.signal?.addEventListener("abort", disIptal);
+
   let response: Response;
   try {
     response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -85,15 +119,24 @@ export async function chatCompletion(request: ChatRequest): Promise<ChatResult> 
         "X-Title": "Trip Planner App",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch (networkError) {
+    const iptalEdildi =
+      networkError instanceof Error && networkError.name === "AbortError";
+
     return {
       ok: false,
       status: 0,
       content: "",
       finishReason: "",
-      detay: `Ağ hatası: ${String(networkError)}`,
+      detay: iptalEdildi
+        ? `Zaman aşımı (${zamanAsimi} ms) ya da iptal`
+        : `Ağ hatası: ${String(networkError)}`,
     };
+  } finally {
+    clearTimeout(timer);
+    request.signal?.removeEventListener("abort", disIptal);
   }
 
   const responseText = await response.text().catch(() => "");

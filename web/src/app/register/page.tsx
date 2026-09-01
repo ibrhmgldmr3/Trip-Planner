@@ -4,20 +4,29 @@ import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { z } from "zod";
+import { registerSchema, ilkHataMesaji } from "@/lib/api-schemas";
 import { logger } from "@/lib/logger";
+import { Alan, Dugme, GIRDI_SINIFI, Kart } from "@/components/ui";
 
-// Schema for form validation
-const registerSchema = z.object({
-  name: z.string().min(2, "İsim en az 2 karakter olmalıdır"),
-  email: z.string().email("Geçerli bir e-posta giriniz"),
-  password: z.string().min(8, "Şifre en az 8 karakter olmalıdır"),
-  confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Şifreler eşleşmiyor",
-  path: ["confirmPassword"],
-});
+/**
+ * Form şeması sunucudaki `registerSchema`yı GENİŞLETİYOR, tekrar
+ * TANIMLAMIYOR.
+ *
+ * Eskiden burada ayrı, daha ZAYIF bir şema vardı: yalnızca `min(8)`
+ * kontrolü yapıyor, sunucunun zorunlu tuttuğu harf/rakam kurallarını ve
+ * üst sınırı (72 karakter) bilmiyordu. Sonuç kullanıcı için görünmüyordu
+ * (sunucu zaten reddediyordu) ama gereksiz bir gidiş-dönüş ve iki şemanın
+ * zamanla sessizce ayrışması riski vardı — sunucudaki kural değişse
+ * istemci bundan habersiz kalırdı.
+ */
+const registerFormSchema = registerSchema
+  .extend({ confirmPassword: z.string() })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Şifreler eşleşmiyor",
+    path: ["confirmPassword"],
+  });
 
-type FormData = z.infer<typeof registerSchema>;
+type FormData = z.infer<typeof registerFormSchema>;
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState<FormData>({
@@ -43,17 +52,10 @@ export default function RegisterPage() {
 
     try {
       // Validate form data
-      const result = registerSchema.safeParse(formData);
-      
+      const result = registerFormSchema.safeParse(formData);
+
       if (!result.success) {
-        const errorMessage = result.error.format()._errors[0] || 
-          result.error.format().name?._errors[0] || 
-          result.error.format().email?._errors[0] || 
-          result.error.format().password?._errors[0] || 
-          result.error.format().confirmPassword?._errors[0] || 
-          "Form validation failed";
-        
-        setError(errorMessage);
+        setError(ilkHataMesaji(result.error, "Form bilgileri geçersiz"));
         setIsLoading(false);
         return;
       }
@@ -95,148 +97,151 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-blue-900 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 text-gray-800 dark:text-gray-200">
+    <main className="min-h-screen bg-[var(--bg)] px-4 py-12 md:py-20 flex items-start justify-center">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 dark:text-blue-300 mb-2">
-            Kayıt Ol
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)]">
+            Hesap oluşturun
           </h1>
-          <p className="text-gray-800 dark:text-gray-300">
-            Trip Planner&apos;a hoş geldiniz
+          <p className="text-[var(--fg-muted)] mt-2">
+            Planlarınız kaydedilsin, her cihazdan erişin.
           </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4" role="alert">
-            {error}
-          </div>
-        )}
+        <Kart>
+          <div className="p-6 md:p-7">
+            {error && (
+              <p
+                role="alert"
+                className="mb-5 rounded-[var(--radius)] border border-[var(--danger)]/30 bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]"
+              >
+                {error}
+              </p>
+            )}
 
-        {success && (
-          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded mb-4" role="alert">
-            {success}
-          </div>
-        )}
+            {success && (
+              <p
+                role="status"
+                className="mb-5 rounded-[var(--radius)] border border-[var(--ok)]/30 bg-[var(--ok-soft)] px-4 py-3 text-sm text-[var(--ok)]"
+              >
+                {success}
+              </p>
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-              İsim
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              autoComplete="name"
-              required
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Adınız"
-            />
-          </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <Alan etiket="İsim" htmlFor="name">
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={formData.name}
+                  onChange={handleChange}
+                  className={GIRDI_SINIFI}
+                  placeholder="Adınız"
+                />
+              </Alan>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-              E-posta
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="E-posta adresiniz"
-            />
-          </div>
+              <Alan etiket="E-posta" htmlFor="email">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={GIRDI_SINIFI}
+                  placeholder="ornek@eposta.com"
+                />
+              </Alan>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-              Şifre
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="En az 8 karakter"
-            />
-          </div>
+              {/*
+                Kurallar ARTIK ÖNCEDEN yazıyor. Eskiden yer tutucu yalnızca
+                "En az 8 karakter" diyordu; harf ve rakam zorunluluğunu
+                kullanıcı ancak sunucu reddedince öğreniyordu.
+              */}
+              <Alan
+                etiket="Şifre"
+                htmlFor="password"
+                ipucu="En az 8 karakter, en az bir harf ve bir rakam içermeli."
+              >
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={GIRDI_SINIFI}
+                  placeholder="••••••••"
+                />
+              </Alan>
 
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-              Şifre Tekrar
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Şifrenizi tekrar girin"
-            />
-          </div>
+              <Alan etiket="Şifre tekrar" htmlFor="confirmPassword">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={GIRDI_SINIFI}
+                  placeholder="••••••••"
+                />
+              </Alan>
 
-          <div className="flex items-center">
-            <input
-              id="terms"
-              name="terms"
-              type="checkbox"
-              required
-              className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded"
-            />
-            <label htmlFor="terms" className="ml-2 block text-sm text-gray-800 dark:text-gray-300">
-              <span>
-                <Link href="/terms" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
-                  Kullanım şartlarını
-                </Link>{" "}
-                ve{" "}
-                <Link href="/privacy" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
-                  Gizlilik politikasını
-                </Link>{" "}
-                kabul ediyorum
-              </span>
-            </label>
-          </div>
+              <div className="flex items-start gap-2.5">
+                <input
+                  id="terms"
+                  name="terms"
+                  type="checkbox"
+                  required
+                  className="mt-1 h-4 w-4 rounded border-[var(--line-strong)] accent-[var(--accent)]"
+                />
+                <label htmlFor="terms" className="text-sm text-[var(--fg-muted)] leading-relaxed">
+                  <Link
+                    href="/terms"
+                    className="text-[var(--accent)] hover:underline underline-offset-4"
+                  >
+                    Kullanım şartlarını
+                  </Link>{" "}
+                  ve{" "}
+                  <Link
+                    href="/privacy"
+                    className="text-[var(--accent)] hover:underline underline-offset-4"
+                  >
+                    gizlilik politikasını
+                  </Link>{" "}
+                  kabul ediyorum
+                </label>
+              </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-md hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {isLoading ? "Kayıt yapılıyor..." : "Kayıt Ol"}
-            </button>
-          </div>
-        </form>
+              <Dugme type="submit" boy="lg" disabled={isLoading} className="w-full">
+                {isLoading ? "Kayıt yapılıyor…" : "Kayıt ol"}
+              </Dugme>
+            </form>
 
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-[var(--line)]" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-3 bg-[var(--surface)] text-sm text-[var(--fg-subtle)]">
+                  veya
+                </span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">veya</span>
-            </div>
-          </div>
 
-          <div className="mt-6">
             <button
               onClick={() => signIn("google", { callbackUrl: "/" })}
               type="button"
-              className="w-full px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-800 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center gap-2"
+              className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] text-sm font-medium transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   fill="#4285F4"
@@ -254,22 +259,21 @@ export default function RegisterPage() {
                   fill="#EA4335"
                 />
               </svg>
-              Google ile Kayıt Ol
+              Google ile devam et
             </button>
           </div>
-        </div>
+        </Kart>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-800 dark:text-gray-300">
-            Zaten hesabınız var mı?{" "}
-            <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
-              Giriş Yap
-            </Link>
-          </p>
-        </div>
+        <p className="text-sm text-[var(--fg-muted)] text-center mt-6">
+          Zaten hesabınız var mı?{" "}
+          <Link
+            href="/login"
+            className="text-[var(--accent)] font-medium hover:underline underline-offset-4"
+          >
+            Giriş yapın
+          </Link>
+        </p>
       </div>
     </main>
   );
 }
-
-

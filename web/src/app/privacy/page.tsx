@@ -14,26 +14,26 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen p-4 md:p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 md:p-10">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">
+    <main className="min-h-screen bg-[var(--bg)] px-4 md:px-8 py-12 md:py-16">
+      <div className="mx-auto max-w-[68ch]">
+        <div>
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-2">
             Gizlilik Politikası
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-sm text-[var(--fg-muted)] mb-8">
             Son güncelleme: [doldurulacak] &middot; Yürürlük tarihi: [doldurulacak]
           </p>
 
-          <div className="rounded-lg border border-yellow-300 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/30 p-4 mb-8">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="rounded-[var(--radius)] bg-[var(--warn-soft)] p-4 mb-8">
+            <p className="text-sm text-[var(--warn)] leading-relaxed">
               <strong>Taslak metin.</strong> Bu sayfa henüz hukuki incelemeden geçmemiştir.
               Köşeli parantez içindeki alanlar doldurulmadan yayına alınmamalıdır.
             </p>
           </div>
 
-          <section className="space-y-8 text-gray-700 dark:text-gray-300 leading-relaxed">
+          <section className="space-y-8 text-[var(--fg-muted)] leading-relaxed">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 1. Veri Sorumlusu
               </h2>
               <p>
@@ -52,11 +52,11 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 2. İşlenen Veriler
               </h2>
 
-              <h3 className="font-semibold text-gray-900 dark:text-white mt-4 mb-1">
+              <h3 className="font-semibold text-[var(--fg)] mt-4 mb-1">
                 Hesap verileri
               </h3>
               <p>
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
                 ve oturum jetonları da saklanır. Düz metin şifre hiçbir zaman saklanmaz.
               </p>
 
-              <h3 className="font-semibold text-gray-900 dark:text-white mt-4 mb-1">
+              <h3 className="font-semibold text-[var(--fg)] mt-4 mb-1">
                 Seyahat planı verileri
               </h3>
               <p>
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
                 durumu (planlandı / tamamlandı / iptal) ve tamamlanma tarihi.
               </p>
 
-              <h3 className="font-semibold text-gray-900 dark:text-white mt-4 mb-1">
+              <h3 className="font-semibold text-[var(--fg)] mt-4 mb-1">
                 Konum ve yer verileri
               </h3>
               <p>
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
                 planda takip etmiyor ve sunucuya kaydetmiyoruz.
               </p>
 
-              <h3 className="font-semibold text-gray-900 dark:text-white mt-4 mb-1">
+              <h3 className="font-semibold text-[var(--fg)] mt-4 mb-1">
                 Yapay zekâ sohbet verileri
               </h3>
               <p>
@@ -95,7 +95,7 @@ export default function PrivacyPage() {
                 planı yeniden görüntüleyebilmeniz için hesabınıza bağlı olarak saklanır.
               </p>
 
-              <h3 className="font-semibold text-gray-900 dark:text-white mt-4 mb-1">
+              <h3 className="font-semibold text-[var(--fg)] mt-4 mb-1">
                 Teknik veriler
               </h3>
               <p>
@@ -106,7 +106,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 3. İşleme Amaçları ve Hukuki Sebep
               </h2>
               <ul className="list-disc pl-5 space-y-2">
@@ -133,7 +133,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 4. Aktarım ve Yurt Dışına Aktarım
               </h2>
               <p>
@@ -166,7 +166,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 5. Saklama Süresi
               </h2>
               <p>
@@ -180,7 +180,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 6. Haklarınız
               </h2>
               <p>
@@ -199,7 +199,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 7. Güvenlik
               </h2>
               <p>
@@ -212,7 +212,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 8. Çocukların Verileri
               </h2>
               <p>
@@ -223,7 +223,7 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
                 9. Değişiklikler
               </h2>
               <p>
@@ -233,16 +233,16 @@ export default function PrivacyPage() {
             </div>
           </section>
 
-          <div className="mt-10 pt-6 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-4">
+          <div className="mt-10 pt-6 border-t border-[var(--line)] flex flex-wrap gap-4">
             <Link
               href="/terms"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
             >
               Kullanım Şartları
             </Link>
             <Link
               href="/"
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 border border-[var(--line-strong)] text-[var(--fg-muted)] rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-[var(--surface-2)] transition-colors"
             >
               Ana Sayfaya Dön
             </Link>

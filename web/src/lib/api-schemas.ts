@@ -39,3 +39,340 @@ export const planRequestSchema = z.object({
   accommodation: z.string().max(60).optional(),
   specialRequirements: z.string().max(500).optional(),
 });
+
+/** Doğrulanmış plan isteği; üretim katmanı bu tipi alıyor. */
+export type PlanRequestInput = z.infer<typeof planRequestSchema>;
+
+/* -------------------------------------------------------------------------- */
+/* Plan güncelleme                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `PATCH /api/plan-detail/[id]` gövdesi (bütçe güncellemesi).
+ *
+ * Eskiden gövde doğrudan `Number(body.total_cost)` ile okunuyordu; sayısal
+ * olmayan bir değer NaN üretip Prisma'da yakalanmamış hataya dönüşüyordu.
+ * `butce_tahmini` de sınırsızdı — JSON metni olarak megabaytlarca veri
+ * yazılabiliyordu.
+ */
+export const planBudgetPatchSchema = z
+  .object({
+    total_cost: z.number().finite().min(0).max(100_000_000).optional(),
+    daily_cost: z.number().finite().min(0).max(10_000_000).optional(),
+    // Serileştirilmiş bütçe JSON'u. 200 KB'ın üstü veri değil, kaza demektir.
+    butce_tahmini: z.string().max(200_000).optional(),
+  })
+  .refine(
+    (v) =>
+      v.total_cost !== undefined ||
+      v.daily_cost !== undefined ||
+      v.butce_tahmini !== undefined,
+    { message: "Güncellenecek en az bir alan gönderilmelidir" }
+  );
+
+/** `PUT /api/plan-detail/[id]` gövdesi (günlük plan güncellemesi). */
+export const planDailyPlansPutSchema = z.object({
+  // İstemci `JSON.stringify(plans)` gönderiyor; içeriği ayrıca doğrulanıyor.
+  daily_plans: z.string().min(2).max(500_000),
+});
+
+/** `PATCH /api/trip-plans/[id]/status` gövdesi. */
+export const tripPlanStatusSchema = z.object({
+  status: z.enum(["PLANNED", "ACTIVE", "COMPLETED", "CANCELLED", "DONE"]),
+});
+
+/* -------------------------------------------------------------------------- */
+/* Manuel plan                                                                */
+/* -------------------------------------------------------------------------- */
+
+const manuelAktiviteSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().trim().max(160).default(""),
+  startTime: z.string().max(16).optional(),
+  endTime: z.string().max(16).optional(),
+  cost: z.number().finite().min(0).max(10_000_000).default(0),
+  description: z.string().max(600).optional(),
+  category: z.string().max(60).optional(),
+  location: z.string().max(200).optional(),
+});
+
+/**
+ * `POST /api/manual-travel-plan` gövdesi.
+ *
+ * Eskiden bu uç hiç doğrulama yapmıyordu: `planData.basicInfo.destination`
+ * doğrudan okunuyordu, `basicInfo` yoksa TypeError fırlatıp 500 dönüyor ve
+ * hata gövdesinde stack trace sızdırıyordu. Ayrıca oturum kontrolü yoktu.
+ */
+export const manualPlanSchema = z.object({
+  basicInfo: z.object({
+    destination: z.string().trim().min(1, "Hedef şehir gereklidir").max(80),
+    country: z.string().trim().max(80).optional().default(""),
+    startDate: z.string().min(1, "Başlangıç tarihi gereklidir").max(40),
+    endDate: z.string().min(1, "Bitiş tarihi gereklidir").max(40),
+    travelers: z.number().int().min(1).max(50).default(1),
+    travelStyle: z.string().max(60).optional().default(""),
+  }),
+  transport: z
+    .object({
+      id: z.string().max(64).optional(),
+      type: z.string().max(60).optional(),
+      provider: z.string().max(120).optional(),
+      price: z.number().finite().min(0).max(10_000_000).default(0),
+      duration: z.string().max(60).optional(),
+      departure: z.string().max(120).optional(),
+      arrival: z.string().max(120).optional(),
+    })
+    .nullable()
+    .optional(),
+  accommodation: z
+    .object({
+      id: z.string().max(64).optional(),
+      name: z.string().max(160).optional(),
+      type: z.string().max(60).optional(),
+      rating: z.number().finite().min(0).max(5).optional(),
+      price: z.number().finite().min(0).max(10_000_000).default(0),
+      location: z.string().max(200).optional(),
+      amenities: z.array(z.string().max(60)).max(30).optional(),
+    })
+    .nullable()
+    .optional(),
+  dailyPlans: z
+    .array(
+      z.object({
+        day: z.number().int().min(1).max(60),
+        activities: z.array(manuelAktiviteSchema).max(20).default([]),
+        notes: z.string().max(2000).optional().default(""),
+        isEmpty: z.boolean().optional().default(false),
+      })
+    )
+    .max(60)
+    .default([]),
+  budget: z.object({
+    currentBudget: z.number().finite().min(0).max(100_000_000).default(0),
+    estimatedTotal: z.number().finite().min(0).max(100_000_000).default(0),
+    breakdown: z.object({
+      transport: z.number().finite().min(0).max(100_000_000).default(0),
+      accommodation: z.number().finite().min(0).max(100_000_000).default(0),
+      activities: z.number().finite().min(0).max(100_000_000).default(0),
+      food: z.number().finite().min(0).max(100_000_000).default(0),
+      other: z.number().finite().min(0).max(100_000_000).default(0),
+    }),
+  }),
+});
+
+export type ManualPlanInput = z.infer<typeof manualPlanSchema>;
+
+/**
+ * Zod hatasından kullanıcıya gösterilecek TEK bir mesaj üretir.
+ *
+ * `error.format()._errors[0]` KULLANMAYIN: o dizi yalnızca kök seviyedeki
+ * (alan adı olmayan) hataları taşır. Alan hataları `format().name._errors`
+ * altındadır, dolayısıyla `_errors[0]` alan hatalarında daima `undefined`
+ * olur ve kullanıcı şemadaki Türkçe mesaj yerine hep genel yedek metni
+ * görürdü.
+ */
+export function ilkHataMesaji(error: z.ZodError, yedek = "Geçersiz istek"): string {
+  const issue = error.issues[0];
+  if (!issue) return yedek;
+
+  const yol = issue.path.join(".");
+  return yol ? `${yol}: ${issue.message}` : issue.message;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Trip (ilişkisel model) uçları                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `POST /api/trip` gövdesi.
+ *
+ * Bu uçlar eskiden gövdeyi hiç doğrulamıyordu: `parseFloat(budget)` sayısal
+ * olmayan girdide NaN üretiyor, `new Date(startDate)` geçersiz tarihte
+ * Invalid Date yazmaya çalışıyor ve Prisma'da yakalanmamış hataya dönüşüyordu.
+ */
+export const tripCreateSchema = z.object({
+  title: z.string().trim().min(1, "Başlık gereklidir").max(160),
+  description: z.string().trim().max(2000).optional(),
+  startDate: z.string().min(1, "Başlangıç tarihi gereklidir").max(40),
+  endDate: z.string().min(1, "Bitiş tarihi gereklidir").max(40),
+  city: z.string().trim().min(1, "Şehir gereklidir").max(80),
+  country: z.string().trim().max(80).optional(),
+  budget: z.number().finite().min(0).max(100_000_000).optional(),
+});
+
+/** `PUT /api/trip` gövdesi; tüm alanlar opsiyonel, `id` zorunlu. */
+export const tripUpdateSchema = z.object({
+  id: z.string().min(1, "Seyahat kimliği gereklidir").max(64),
+  title: z.string().trim().min(1).max(160).optional(),
+  description: z.string().trim().max(2000).optional(),
+  startDate: z.string().max(40).optional(),
+  endDate: z.string().max(40).optional(),
+  city: z.string().trim().min(1).max(80).optional(),
+  country: z.string().trim().max(80).optional(),
+  budget: z.number().finite().min(0).max(100_000_000).optional(),
+  status: z.enum(["PLANNED", "ACTIVE", "COMPLETED", "CANCELLED", "DONE"]).optional(),
+});
+
+/** `POST /api/trip/budget` gövdesi. */
+export const budgetItemCreateSchema = z.object({
+  tripId: z.string().min(1, "Seyahat kimliği gereklidir").max(64),
+  category: z.string().trim().min(1, "Kategori gereklidir").max(60),
+  description: z.string().trim().min(1, "Açıklama gereklidir").max(200),
+  amount: z.number().finite().min(0).max(10_000_000),
+  date: z.string().max(40).optional(),
+  isEstimate: z.boolean().optional(),
+  isPaid: z.boolean().optional(),
+});
+
+/** `PUT /api/trip/budget` gövdesi. */
+export const budgetItemUpdateSchema = z.object({
+  id: z.string().min(1, "Kalem kimliği gereklidir").max(64),
+  category: z.string().trim().min(1).max(60).optional(),
+  description: z.string().trim().min(1).max(200).optional(),
+  amount: z.number().finite().min(0).max(10_000_000).optional(),
+  date: z.string().max(40).optional(),
+  isEstimate: z.boolean().optional(),
+  isPaid: z.boolean().optional(),
+});
+
+/* -------------------------------------------------------------------------- */
+/* Trip alt kaynakları — günlük plan, konaklama, ulaşım                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Günlük plan içindeki tek aktivite.
+ *
+ * `DailyPlan.activities` bir `Json` sütunu; şemasız bırakılırsa oraya her şey
+ * yazılabilir ve okuyan sayfalar savunmasız kalır. Sütunun içeriğini de
+ * doğruluyoruz — JSON sütunu "doğrulama yok" demek değil.
+ */
+export const dailyActivitySchema = z.object({
+  id: z.string().max(64).optional(),
+  title: z.string().trim().min(1, "Aktivite adı gereklidir").max(160),
+  description: z.string().trim().max(600).optional(),
+  time: z.string().trim().max(16).optional(),
+  endTime: z.string().trim().max(16).optional(),
+  location: z.string().trim().max(200).optional(),
+  cost: z.number().finite().min(0).max(10_000_000).optional(),
+  category: z.string().trim().max(60).optional(),
+});
+
+/** `POST /api/trip/daily-plans` gövdesi. */
+export const dailyPlanCreateSchema = z.object({
+  tripId: z.string().min(1, "Seyahat kimliği gereklidir").max(64),
+  date: z.string().min(1, "Tarih gereklidir").max(40),
+  title: z.string().trim().max(160).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  activities: z.array(dailyActivitySchema).max(30).default([]),
+});
+
+/** `PUT /api/trip/daily-plans` gövdesi. */
+export const dailyPlanUpdateSchema = z.object({
+  id: z.string().min(1, "Günlük plan kimliği gereklidir").max(64),
+  date: z.string().max(40).optional(),
+  title: z.string().trim().max(160).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  activities: z.array(dailyActivitySchema).max(30).optional(),
+});
+
+/** Konaklama durumu; serbest metin yerine sabit küme. */
+export const REZERVASYON_DURUMLARI = ["pending", "confirmed", "cancelled"] as const;
+
+/** `POST /api/trip/accommodations` gövdesi. */
+export const accommodationCreateSchema = z.object({
+  tripId: z.string().min(1, "Seyahat kimliği gereklidir").max(64),
+  name: z.string().trim().min(1, "Konaklama adı gereklidir").max(160),
+  location: z.string().trim().max(200).optional(),
+  checkIn: z.string().min(1, "Giriş tarihi gereklidir").max(40),
+  checkOut: z.string().min(1, "Çıkış tarihi gereklidir").max(40),
+  price: z.number().finite().min(0).max(10_000_000),
+  priceUnit: z.enum(["total", "night"]).optional(),
+  bookingUrl: z.string().url("Geçerli bir bağlantı giriniz").max(500).optional(),
+  type: z.string().trim().max(60).optional(),
+  amenities: z.array(z.string().trim().max(60)).max(30).optional(),
+  address: z.string().trim().max(300).optional(),
+  coordinates: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
+  rating: z.number().finite().min(0).max(5).optional(),
+  notes: z.string().trim().max(1000).optional(),
+  status: z.enum(REZERVASYON_DURUMLARI).optional(),
+  confirmation: z.string().trim().max(120).optional(),
+});
+
+/** `PUT /api/trip/accommodations` gövdesi. */
+export const accommodationUpdateSchema = accommodationCreateSchema
+  .partial()
+  .extend({ id: z.string().min(1, "Konaklama kimliği gereklidir").max(64) })
+  // tripId güncellenemez: bir konaklamayı başka bir seyahate taşımak,
+  // sahiplik kontrolünü atlatmanın kestirme yolu olurdu.
+  .omit({ tripId: true });
+
+/** `POST /api/trip/transportations` gövdesi. */
+export const transportationCreateSchema = z.object({
+  tripId: z.string().min(1, "Seyahat kimliği gereklidir").max(64),
+  type: z.string().trim().min(1, "Ulaşım türü gereklidir").max(60),
+  provider: z.string().trim().max(120).optional(),
+  departureTime: z.string().min(1, "Kalkış zamanı gereklidir").max(40),
+  arrivalTime: z.string().min(1, "Varış zamanı gereklidir").max(40),
+  departureLocation: z.string().trim().min(1, "Kalkış yeri gereklidir").max(200),
+  arrivalLocation: z.string().trim().min(1, "Varış yeri gereklidir").max(200),
+  price: z.number().finite().min(0).max(10_000_000),
+  bookingReference: z.string().trim().max(120).optional(),
+  bookingUrl: z.string().url("Geçerli bir bağlantı giriniz").max(500).optional(),
+  seats: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(1000).optional(),
+  status: z.enum(REZERVASYON_DURUMLARI).optional(),
+});
+
+/** `PUT /api/trip/transportations` gövdesi. */
+export const transportationUpdateSchema = transportationCreateSchema
+  .partial()
+  .extend({ id: z.string().min(1, "Ulaşım kimliği gereklidir").max(64) })
+  .omit({ tripId: true });
+
+/* -------------------------------------------------------------------------- */
+/* Agentic araç argümanları                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `web_search` aracının argüman şeması.
+ *
+ * Modelin ürettiği argümanlar HENÜZ DOĞRULANMAMIŞ dış girdi sayılıyor —
+ * araç çalıştırılmadan önce buradan geçiyor. Uzunluk sınırı hem kötüye
+ * kullanımı hem arama sağlayıcısına giden token/maliyeti sınırlıyor.
+ */
+export const webSearchToolArgsSchema = z.object({
+  query: z.string().trim().min(1, "Sorgu boş olamaz").max(200),
+});
+
+export type WebSearchToolArgs = z.infer<typeof webSearchToolArgsSchema>;
+
+/**
+ * `get_hotel_prices` aracının argüman şeması.
+ *
+ * Alanlar arama sorgusu ŞABLONUNU dolduruyor; bir rezervasyon API'sine
+ * gitmiyor. Tarihler serbest metin: model "15 Mayıs 2026" de "2026-05-15"
+ * de üretebiliyor ve ikisi de arama sorgusunda aynı işi görüyor. Bu yüzden
+ * burada tarih biçimi ZORLANMIYOR — reddedilen bir argüman modele bir tur
+ * daha maliyet demek, oysa hatalı biçimin tek sonucu biraz daha zayıf bir
+ * arama sorgusu.
+ */
+export const hotelPricesToolArgsSchema = z.object({
+  city: z.string().trim().min(1, "Şehir boş olamaz").max(80),
+  checkIn: z.string().trim().max(40).optional(),
+  checkOut: z.string().trim().max(40).optional(),
+  /** "ekonomik" | "orta" | "lüks" bekleniyor ama serbest metin kabul ediliyor. */
+  budgetLevel: z.string().trim().max(40).optional(),
+});
+
+export type HotelPricesToolArgs = z.infer<typeof hotelPricesToolArgsSchema>;
+
+/** `get_transport_prices` aracının argüman şeması. */
+export const transportPricesToolArgsSchema = z.object({
+  from: z.string().trim().min(1, "Kalkış noktası boş olamaz").max(80),
+  to: z.string().trim().min(1, "Varış noktası boş olamaz").max(80),
+  date: z.string().trim().max(40).optional(),
+  /** "uçak" | "otobüs" | "tren" gibi; serbest metin. */
+  mode: z.string().trim().max(40).optional(),
+});
+
+export type TransportPricesToolArgs = z.infer<typeof transportPricesToolArgsSchema>;

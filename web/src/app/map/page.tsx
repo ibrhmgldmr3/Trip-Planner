@@ -1,8 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { logger } from "@/lib/logger";
+import {
+  gunleriCoz,
+  type Koordinat,
+  type PlanAktivitesi,
+  type PlanGunu,
+} from "@/lib/plan-budget";
+
+/** Koordinatı çözülmüş aktivite; rota çizimi yalnızca bunlarla çalışıyor. */
+type KoordinatliAktivite = PlanAktivitesi & { coordinates: Koordinat };
+
+/** Sayfanın iki kipi: serbest POI arama ve kaydedilmiş bir planın rotası. */
+type HaritaKipi = "kesfet" | "plan";
+
+/** `/api/my-plans` listesinden bu sayfanın kullandığı alanlar. */
+interface PlanOzeti {
+  id: string;
+  city: string;
+  country: string | null;
+  startDate: string | null;
+}
 
 interface POI {
   id: string;
@@ -29,9 +49,42 @@ export default function MapPage() {
   const [loading, setLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPois, setSelectedPois] = useState<POI[]>([]);
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
-  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
   const [routeInfo, setRouteInfo] = useState<{distance: string, duration: string} | null>(null);
+
+  /**
+   * Haritaya çizilen güncel rotanın polyline'ları.
+   *
+   * Ref, state değil: her değişiklik render tetiklemesin diye.
+   * `google.maps.routes.Route` (yeni Routes API) `DirectionsRenderer`'ın
+   * yerini alıyor; polyline'lar `route.createPolylines()`'tan geliyor ve
+   * elle temizlenmesi gerekiyor — `DirectionsRenderer` gibi tek çağrıyla
+   * temizlenen bir nesne yok.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rotaPolylineleriRef = useRef<any[]>([]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Plan rotası kipi (Faz D)                                               */
+  /* ---------------------------------------------------------------------- */
+
+  const [kip, setKip] = useState<HaritaKipi>("kesfet");
+  const [planlar, setPlanlar] = useState<PlanOzeti[]>([]);
+  const [seciliPlanId, setSeciliPlanId] = useState<string>("");
+  const [planGunleri, setPlanGunleri] = useState<PlanGunu[]>([]);
+  const [seciliGun, setSeciliGun] = useState<number | null>(null);
+  const [planYukleniyor, setPlanYukleniyor] = useState(false);
+  const [konumlarCozuluyor, setKonumlarCozuluyor] = useState(false);
+
+  /**
+   * Plan kipinde haritaya eklenen işaretçiler.
+   *
+   * Ref, state değil: işaretçiler render'a girmiyor, yalnızca temizlenmek
+   * için tutuluyorlar. State olsalardı her ekleme gereksiz bir render
+   * tetiklerdi. (Keşfet kipindeki POI işaretçileri bugün hiç
+   * temizlenmiyor — bilinen bir eksik; bu kip aynı hatayı tekrarlamıyor.)
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const planMarkerlariRef = useRef<any[]>([]);
 
   useEffect(() => {
     const loadGoogleMaps = () => {
@@ -53,9 +106,14 @@ export default function MapPage() {
 
       
       // Google Maps API'yi yükle
+      // `v=weekly` ŞART: varsayılan (`v` belirtilmeyen) sürüm kanalında
+      // `Place.searchNearby`/`Route.computeRoutes` istekleri, tam olarak
+      // dokümantasyona uygun şekilde kurulmuş olsalar bile sunucuya hiç
+      // gitmeden "Invalid LocationRestriction" gibi hatalarla istemci
+      // tarafında reddediliyor — `weekly` kanalı bu doğrulayıcıyı düzeltiyor.
       const script = document.createElement('script');
       script.id = 'google-maps-script';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,routes&v=weekly`;
       script.async = true;
       script.defer = true;
       
@@ -85,24 +143,6 @@ export default function MapPage() {
           
           setMap(mapInstance);
           setCurrentLocation({ lat: 39.9334, lng: 32.8597 });
-          
-          // Directions service'leri oluştur
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const directionsServiceInstance = new (window as any).google.maps.DirectionsService();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const directionsRendererInstance = new (window as any).google.maps.DirectionsRenderer({
-            draggable: false,
-            suppressMarkers: false,
-            polylineOptions: {
-              strokeColor: '#4285F4',
-              strokeWeight: 4,
-              strokeOpacity: 0.8
-            }
-          });
-          
-          directionsRendererInstance.setMap(mapInstance);
-          setDirectionsService(directionsServiceInstance);
-          setDirectionsRenderer(directionsRendererInstance);
         } catch (error) {
           logger.error("Harita oluşturulamadı", error);
           toast.error('Harita oluşturulamadı');
@@ -115,161 +155,117 @@ export default function MapPage() {
     loadGoogleMaps();
   }, []);
 
-  // POI'leri getir
-  const fetchPOIs = () => {
+  // Places API (New) `priceLevel` bir metin enum'u ("PRICE_LEVEL_MODERATE" gibi);
+  // arayüz 0-4 arası nokta gösterdiği için sayıya çeviriyoruz.
+  const priceLevelToNumber = (priceLevel: unknown): number | undefined => {
+    const eslesme: Record<string, number> = {
+      PRICE_LEVEL_FREE: 0,
+      PRICE_LEVEL_INEXPENSIVE: 1,
+      PRICE_LEVEL_MODERATE: 2,
+      PRICE_LEVEL_EXPENSIVE: 3,
+      PRICE_LEVEL_VERY_EXPENSIVE: 4,
+    };
+    return typeof priceLevel === "string" ? eslesme[priceLevel] : undefined;
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const placeToPoi = (place: any): POI => ({
+    id: place.id ?? "",
+    name: place.displayName ?? "",
+    vicinity: place.formattedAddress ?? "",
+    rating: place.rating ?? undefined,
+    types: place.types ?? [],
+    geometry: { location: place.location },
+    price_level: priceLevelToNumber(place.priceLevel),
+  });
+
+  /**
+   * Places API (New) ile yakındaki yerleri arar.
+   *
+   * `PlacesService.nearbySearch` (legacy Places API) Google Cloud'da ayrı
+   * bir etkinleştirme gerektiriyordu ve "legacy API" hatasına yol açıyordu;
+   * `Place.searchNearby` aynı `places` kütüphanesinin güncel API'si.
+   */
+  const yakindaYerAra = async (
+    types: string[],
+    yaricap: number,
+    markerRengi: string,
+    basariMesaji: (adet: number) => string,
+    sonucYokMesaji: string
+  ) => {
     if (!map || !currentLocation) {
       toast.error('Harita henüz yüklenmedi!');
       return;
     }
 
     setLoading(true);
-    
+
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const service = new (window as any).google.maps.places.PlacesService(map);
-      
-      const request = {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        location: new (window as any).google.maps.LatLng(currentLocation.lat, currentLocation.lng),
-        radius: 3000, // 3km radius (daha küçük radius)
-        types: ['tourist_attraction'] // Sadece turistik yerler
-      };
+      const gmaps = (window as any).google.maps;
 
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      service.nearbySearch(request, (results: any[], status: any) => {
-        setLoading(false);
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const PlacesServiceStatus = (window as any).google.maps.places.PlacesServiceStatus;
-        
-        if (status === PlacesServiceStatus.OK && results && results.length > 0) {
-          setPois(results.slice(0, 8)); // İlk 8 sonucu al
-          toast.success(`${Math.min(results.length, 8)} yer bulundu!`);
-          
-          // Önceki marker'ları temizle (POI marker'larını)
-          // Not: Seçili POI'ler korunur, sadece haritadaki marker'lar yenilenir
-          
-          // Haritaya marker'ları ekle
-          results.slice(0, 8).forEach((place, index) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            new (window as any).google.maps.Marker({
-              position: place.geometry.location,
-              map: map,
-              title: place.name,
-              label: (index + 1).toString(),
-              icon: {
-                url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                scaledSize: new (window as any).google.maps.Size(32, 32)
-              }
-            });
-          });
-        } else if (status === PlacesServiceStatus.ZERO_RESULTS) {
-          toast.error('Bu bölgede hiç yer bulunamadı!');
-          setPois([]);
-        } else if (status === PlacesServiceStatus.OVER_QUERY_LIMIT) {
-          toast.error('API kullanım limitini aştınız!');
-        } else if (status === PlacesServiceStatus.REQUEST_DENIED) {
-          toast.error('API erişimi reddedildi!');
-        } else {
-          logger.warn("Places API beklenmeyen durum döndürdü", undefined, { status });
-          toast.error('Yerler yüklenirken hata oluştu!');
-        }
+      const { places } = await gmaps.places.Place.searchNearby({
+        fields: ["id", "displayName", "location", "types", "rating", "priceLevel", "formattedAddress"],
+        locationRestriction: {
+          center: new gmaps.LatLng(currentLocation.lat, currentLocation.lng),
+          radius: yaricap,
+        },
+        includedTypes: types,
+        maxResultCount: 8,
+        rankPreference: gmaps.places.SearchNearbyRankPreference.POPULARITY,
       });
-      
-      // 10 saniye timeout ekle
-      setTimeout(() => {
-        if (loading) {
-          setLoading(false);
-          toast.error('İstek zaman aşımına uğradı!');
-        }
-      }, 10000);
-      
-    } catch (error) {
-      logger.error("Yakındaki yerler getirilemedi", error);
+
       setLoading(false);
-      toast.error('Bir hata oluştu!');
+
+      if (!places || places.length === 0) {
+        toast.error(sonucYokMesaji);
+        setPois([]);
+        return;
+      }
+
+      const yeniPois: POI[] = places.map(placeToPoi);
+      setPois(yeniPois);
+      toast.success(basariMesaji(yeniPois.length));
+
+      // Haritaya marker'ları ekle
+      yeniPois.forEach((poi, index) => {
+        new gmaps.Marker({
+          position: poi.geometry.location,
+          map: map,
+          title: poi.name,
+          label: (index + 1).toString(),
+          icon: {
+            url: `https://maps.google.com/mapfiles/ms/icons/${markerRengi}-dot.png`,
+            scaledSize: new gmaps.Size(32, 32),
+          },
+        });
+      });
+    } catch (error) {
+      setLoading(false);
+      logger.error("Yakındaki yerler getirilemedi", error);
+      toast.error('Yerler yüklenirken hata oluştu!');
     }
   };
+
+  // POI'leri getir
+  const fetchPOIs = () =>
+    yakindaYerAra(
+      ['tourist_attraction'],
+      3000,
+      'red',
+      (adet) => `${adet} yer bulundu!`,
+      'Bu bölgede hiç yer bulunamadı!'
+    );
 
   // Belirli türde POI'leri getir
-  const fetchPOIsByType = (types: string[]) => {
-    if (!map || !currentLocation) {
-      toast.error('Harita henüz yüklenmedi!');
-      return;
-    }
-
-    setLoading(true);
-    
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const service = new (window as any).google.maps.places.PlacesService(map);
-      
-      const request = {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        location: new (window as any).google.maps.LatLng(currentLocation.lat, currentLocation.lng),
-        radius: 2000, // 2km radius
-        types: types
-      };
-
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      service.nearbySearch(request, (results: any[], status: any) => {
-        setLoading(false);
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const PlacesServiceStatus = (window as any).google.maps.places.PlacesServiceStatus;
-        
-        if (status === PlacesServiceStatus.OK && results && results.length > 0) {
-          setPois(results.slice(0, 8));
-          toast.success(`${Math.min(results.length, 8)} yer bulundu!`);
-          
-          // Önceki marker'ları temizle
-          // Bu basit implementation'da marker'ları temizlemiyoruz
-          
-          // Haritaya marker'ları ekle
-          results.slice(0, 8).forEach((place, index) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            new (window as any).google.maps.Marker({
-              position: place.geometry.location,
-              map: map,
-              title: place.name,
-              label: (index + 1).toString(),
-              icon: {
-                url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                scaledSize: new (window as any).google.maps.Size(32, 32)
-              }
-            });
-          });
-        } else if (status === PlacesServiceStatus.ZERO_RESULTS) {
-          toast.error('Bu bölgede bu türde yer bulunamadı!');
-          setPois([]);
-        } else if (status === PlacesServiceStatus.OVER_QUERY_LIMIT) {
-          toast.error('API kullanım limitini aştınız!');
-        } else if (status === PlacesServiceStatus.REQUEST_DENIED) {
-          toast.error('API erişimi reddedildi!');
-        } else {
-          logger.warn("Places API beklenmeyen durum döndürdü", undefined, { status });
-          toast.error('Yerler yüklenirken hata oluştu!');
-        }
-      });
-      
-      // 10 saniye timeout ekle
-      setTimeout(() => {
-        if (loading) {
-          setLoading(false);
-          toast.error('İstek zaman aşımına uğradı!');
-        }
-      }, 10000);
-      
-    } catch (error) {
-      logger.error("Yakındaki yerler getirilemedi", error);
-      setLoading(false);
-      toast.error('Bir hata oluştu!');
-    }
-  };
+  const fetchPOIsByType = (types: string[]) =>
+    yakindaYerAra(
+      types,
+      2000,
+      'orange',
+      (adet) => `${adet} yer bulundu!`,
+      'Bu bölgede bu türde yer bulunamadı!'
+    );
 
   // Mevcut konumu al
   const getCurrentLocation = () => {
@@ -361,113 +357,500 @@ export default function MapPage() {
 
   // En kısa rotayı hesapla
   const calculateOptimalRoute = async () => {
-    if (!directionsService || !directionsRenderer || !currentLocation || selectedPois.length === 0) {
+    if (!map || !currentLocation || selectedPois.length === 0) {
       toast.error('Rota oluşturmak için en az 1 POI seçin!');
       return;
     }
 
     setLoading(true);
-    
+    rotaCizimiTemizle();
+
     try {
-      // Başlangıç noktası (mevcut konum)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const origin = new (window as any).google.maps.LatLng(currentLocation.lat, currentLocation.lng);
-      
-      // POI'lerin koordinatları
-      const waypoints = selectedPois.map(poi => ({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        location: new (window as any).google.maps.LatLng(
-          poi.geometry.location.lat(),
-          poi.geometry.location.lng()
-        ),
-        stopover: true
+      const gmaps = (window as any).google.maps;
+
+      // POI'lerin koordinatları; son POI destination oluyor.
+      const noktalar = selectedPois.map((poi) => ({
+        lat: poi.geometry.location.lat(),
+        lng: poi.geometry.location.lng(),
       }));
+      const destination = noktalar.pop() ?? currentLocation;
 
-      // Son POI'yi destination yap
-      const destination = waypoints.pop()?.location || origin;
-
-      const request = {
-        origin: origin,
-        destination: destination,
-        waypoints: waypoints,
-        optimizeWaypoints: true, // En kısa rota için optimize et
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        travelMode: (window as any).google.maps.TravelMode.WALKING,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        unitSystem: (window as any).google.maps.UnitSystem.METRIC,
-        avoidHighways: false,
-        avoidTolls: true
-      };
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      directionsService.route(request, (result: any, status: any) => {
-        setLoading(false);
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (status === (window as any).google.maps.DirectionsStatus.OK && result) {
-          directionsRenderer.setDirections(result);
-
-          // Rota bilgilerini hesapla
-          const route = result.routes[0];
-          let totalDistance = 0;
-          let totalDuration = 0;
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          route.legs.forEach((leg: any) => {
-            totalDistance += leg.distance?.value || 0;
-            totalDuration += leg.duration?.value || 0;
-          });
-
-          setRouteInfo({
-            distance: `${(totalDistance / 1000).toFixed(1)} km`,
-            duration: `${Math.round(totalDuration / 60)} dk`
-          });
-
-          toast.success(`Rota oluşturuldu! ${selectedPois.length} POI için en kısa yol hesaplandı.`);
-        } else {
-          logger.warn("Rota isteği başarısız", undefined, { status });
-          toast.error('Rota hesaplanamadı. Lütfen farklı POIler seçin.');
-        }
+      const { routes } = await gmaps.routes.Route.computeRoutes({
+        origin: currentLocation,
+        destination,
+        intermediates: noktalar.map((location) => ({ location })),
+        optimizeWaypointOrder: true, // En kısa rota için sırayı optimize et
+        travelMode: "WALKING",
+        routeModifiers: { avoidTolls: true },
+        fields: ["path", "distanceMeters", "durationMillis"],
       });
 
+      const route = routes?.[0];
+      if (!route) {
+        toast.error('Rota hesaplanamadı. Lütfen farklı POIler seçin.');
+        return;
+      }
+
+      rotaPolylineleriRef.current = route.createPolylines({
+        polylineOptions: { map, strokeColor: '#4285F4', strokeWeight: 4, strokeOpacity: 0.8 },
+      });
+
+      setRouteInfo({
+        distance: `${(route.distanceMeters / 1000).toFixed(1)} km`,
+        duration: `${Math.round(route.durationMillis / 60000)} dk`,
+      });
+
+      toast.success(`Rota oluşturuldu! ${selectedPois.length} POI için en kısa yol hesaplandı.`);
     } catch (error) {
       logger.error("Rota hesaplanamadı", error);
-      toast.error('Rota hesaplama hatası');
+      toast.error('Rota hesaplanamadı. Lütfen farklı POIler seçin.');
+    } finally {
       setLoading(false);
+    }
+  };
+
+  /* ---------------------------------------------------------------------- */
+  /* Plan rotası kipi (Faz D)                                               */
+  /* ---------------------------------------------------------------------- */
+
+  /** Haritadaki numaralı işaretçileri ve çizili rotayı kaldırır (her iki kip de kullanıyor). */
+  const rotaCizimiTemizle = useCallback(() => {
+    planMarkerlariRef.current.forEach((marker) => marker.setMap(null));
+    planMarkerlariRef.current = [];
+
+    rotaPolylineleriRef.current.forEach((polyline) => polyline.setMap(null));
+    rotaPolylineleriRef.current = [];
+
+    setRouteInfo(null);
+  }, []);
+
+  // Plan listesi yalnızca plan kipine geçildiğinde ve bir kez yükleniyor;
+  // keşfet kipini kullanan bir ziyaretçi için gereksiz bir istek olurdu.
+  useEffect(() => {
+    if (kip !== "plan" || planlar.length > 0) return;
+
+    let iptal = false;
+
+    (async () => {
+      try {
+        const yanit = await fetch("/api/my-plans");
+        if (!yanit.ok) {
+          // 401 beklenen bir durum: giriş yapmamış kullanıcı.
+          if (yanit.status !== 401) logger.warn("Planlar getirilemedi", undefined, { status: yanit.status });
+          return;
+        }
+
+        const govde = await yanit.json();
+        if (!iptal) setPlanlar(Array.isArray(govde?.plans) ? govde.plans : []);
+      } catch (error) {
+        logger.error("Planlar getirilemedi", error);
+      }
+    })();
+
+    return () => {
+      iptal = true;
+    };
+  }, [kip, planlar.length]);
+
+  /** Seçilen planın gün planını okur ve koordinatlı aktiviteleri hazırlar. */
+  const planiYukle = useCallback(
+    async (planId: string) => {
+      setPlanYukleniyor(true);
+      rotaCizimiTemizle();
+
+      try {
+        const yanit = await fetch(`/api/plan-detail/${planId}`);
+        if (!yanit.ok) {
+          toast.error("Plan yüklenemedi");
+          setPlanGunleri([]);
+          setSeciliGun(null);
+          return;
+        }
+
+        const govde = await yanit.json();
+        // `gunleriCoz` markdown biçimli eski planlarda null dönüyor.
+        const gunler = gunleriCoz(govde?.plan?.gun_plani) ?? [];
+
+        setPlanGunleri(gunler);
+        setSeciliGun(gunler[0]?.day ?? null);
+
+        if (gunler.length === 0) {
+          toast.error("Bu planın gün planı haritada gösterilebilecek biçimde değil");
+        }
+      } catch (error) {
+        logger.error("Plan detayı getirilemedi", error);
+        toast.error("Plan yüklenemedi");
+        setPlanGunleri([]);
+        setSeciliGun(null);
+      } finally {
+        setPlanYukleniyor(false);
+      }
+    },
+    [rotaCizimiTemizle]
+  );
+
+  const aktifGun = planGunleri.find((gun) => gun.day === seciliGun) ?? null;
+  // Tip koruyucu (`is`) şart: düz bir `filter` sonrası TypeScript
+  // `coordinates`i hâlâ opsiyonel görüyor ve Directions çağrısı derlenmiyor.
+  const koordinatliAktiviteler =
+    aktifGun?.activities.filter((a): a is KoordinatliAktivite => Boolean(a.coordinates)) ?? [];
+  const koordinatsizSayisi = (aktifGun?.activities.length ?? 0) - koordinatliAktiviteler.length;
+
+  /**
+   * "09:00" biçimindeki saati dakikaya çevirir.
+   * Ayrıştırılamayan saatler sona atılıyor (sonsuz), böylece saati
+   * belirsiz aktiviteler rotanın ortasına girip sırayı bozmuyor.
+   */
+  const saatDegeri = (deger: string): number => {
+    const eslesme = deger.trim().match(/^(\d{1,2}):(\d{2})/);
+    return eslesme ? Number(eslesme[1]) * 60 + Number(eslesme[2]) : Number.POSITIVE_INFINITY;
+  };
+
+  /**
+   * Seçili günün rotasını çizer.
+   *
+   * Keşfet kipindeki rotadan farkı: waypoint'ler OPTİMİZE EDİLMİYOR.
+   * Buradaki sıra kullanıcının planı — 09:00'daki müzeyi 15:00'teki
+   * restorandan sonraya almak "daha kısa" olsa bile yanlış.
+   */
+  const planRotasiniCiz = async () => {
+    if (!map) {
+      toast.error("Harita henüz yüklenmedi!");
+      return;
+    }
+
+    const sirali = koordinatliAktiviteler
+      .map((aktivite, index) => ({ aktivite, index }))
+      .sort(
+        (a, b) =>
+          saatDegeri(a.aktivite.startTime) - saatDegeri(b.aktivite.startTime) ||
+          a.index - b.index
+      )
+      .map((x) => x.aktivite);
+
+    if (sirali.length === 0) {
+      toast.error("Bu günde koordinatı çözülmüş aktivite yok");
+      return;
+    }
+
+    rotaCizimiTemizle();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gmaps = (window as any).google.maps;
+
+    // Kendi işaretçilerimizi koyuyoruz: numara + aktivite adı.
+    sirali.forEach((aktivite, index) => {
+      const marker = new gmaps.Marker({
+        position: aktivite.coordinates,
+        map,
+        title: `${index + 1}. ${aktivite.name}${aktivite.startTime ? ` (${aktivite.startTime})` : ""}`,
+        label: String(index + 1),
+      });
+      planMarkerlariRef.current.push(marker);
+    });
+
+    if (sirali.length === 1) {
+      map.setCenter(sirali[0].coordinates);
+      map.setZoom(15);
+      toast.success("Tek koordinatlı aktivite haritada gösterildi");
+      return;
+    }
+
+    // Routes API en fazla 25 ara nokta kabul ediyor; fazlası sessizce
+    // kırpılmak yerine kullanıcıya bildiriliyor.
+    const araNoktalar = sirali.slice(1, -1);
+    const kirpilan = Math.max(0, araNoktalar.length - 25);
+
+    setLoading(true);
+
+    try {
+      const { routes } = await gmaps.routes.Route.computeRoutes({
+        origin: sirali[0].coordinates,
+        destination: sirali[sirali.length - 1].coordinates,
+        intermediates: araNoktalar.slice(0, 25).map((a) => ({ location: a.coordinates })),
+        optimizeWaypointOrder: false, // Sıra kullanıcının planı; optimize edilmiyor.
+        travelMode: "WALKING",
+        fields: ["path", "distanceMeters", "durationMillis"],
+      });
+
+      const route = routes?.[0];
+      if (!route) {
+        toast.error("Rota hesaplanamadı; işaretçiler haritada gösteriliyor");
+        return;
+      }
+
+      rotaPolylineleriRef.current = route.createPolylines({
+        polylineOptions: { map, strokeColor: '#4285F4', strokeWeight: 4, strokeOpacity: 0.8 },
+      });
+
+      setRouteInfo({
+        distance: `${(route.distanceMeters / 1000).toFixed(1)} km`,
+        duration: `${Math.round(route.durationMillis / 60000)} dk`,
+      });
+
+      toast.success(
+        kirpilan > 0
+          ? `Rota çizildi (${kirpilan} durak sınır nedeniyle rotaya alınamadı)`
+          : `${sirali.length} durak için rota çizildi`
+      );
+    } catch (error) {
+      logger.warn("Plan rotası hesaplanamadı", error);
+      toast.error("Rota hesaplanamadı; işaretçiler haritada gösteriliyor");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Koordinatı olmayan aktiviteleri sunucuda çözdürür.
+   *
+   * Koordinatlar SUNUCUDAN geliyor (Google Geocoding); istemci yalnızca
+   * tetikliyor. Böylece tarayıcı anahtarının kotası harcanmıyor ve
+   * kullanıcı kendi planına rastgele koordinat yazamıyor.
+   */
+  const konumlariCoz = async () => {
+    if (!seciliPlanId) return;
+
+    setKonumlarCozuluyor(true);
+
+    try {
+      const yanit = await fetch(`/api/plan-detail/${seciliPlanId}/coordinates`, {
+        method: "POST",
+      });
+      const govde = await yanit.json().catch(() => null);
+
+      if (!yanit.ok) {
+        toast.error(govde?.error || "Konumlar çözülemedi");
+        return;
+      }
+
+      if (govde?.cozulen > 0) {
+        toast.success(`${govde.cozulen} konum çözüldü`);
+        // Plan yeniden okunuyor: koordinatlar sunucuda yazıldı.
+        await planiYukle(seciliPlanId);
+      } else {
+        toast.error("Hiçbir konum çözülemedi; adresler fazla belirsiz olabilir");
+      }
+    } catch (error) {
+      logger.error("Konumlar çözülemedi", error);
+      toast.error("Konumlar çözülemedi");
+    } finally {
+      setKonumlarCozuluyor(false);
     }
   };
 
   // Rotayı temizle
   const clearRoute = () => {
-    if (directionsRenderer) {
-      directionsRenderer.setMap(null);
-      directionsRenderer.setMap(map);
-    }
-    setRouteInfo(null);
+    rotaCizimiTemizle();
     setSelectedPois([]);
     toast.success('Rota ve seçimler temizlendi');
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-[var(--surface-2)]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-3">
             Harita & Rota Planlayıcı
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p className="text-lg text-[var(--fg-muted)] max-w-2xl mx-auto">
             İstediğiniz yerleri seçin ve size en optimal rotayı oluşturalım
           </p>
         </div>
 
+        {/* Kip seçimi */}
+        <div className="flex justify-center gap-2 mb-6">
+          {([
+            { deger: "kesfet", etiket: "Yakındaki Yerler" },
+            { deger: "plan", etiket: "Plan Rotası" },
+          ] as const).map((secenek) => (
+            <button
+              key={secenek.deger}
+              onClick={() => {
+                setKip(secenek.deger);
+                rotaCizimiTemizle();
+              }}
+              className={`px-5 py-2 rounded-lg font-medium transition-colors ${
+                kip === secenek.deger
+                  ? "bg-[var(--accent)] text-[var(--accent-contrast)]"
+                  : "bg-[var(--surface)] text-[var(--fg-muted)] border border-[var(--line-strong)] hover:bg-gray-50 dark:hover:bg-[var(--surface-2)]"
+              }`}
+            >
+              {secenek.etiket}
+            </button>
+          ))}
+        </div>
+
+        {/* Plan rotası paneli */}
+        {kip === "plan" && (
+          <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6 mb-8 border border-[var(--line)]">
+            <h2 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-4">
+              Kaydedilmiş plandan rota çiz
+            </h2>
+
+            {planlar.length === 0 ? (
+              <p className="text-[var(--fg-muted)]">
+                Henüz kaydedilmiş bir planınız yok ya da giriş yapmadınız.{" "}
+                <a href="/ai-planner" className="text-[var(--accent)] underline">
+                  Yeni bir plan oluşturun
+                </a>
+                .
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-sm font-medium text-[var(--fg-muted)]">Plan</span>
+                    <select
+                      value={seciliPlanId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setSeciliPlanId(id);
+                        setPlanGunleri([]);
+                        setSeciliGun(null);
+                        if (id) planiYukle(id);
+                      }}
+                      className="mt-1 w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] px-3 py-2"
+                    >
+                      <option value="">Plan seçin</option>
+                      {planlar.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.city}
+                          {plan.country ? `, ${plan.country}` : ""}
+                          {plan.startDate ? ` — ${new Date(plan.startDate).toLocaleDateString("tr-TR")}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-[var(--fg-muted)]">Gün</span>
+                    <select
+                      value={seciliGun ?? ""}
+                      onChange={(e) => {
+                        setSeciliGun(e.target.value ? Number(e.target.value) : null);
+                        rotaCizimiTemizle();
+                      }}
+                      disabled={planGunleri.length === 0}
+                      className="mt-1 w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] px-3 py-2 disabled:opacity-50"
+                    >
+                      {planGunleri.length === 0 && <option value="">—</option>}
+                      {planGunleri.map((gun) => (
+                        <option key={gun.day} value={gun.day}>
+                          {gun.day}. gün{gun.date ? ` (${gun.date})` : ""} — {gun.activities.length} aktivite
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {planYukleniyor && (
+                  <p className="text-sm text-[var(--fg-muted)]">Plan yükleniyor...</p>
+                )}
+
+                {aktifGun && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={planRotasiniCiz}
+                        disabled={loading || koordinatliAktiviteler.length === 0}
+                        className="bg-[var(--accent)] text-[var(--accent-contrast)] px-5 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors font-medium disabled:bg-[var(--line-strong)]"
+                      >
+                        {loading ? "Hesaplanıyor..." : "Rotayı Çiz"}
+                      </button>
+
+                      {koordinatsizSayisi > 0 && (
+                        <button
+                          onClick={konumlariCoz}
+                          disabled={konumlarCozuluyor}
+                          className="bg-[var(--accent)] text-[var(--accent-contrast)] px-5 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors font-medium disabled:bg-[var(--line-strong)]"
+                          title="Konumları sunucuda çözer ve plana kaydeder"
+                        >
+                          {konumlarCozuluyor ? "Çözülüyor..." : "Eksik konumları çöz"}
+                        </button>
+                      )}
+
+                      <span className="text-sm text-[var(--fg-muted)]">
+                        {koordinatliAktiviteler.length} koordinatlı
+                        {koordinatsizSayisi > 0 && `, ${koordinatsizSayisi} koordinatsız`}
+                      </span>
+                    </div>
+
+                    {routeInfo && (
+                      <div className="flex gap-6 bg-[var(--ok-soft)] border border-transparent rounded-lg p-4">
+                        <div>
+                          <div className="text-xl font-bold text-[var(--accent)]">
+                            {routeInfo.distance}
+                          </div>
+                          <div className="text-sm text-[var(--fg-muted)]">Toplam mesafe</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-[var(--accent)]">
+                            {routeInfo.duration}
+                          </div>
+                          <div className="text-sm text-[var(--fg-muted)]">
+                            Yürüyerek tahmini süre
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {koordinatliAktiviteler.length === 0 && (
+                      <p className="text-sm text-[var(--warn)] dark:text-[var(--warn)] bg-[var(--warn-soft)] border border-transparent rounded-lg p-3">
+                        Bu gündeki aktivitelerin konumu henüz çözülmemiş. Bu özellikten önce
+                        üretilmiş planlarda beklenen bir durum — &quot;Eksik konumları çöz&quot;
+                        düğmesi konumları bir kez hesaplayıp plana kaydeder.
+                      </p>
+                    )}
+
+                    <ol className="space-y-2">
+                      {aktifGun.activities.map((aktivite, index) => (
+                        <li
+                          key={aktivite.id || index}
+                          className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-2)]/50"
+                        >
+                          <span
+                            className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                              aktivite.coordinates
+                                ? "bg-[var(--accent)] text-[var(--accent-contrast)]"
+                                : "bg-[var(--surface-3)] dark:bg-[var(--surface-3)] text-[var(--fg-muted)]"
+                            }`}
+                          >
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-[var(--fg)]">
+                              {aktivite.startTime && (
+                                <span className="text-[var(--fg-subtle)] mr-2">
+                                  {aktivite.startTime}
+                                </span>
+                              )}
+                              {aktivite.name || "Aktivite"}
+                            </p>
+                            <p className="text-sm text-[var(--fg-muted)] truncate">
+                              {aktivite.location || "Konum belirtilmemiş"}
+                              {!aktivite.coordinates && " — haritada gösterilemiyor"}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Map Container */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
+        <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6 mb-8 border border-[var(--line)]">
           {/* Map Controls */}
-          <div className="flex flex-wrap gap-3 mb-6">
+          <div className={`flex-wrap gap-3 mb-6 ${kip === "kesfet" ? "flex" : "hidden"}`}>
             <button
               onClick={getCurrentLocation}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 font-medium"
+              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-4 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors flex items-center space-x-2 font-medium"
             >
               <span>Konumumu Bul</span>
             </button>
@@ -475,30 +858,28 @@ export default function MapPage() {
             <button
               onClick={fetchPOIs}
               disabled={loading || !map}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
+              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-4 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors flex items-center space-x-2 font-medium disabled:bg-[var(--line-strong)]"
             >
               <span>{loading ? 'Yükleniyor...' : 'Turistik Yerler'}</span>
             </button>
             
             <button
-              onClick={() => fetchPOIsByType(['restaurant', 'cafe', 'food'])}
+              onClick={() => fetchPOIsByType(['restaurant', 'cafe'])}
               disabled={loading || !map}
-              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
+              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-4 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors flex items-center space-x-2 font-medium disabled:bg-[var(--line-strong)]"
             >
-              <span></span>
               <span>{loading ? 'Yükleniyor...' : 'Restoranlar'}</span>
             </button>
             
             <button
-              onClick={() => fetchPOIsByType(['lodging', 'hotel'])}
+              onClick={() => fetchPOIsByType(['lodging'])}
               disabled={loading || !map}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 font-medium disabled:bg-gray-400"
+              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-4 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors flex items-center space-x-2 font-medium disabled:bg-[var(--line-strong)]"
             >
-              <span></span>
               <span>{loading ? 'Yükleniyor...' : 'Oteller'}</span>
             </button>
             
-            {pois.length > 0 && (
+            {kip === "kesfet" && pois.length > 0 && (
               <button
                 onClick={() => {
                   setPois([]);
@@ -512,7 +893,7 @@ export default function MapPage() {
                   }
                   toast.success('POI arama sonuçları temizlendi!');
                 }}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 font-medium"
+                className="bg-[var(--danger)] text-white px-4 py-2 rounded-lg hover:bg-[var(--danger-hover)] transition-colors flex items-center space-x-2 font-medium"
               >
                 <span>Temizle</span>
               </button>
@@ -520,7 +901,7 @@ export default function MapPage() {
             
             {pois.length > 0 && (
               <div className="flex items-center">
-                <span className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg font-medium">
+                <span className="bg-[var(--surface-2)] text-[var(--fg-muted)] px-3 py-2 rounded-lg font-medium">
                   {pois.length} yer bulundu
                 </span>
               </div>
@@ -530,13 +911,12 @@ export default function MapPage() {
           
           <div 
             ref={mapRef}
-            className="w-full h-96 rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden"
+            className="w-full h-96 rounded-lg border border-[var(--line-strong)] overflow-hidden"
             style={{ minHeight: '400px' }}
           >
-            <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-center h-full bg-[var(--surface-2)] rounded-lg">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-300">
+                <p className="text-[var(--fg-muted)]">
                   Harita yükleniyor...
                 </p>
               </div>
@@ -545,19 +925,18 @@ export default function MapPage() {
         </div>
 
         {/* Seçili POI'ler Paneli */}
-        {selectedPois.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
+        {kip === "kesfet" && selectedPois.length > 0 && (
+          <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6 mb-8 border border-[var(--line)]">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                ? Seçili Yerler ({selectedPois.length})
+              <h2 className="text-2xl font-bold text-[var(--fg)]">
+                Seçili Yerler ({selectedPois.length})
               </h2>
               <div className="flex space-x-3">
                 <button
                   onClick={calculateOptimalRoute}
                   disabled={loading}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center space-x-2 font-medium"
+                  className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:bg-[var(--line-strong)] flex items-center space-x-2 font-medium"
                 >
-                  <span>^</span>
                   <span>{loading ? 'Hesaplanıyor...' : 'Rota Oluştur'}</span>
                 </button>
                 <button
@@ -565,7 +944,7 @@ export default function MapPage() {
                     setSelectedPois([]);
                     clearRoute();
                   }}
-                  className="bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors"
+                  className="bg-[var(--danger)] text-white px-4 py-3 rounded-lg hover:bg-[var(--danger-hover)] transition-colors"
                 >
                   
                 </button>
@@ -574,22 +953,22 @@ export default function MapPage() {
 
             {/* Rota Bilgileri */}
             {routeInfo && (
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg mb-6 border border-green-200 dark:border-green-700">
-                <h3 className="text-lg font-semibold text-green-800 dark:text-green-300 mb-3">
-                  ? Rota Hesaplandı
+              <div className="bg-[var(--ok-soft)] p-4 rounded-lg mb-6 border border-transparent">
+                <h3 className="text-lg font-semibold text-[var(--ok)] mb-3">
+                  Rota Hesaplandı
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    <div className="text-2xl font-bold text-[var(--accent)]">
                       {routeInfo.distance}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Toplam Mesafe</div>
+                    <div className="text-sm text-[var(--fg-muted)]">Toplam Mesafe</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    <div className="text-2xl font-bold text-[var(--accent)]">
                       {routeInfo.duration}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Tahmini Süre</div>
+                    <div className="text-sm text-[var(--fg-muted)]">Tahmini Süre</div>
                   </div>
                 </div>
               </div>
@@ -602,35 +981,35 @@ export default function MapPage() {
                 return (
                   <div
                     key={uniqueKey}
-                    className="group bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-5 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                    className="group bg-[var(--bg)] border-2 border-[var(--line)] dark:border-[var(--line)] rounded-[var(--radius-lg)] p-5 hover:shadow-lg transition-colors duration-150"
                   >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-md">
+                      <div className="w-8 h-8 bg-[var(--bg)] text-white rounded-full flex items-center justify-center text-sm font-bold">
                         {index + 1}
                       </div>
-                      <h4 className="font-bold text-gray-800 dark:text-white text-base leading-tight">
+                      <h4 className="font-bold text-[var(--fg)] text-base leading-tight">
                         {poi.name}
                       </h4>
                     </div>
                     <button
                       onClick={() => togglePoiSelection(poi)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 w-8 h-8 rounded-full flex items-center justify-center font-bold transition-all duration-200 text-lg group-hover:scale-110"
+                      className="text-[var(--danger)] hover:text-[var(--danger)] hover:bg-red-50 dark:hover:bg-[var(--danger-soft)] w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors duration-150 text-lg group-hover:scale-110"
                       title="Seçimi kaldır"
                     >
                       ×
                     </button>
                   </div>
                   <div className="flex items-center space-x-2 mb-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
+                    <p className="text-sm text-[var(--fg-muted)] font-medium">
                       {poi.vicinity}
                     </p>
                   </div>
                   {poi.rating && (
                     <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 py-1 rounded-full">
-                        <span className="text-yellow-500 text-sm">★</span>
-                        <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                      <div className="flex items-center space-x-1 bg-[var(--warn-soft)] px-2 py-1 rounded-full">
+                        <span className="text-[var(--warn)] text-sm">★</span>
+                        <span className="text-sm font-medium text-[var(--warn)] dark:text-[var(--warn)]">
                           {poi.rating.toFixed(1)}
                         </span>
                       </div>
@@ -645,15 +1024,13 @@ export default function MapPage() {
 
         {/* POI Listesi */}
         {pois.length > 0 && (
-          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-6 mb-8 border border-gray-100 dark:border-gray-700">
+          <div className="bg-[var(--bg)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6 mb-8 border border-[var(--line)]">
             <div className="flex items-center space-x-3 mb-8">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-              </div>
               <div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                <h2 className="text-3xl font-bold bg-[var(--accent)] bg-clip-text text-transparent">
                   Yakındaki İlgi Çekici Yerler
                 </h2>
-                <p className="text-gray-600 dark:text-gray-300">
+                <p className="text-[var(--fg-muted)]">
                   Ziyaret etmek istediğiniz yerleri seçin
                 </p>
               </div>
@@ -667,30 +1044,30 @@ export default function MapPage() {
                 return (
                   <div
                     key={uniqueKey}
-                    className={`group border-2 rounded-xl p-5 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 ${
+                    className={`group border-2 rounded-[var(--radius-lg)] p-5 hover:shadow-xl transition-colors duration-150 cursor-pointer ${
                       isSelected 
-                        ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 shadow-lg scale-105' 
-                        : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                        ? 'border-[var(--line)] bg-[var(--bg)] scale-105' 
+                        : 'border-[var(--line)] hover:border-[var(--line)] dark:hover:border-[var(--accent)] bg-[var(--surface)]'
                     }`}
                     onClick={() => togglePoiSelection(poi)}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-colors duration-150 ${
                           isSelected 
-                            ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg scale-110' 
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
+                            ? 'bg-[var(--bg)] text-white scale-110' 
+                            : 'bg-[var(--surface-3)] text-[var(--fg-muted)] group-hover:bg-[var(--accent-soft)] dark:group-hover:bg-[var(--accent-soft)]'
                         }`}>
                           {isSelected ? '✓' : index + 1}
                         </div>
-                        <h3 className="font-bold text-gray-800 dark:text-white text-lg leading-tight">
+                        <h3 className="font-bold text-[var(--fg)] text-lg leading-tight">
                           {poi.name}
                         </h3>
                       </div>
                       {poi.rating && (
-                        <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/20 px-3 py-2 rounded-full border border-yellow-200 dark:border-yellow-700 shadow-sm">
-                          <span className="text-yellow-500 text-lg">★</span>
-                          <span className="text-sm font-bold text-yellow-700 dark:text-yellow-400">
+                        <div className="flex items-center space-x-1 bg-[var(--accent)] px-3 py-2 rounded-full border border-[var(--line)] dark:border-[var(--line)] shadow-sm">
+                          <span className="text-[var(--warn)] text-lg">★</span>
+                          <span className="text-sm font-bold text-[var(--warn)] dark:text-[var(--warn)]">
                             {poi.rating.toFixed(1)}
                           </span>
                         </div>
@@ -698,7 +1075,7 @@ export default function MapPage() {
                     </div>
                   
                   <div className="flex items-center space-x-2 mb-4">
-                    <p className="text-gray-600 dark:text-gray-300 font-medium">
+                    <p className="text-[var(--fg-muted)] font-medium">
                       {poi.vicinity}
                     </p>
                   </div>
@@ -707,7 +1084,7 @@ export default function MapPage() {
                     {poi.types.slice(0, 3).map((type, idx) => (
                       <span
                         key={idx}
-                        className="text-xs bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-800 dark:text-blue-400 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700 font-medium"
+                        className="text-xs bg-[var(--accent)] text-[var(--accent)] dark:text-[var(--accent)] px-3 py-1 rounded-full border border-[var(--line)] dark:border-[var(--line)] font-medium"
                       >
                         {translateType(type)}
                       </span>
@@ -716,15 +1093,15 @@ export default function MapPage() {
                   
                   {poi.price_level !== undefined && (
                     <div className="flex items-center space-x-3 mb-4">
-                      <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Fiyat Seviyesi:</span>
+                      <span className="text-sm text-[var(--fg-muted)] font-medium">Fiyat Seviyesi:</span>
                       <div className="flex">
                         {[...Array(5)].map((_, idx) => (
                           <span
                             key={idx}
-                            className={`text-lg transition-all duration-200 ${
+                            className={`text-lg transition-colors duration-150 ${
                               idx < poi.price_level! 
-                                ? 'text-green-500 scale-110' 
-                                : 'text-gray-300 dark:text-gray-600'
+                                ? 'text-[var(--ok)] scale-110' 
+                                : 'text-[var(--fg-subtle)] dark:text-[var(--fg-muted)]'
                             }`}
                           >
                             </span>
@@ -733,13 +1110,13 @@ export default function MapPage() {
                     </div>
                   )}
                   
-                  <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 px-3 py-2 rounded-lg mb-4">
+                  <div className="text-xs text-[var(--fg-subtle)] bg-[var(--surface-2)]/50 px-3 py-2 rounded-lg mb-4">
                     {poi.geometry.location.lat().toFixed(4)}, {poi.geometry.location.lng().toFixed(4)}
                   </div>
                   
                   {isSelected && (
                     <div className="text-center animate-pulse">
-                      <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+                      <span className="bg-[var(--accent)] text-white px-4 py-2 rounded-full text-sm font-bold">
                         Rotaya Dahil
                       </span>
                     </div>
@@ -753,23 +1130,21 @@ export default function MapPage() {
 
         {/* Navigation */}
         <div className="text-center mt-12">
-          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
-            <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+          <div className="bg-[var(--bg)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8 border border-[var(--line)]">
+            <h3 className="text-2xl font-bold text-[var(--fg)] mb-6">
               Seyahat Planlama Araçları
             </h3>
             <div className="flex flex-wrap justify-center gap-4">
               <a
                 href="/daily-planner"
-                className="group bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="group bg-[var(--accent)] text-white px-8 py-4 rounded-[var(--radius-lg)] hover:bg-[var(--accent-hover)] transition-colors duration-150 flex items-center space-x-3 hover:shadow-xl"
               >
-                <span className="text-2xl group-hover:scale-110 transition-transform"></span>
                 <span className="font-semibold text-lg">Günlük Planlayıcı</span>
               </a>
               <a
                 href="/my-plans"
-                className="group bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="group bg-[var(--accent)] text-white px-8 py-4 rounded-[var(--radius-lg)] hover:bg-[var(--accent-hover)] transition-colors duration-150 flex items-center space-x-3 hover:shadow-xl"
               >
-                <span className="text-2xl group-hover:scale-110 transition-transform"></span>
                 <span className="font-semibold text-lg">Planlarım</span>
               </a>
             </div>

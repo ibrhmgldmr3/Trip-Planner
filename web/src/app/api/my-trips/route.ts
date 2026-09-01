@@ -1,47 +1,34 @@
 import { NextResponse } from "next/server";
-import { TripStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
+import { TripStatus, isTripStatus } from "@/lib/trip-status";
 import { logger } from "@/lib/logger";
 
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
-    // Session kontrolü
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Giriş yapmanız gerekiyor" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     // Query parametrelerini al
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status');
-    
-    // Kullanıcıyı email ile bul
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Kullanıcı bulunamadı" },
-        { status: 404 }
-      );
-    }
 
     // Where clause'unu hazırla
     const whereClause: { userId: string; status?: TripStatus } = {
-      userId: user.id
+      userId: auth.user.id
     };
 
-    // Eğer status filtresi varsa ekle
+    // Bilinmeyen bir status değeri geldiğinde eskiden `as TripStatus` ile
+    // zorlanıp Prisma'da yakalanmamış hataya dönüşüyordu; artık 400.
     if (statusFilter) {
-      whereClause.status = statusFilter as TripStatus;
+      if (!isTripStatus(statusFilter)) {
+        return NextResponse.json(
+          { error: "Geçersiz durum filtresi" },
+          { status: 400 }
+        );
+      }
+      whereClause.status = statusFilter;
     }
 
     // TripPlan tablosundan kullanıcının seyahatlerini getir
@@ -100,8 +87,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json(
       { 
         success: false,
-        error: "Seyahatler getirilemedi",
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: "Seyahatler getirilemedi"
       },
       { status: 500 }
     );

@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
 import { updateTripWithAiData } from "@/lib/trip-services";
 import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
 
     const { tripId, extractedData } = await req.json();
 
@@ -26,7 +24,7 @@ export async function POST(req: NextRequest) {
     const trip = await prisma.trip.findFirst({
       where: {
         id: tripId,
-        userId: session.user.id as string,
+        userId: userId,
       },
     });
 

@@ -7,49 +7,134 @@
    yani mevcut dark: sınıflarının sırası bozulmaz. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Açık tema (varsayılan palet) */
+/* ==========================================================================
+   TASARIM TOKEN'LARI
+   --------------------------------------------------------------------------
+   Tek aksan rengi, düz yüzeyler, neredeyse gölgesiz. Gerekçe: bu uygulama
+   para ve zaman kararı verdiriyor (bütçe, rota, rezervasyon tahmini). Sakin
+   ve okunaklı bir yüzey güvenilir okunuyor; birbiriyle yarışan altı aksan
+   rengi ve gradient katmanları okunurluğu düşürüyordu.
+
+   KURAL: sayfalar bundan sonra ham Tailwind rengi (bg-blue-600) yerine
+   buradaki token'lara bağlı yardımcı sınıfları/bileşenleri kullanmalı.
+   ========================================================================== */
+
 :root {
   color-scheme: light;
 
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --secondary: #10b981;
-  --secondary-dark: #059669;
-  --accent: #f97316;
-  --danger: #ef4444;
-  --danger-dark: #dc2626;
-  --background: #ffffff;
-  --foreground: #171717;
-  --card: #ffffff;
-  --card-foreground: #171717;
-  --border: #e5e7eb;
-  --input: #f3f4f6;
-  --radius: 0.5rem;
-  --gradient-from: #dbeafe;
-  --gradient-to: #e0e7ff;
-  --scrollbar-track: #f1f5f9;
+  /* --- Aksan: tek aile, derin mavi-yeşil --- */
+  --accent:          #14564f;
+  --accent-hover:    #0e423c;
+  --accent-active:   #0a322e;
+  --accent-soft:     #e4efec;   /* zemin dolgusu */
+  --accent-border:   #b9d4ce;
+  --accent-contrast: #ffffff;   /* aksan üstündeki metin */
+
+  /* --- Yüzeyler --- */
+  --bg:            #f7f8f7;     /* sayfa zemini */
+  --surface:       #ffffff;     /* kart */
+  --surface-2:     #f1f3f2;     /* ikincil dolgu, girdi zemini */
+  --surface-3:     #e8ebe9;     /* hover */
+
+  /* --- Metin --- */
+  --fg:            #14201f;     /* birincil */
+  --fg-muted:      #5c6b69;     /* ikincil */
+  /* 4.5:1 ESIGI: onceki #8a9895 zemine karsi 2.82 veriyordu ve bu renk
+     placeholder ile kucuk etiketlerde kullaniliyor — okunabilirlik esiginin
+     altindaydi. #647370 zeminde 4.67, kart yuzeyinde 4.97 veriyor. */
+  --fg-subtle:     #647370;     /* üçüncül, etiketler */
+
+  /* --- Çizgiler --- */
+  --line:          #dfe4e2;
+  --line-strong:   #c6cecb;
+
+  /* --- Durum renkleri: yalnızca ANLAM taşıdığında kullanılır --- */
+  --ok:            #2d6b3f;
+  --ok-soft:       #e6f1e9;
+  --warn:          #8a5f10;
+  --warn-soft:     #f8f0dd;
+  --danger:        #a8321f;
+  --danger-hover:  #872718;
+  --danger-soft:   #f8e8e5;
+  --info:          #285a8a;
+  --info-soft:     #e5eef6;
+
+  /* --- Ölçek --- */
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 14px;
+
+  /* Gölge yerine kenarlık; gölge yalnızca gerçekten yüzen katmanlarda
+     (menü, modal) kullanılıyor. */
+  --shadow-pop: 0 8px 24px -8px rgba(20, 32, 31, 0.18);
+
+  /* Geriye dönük uyumluluk: henüz elden geçmemiş sayfalar bu adları
+     kullanıyor. Yeni palete eşleniyorlar ki o sayfalar da tutarlı görünsün. */
+  --primary: var(--accent);
+  --primary-dark: var(--accent-hover);
+  --secondary: var(--ok);
+  --secondary-dark: var(--ok);
+  --danger-dark: var(--danger-hover);
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --border: var(--line);
+  --input: var(--surface-2);
+  --radius: 10px;
+  --gradient-from: var(--accent-soft);
+  --gradient-to: var(--surface-2);
+  --scrollbar-track: var(--surface-2);
 }
 
-/* Koyu tema: <html> üzerindeki .dark sınıfı ile devreye girer */
 .dark {
   color-scheme: dark;
 
-  --primary: #3b82f6;
-  --primary-dark: #60a5fa;
-  --secondary: #10b981;
-  --secondary-dark: #34d399;
-  --accent: #f97316;
-  --danger: #ef4444;
-  --danger-dark: #f87171;
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #1e293b;
-  --card-foreground: #e2e8f0;
-  --border: #334155;
-  --input: #1e293b;
-  --gradient-from: #1e3a8a;
-  --gradient-to: #312e81;
-  --scrollbar-track: #1e293b;
+  --accent:          #5cbcae;
+  --accent-hover:    #7ccdc0;
+  --accent-active:   #8fd8cc;
+  --accent-soft:     #16302d;
+  --accent-border:   #21514b;
+  --accent-contrast: #0b1413;
+
+  --bg:            #0e1413;
+  --surface:       #151d1c;
+  --surface-2:     #1b2524;
+  --surface-3:     #222e2c;
+
+  --fg:            #e2e8e6;
+  --fg-muted:      #9aa8a5;
+  --fg-subtle:     #7e8c89;   /* koyu temada 5.32 / 4.90 */
+
+  --line:          #26312f;
+  --line-strong:   #35423f;
+
+  --ok:            #6cc08a;
+  --ok-soft:       #16281d;
+  --warn:          #d9a641;
+  --warn-soft:     #2b2312;
+  --danger:        #e2705c;
+  --danger-hover:  #ec8875;
+  --danger-soft:   #2c1a17;
+  --info:          #7ab0e0;
+  --info-soft:     #14212c;
+
+  --shadow-pop: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+
+  --primary: var(--accent);
+  --primary-dark: var(--accent-hover);
+  --secondary: var(--ok);
+  --secondary-dark: var(--ok);
+  --danger-dark: var(--danger-hover);
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --border: var(--line);
+  --input: var(--surface-2);
+  --gradient-from: var(--accent-soft);
+  --gradient-to: var(--surface-2);
+  --scrollbar-track: var(--surface-2);
 }
 
 body {
@@ -73,12 +158,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  background: var(--line-strong);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: var(--fg-subtle);
 }
 
 /* Animated Route */
@@ -128,13 +213,10 @@ body {
 }
 
 .hover-lift:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.15), 0 10px 15px -5px rgba(0, 0, 0, 0.1);
-}
-
-/* Koyu zeminde açık gölge kaybolduğu için opaklık artırılıyor */
-.dark .hover-lift:hover {
-  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.5), 0 10px 15px -5px rgba(0, 0, 0, 0.4);
+  /* -6px ve 35px'lik gölge yerine ölçülü bir kalkış: sayfada aynı anda
+     8-10 kart varken büyük hareket arayüzü huzursuz gösteriyordu. */
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
 }
 
 .hover-glow {
@@ -142,8 +224,8 @@ body {
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
-  transform: translateY(-2px);
+  /* Parlama yerine ince bir aksan halkası. */
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* Modern Button Animations */
@@ -153,19 +235,11 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Parıltı süpürmesi kaldırıldı: her düğmede dönen bir ışık huzmesi
+   dikkati eylemden çalıyordu. Sınıf adı korunuyor — henüz elden geçmemiş
+   sayfalar onu kullanıyor. */
 .btn-modern::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
-}
-
-.btn-modern:hover::before {
-  left: 100%;
+  content: none;
 }
 
 /* Card Hover Effects */
@@ -174,30 +248,14 @@ body {
   position: relative;
 }
 
+/* Mavi-mor katman kaldırıldı: kartın kendi rengini bozuyordu. */
 .card-hover::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  border-radius: inherit;
-}
-
-.card-hover:hover::before {
-  opacity: 1;
+  content: none;
 }
 
 .card-hover:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-}
-
-.dark .card-hover:hover {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
 }
 
 /* Glowing Border Animation */
@@ -229,8 +287,10 @@ body {
 }
 
 /* Floating Animation */
+/* Sürekli süzülen kart yok: bitmeyen hareket okumayı zorlaştırıyor.
+   Sınıf adı korunuyor (henüz elden geçmemiş sayfalar kullanıyor). */
 .float {
-  animation: float 3s ease-in-out infinite;
+  animation: none;
 }
 
 @keyframes float {
@@ -260,7 +320,7 @@ body {
 
 /* Pulse Glow Effect */
 .pulse-glow {
-  animation: pulse-glow 2s infinite;
+  animation: none;
 }
 
 @keyframes pulse-glow {
@@ -294,9 +354,10 @@ body {
 .spinner-modern {
   width: 40px;
   height: 40px;
-  border: 4px solid transparent;
-  border-top: 4px solid #3b82f6;
-  border-right: 4px solid #8b5cf6;
+  /* Tek renkli, ince halka: iki farkli renkli kalin kenar hem paletin
+     disinda kaliyordu hem de yuvarlak kosede kirik gorunuyordu. */
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin-modern 1s linear infinite;
 }
@@ -308,9 +369,7 @@ body {
 
 /* Advanced Gradient Animations */
 .gradient-animate {
-  background: linear-gradient(-45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7);
-  background-size: 400% 400%;
-  animation: gradient-flow 8s ease infinite;
+  background: var(--accent-soft);
 }
 
 @keyframes gradient-flow {
@@ -337,7 +396,9 @@ body {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.5);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  /* width/height animasyonu layout thrash yaratiyor; olcek donusumu
+     ayni etkiyi compositor uzerinde veriyor. */
+  transition: transform 0.6s, opacity 0.6s;
 }
 
 .ripple:active::after {
@@ -383,14 +444,12 @@ body {
   }
 }
 
+/* Dönen üç renkli gradient metin yerine sabit aksan rengi: başlık artık
+   okunuyor ve kontrast tahmin edilebilir (gradient'te bazı karelerde
+   metin zemine karışıyordu). */
 .animated-gradient {
-  background: linear-gradient(270deg, #57d7f7, #10b981, #8549e7);
-  background-size: 600% 600%;
-  animation: gradient-shift 8s ease infinite;
+  color: var(--accent);
   display: inline-block;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
 /* Fade In Animasyonu */
@@ -448,7 +507,8 @@ body {
 }
 
 .bounce {
-  animation: bounce 2s ease infinite;
+  /* Zipiplama easing'i tarihli duruyor ve sonsuz tekrar dikkat caliyor. */
+  animation: none;
 }
 
 .custom-route-marker .start-marker div {
@@ -677,5 +737,24 @@ body {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   HAREKET AZALTMA
+   --------------------------------------------------------------------------
+   Bu dosyada onlarca sonsuz animasyon var (pulse, ping, bounce, shimmer).
+   İşletim sisteminde "hareketi azalt" seçen kullanıcı için hepsi tek yerden
+   durduruluyor — vestibüler rahatsızlığı olanlar için bu bir tercih değil,
+   erişilebilirlik gereği.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

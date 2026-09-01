@@ -4,16 +4,36 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
-import { TripStatus } from '@prisma/client';
-import { getTripStatus, getStatusLabel, getStatusColor, canCancel, canMarkAsDone } from '@/lib/trip-status';
+// TripStatus bilinçli olarak @prisma/client'tan DEĞİL: bu bir client
+// bileşeni ve Prisma runtime'ının tarayıcı bundle'ına girmesi istenmiyor.
+import {
+  TripStatus,
+  getTripStatus,
+  getStatusLabel,
+  getStatusTone,
+  canCancel,
+  canMarkAsDone,
+} from '@/lib/trip-status';
 import { logger } from "@/lib/logger";
+import {
+  BagDugme,
+  BosDurum,
+  Dugme,
+  GirisGerekli,
+  Kart,
+  Rozet,
+  SayfaBasi,
+  Yukleniyor,
+} from "@/components/ui";
 
 interface SavedPlan {
   id: string;
   city: string;
   country: string | null;
-  startDate: string;
-  endDate: string;
+  // API bu alanları null döndürebiliyor (tarihsiz plan). Tipin bunu
+  // saklaması `new Date(null)` → 1970 hatasına yol açıyordu.
+  startDate: string | null;
+  endDate: string | null;
   duration: string | null;
   total_cost: number | null;
   ai_model: string;
@@ -24,6 +44,25 @@ interface SavedPlan {
   updatedAt: string;
 }
 
+/** Tarihi güvenle çözer; null/boş/geçersiz girdide null döner. */
+function tarihCoz(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** İki tarihi kullanıcıya gösterilecek aralığa çevirir. */
+function tarihAraligi(start: string | null, end: string | null): string {
+  const bas = tarihCoz(start);
+  const bit = tarihCoz(end);
+
+  if (!bas && !bit) return 'Tarih belirtilmemiş';
+  if (bas && bit) {
+    return `${bas.toLocaleDateString('tr-TR')} - ${bit.toLocaleDateString('tr-TR')}`;
+  }
+  return (bas ?? bit)!.toLocaleDateString('tr-TR');
+}
+
 export default function MyPlansPage() {
   const router = useRouter();
   const { status } = useSession();
@@ -31,39 +70,58 @@ export default function MyPlansPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tarihi geçmiş planları COMPLETED statüsüne geçir
+  /**
+   * Bitiş tarihi geçmiş planları COMPLETED'a çeker.
+   *
+   * DÜZELTİLEN HATA: eskiden `new Date(plan.endDate)` doğrudan çağrılıyordu.
+   * `endDate` null olan planlarda bu 1970-01-01 üretiyor, koşul her zaman
+   * doğru çıkıyor ve TARİHSİZ HER PLAN sayfa açılır açılmaz "Tamamlandı"
+   * olarak işaretleniyordu. Artık tarihi çözülemeyen planlara dokunulmuyor.
+   *
+   * İkinci düzeltme: istekler sırayla atılıyordu; 20 süresi geçmiş plan
+   * 20 ardışık tur demekti. Artık paralel.
+   */
   const checkAndUpdateExpiredPlans = useCallback(async (planList: SavedPlan[]): Promise<SavedPlan[]> => {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Bugünün başlangıcı
-    
-    const updatedPlans = [...planList];
-    
-    for (let i = 0; i < updatedPlans.length; i++) {
-      const plan = updatedPlans[i];
-      const endDate = new Date(plan.endDate);
-      endDate.setHours(23, 59, 59, 999); // Gün sonuna set et
-      
-      // Eğer plan PLANNED veya ACTIVE statüsünde ve bitiş tarihi geçmişse
-      if ((plan.status === 'PLANNED' || plan.status === 'ACTIVE') && endDate < today) {
+
+    const suresiGecenler = planList.filter((plan) => {
+      if (plan.status !== TripStatus.PLANNED && plan.status !== TripStatus.ACTIVE) {
+        return false;
+      }
+
+      const bitis = tarihCoz(plan.endDate);
+      if (!bitis) return false; // Tarihsiz plan otomatik tamamlanmaz.
+
+      bitis.setHours(23, 59, 59, 999);
+      return bitis < today;
+    });
+
+    if (suresiGecenler.length === 0) return planList;
+
+    const guncellenenler = new Set<string>();
+
+    await Promise.all(
+      suresiGecenler.map(async (plan) => {
         try {
-          const response = await fetch('/api/plan-status', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ planId: plan.id, status: 'COMPLETED' }),
+          const response = await fetch(`/api/trip-plans/${plan.id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: TripStatus.COMPLETED }),
           });
 
-          if (response.ok) {
-            updatedPlans[i] = { ...plan, status: 'COMPLETED' as TripStatus };
-          }
+          if (response.ok) guncellenenler.add(plan.id);
         } catch (error) {
           logger.error("Süresi geçmiş plan statüsü güncellenemedi", error);
         }
-      }
-    }
-    
-    return updatedPlans;
+      })
+    );
+
+    if (guncellenenler.size === 0) return planList;
+
+    return planList.map((plan) =>
+      guncellenenler.has(plan.id) ? { ...plan, status: TripStatus.COMPLETED } : plan
+    );
   }, []);
 
   const fetchPlans = useCallback(async () => {
@@ -71,8 +129,11 @@ export default function MyPlansPage() {
       const response = await fetch('/api/my-plans');
       if (response.ok) {
         const data = await response.json();
+        // API şekli beklenenden farklı gelirse (hata gövdesi, boş yanıt)
+        // `data.plans` undefined oluyor ve alt akış patlıyordu.
+        const gelenPlanlar: SavedPlan[] = Array.isArray(data?.plans) ? data.plans : [];
         // Tarih kontrolü yaparak expired planları COMPLETED statüsüne geçir
-        const updatedPlans = await checkAndUpdateExpiredPlans(data.plans);
+        const updatedPlans = await checkAndUpdateExpiredPlans(gelenPlanlar);
         setPlans(updatedPlans);
       } else {
         setError('Planlar yüklenemedi');
@@ -102,12 +163,15 @@ export default function MyPlansPage() {
   const updatePlanStatus = async (planId: string, newStatus: TripStatus) => {
     try {
       
-      const response = await fetch('/api/plan-status', {
-        method: 'PUT',
+      // Tek kanonik durum ucu. `PUT /api/plan-status` Aşama 1'de kaldırıldı:
+      // iki uç aynı işi farklı yapıyor ve bu sayfa ile plan detayı sayfası
+      // aynı butona farklı sonuç veriyordu.
+      const response = await fetch(`/api/trip-plans/${planId}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ planId, status: newStatus }),
+        body: JSON.stringify({ status: newStatus }),
       });
 
 
@@ -153,235 +217,168 @@ export default function MyPlansPage() {
     router.push(`/plan-detail/${planId}`);
   };
 
-  // Session yükleniyor durumu
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
-            {status === 'loading' ? 'Oturum kontrol ediliyor...' : 'Planlarınız yükleniyor...'}
-          </p>
+      <div className="min-h-screen bg-[var(--bg)]">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
+          <Yukleniyor
+            metin={status === 'loading' ? 'Oturum kontrol ediliyor…' : 'Planlarınız yükleniyor…'}
+          />
         </div>
       </div>
     );
   }
 
-  // Kullanıcı giriş yapmamış
   if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
-          >
-            Giriş Yap
-          </button>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
-          >
-            Ana Sayfaya Dön
-          </button>
-        </div>
-      </div>
-    );
+    return <GirisGerekli />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
-          >
-            Tekrar Dene
-          </button>
+      <div className="min-h-screen bg-[var(--bg)]">
+        <div className="max-w-2xl mx-auto px-4 md:px-8 py-16">
+          <BosDurum
+            baslik="Planlar yüklenemedi"
+            aciklama={error}
+            eylem={<Dugme onClick={() => window.location.reload()}>Tekrar dene</Dugme>}
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
-      <div className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            Seyahat Planlarım
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
-            Kaydettiğiniz tüm seyahat planları
-          </p>
-        </div>
+    <div className="min-h-screen bg-[var(--bg)]">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
+        <SayfaBasi
+          baslik="Seyahat planlarım"
+          aciklama={
+            plans.length > 0
+              ? `${plans.length} kayıtlı plan`
+              : 'Kaydettiğiniz planlar burada listelenir.'
+          }
+          yan={<BagDugme href="/travel-mode">Yeni plan</BagDugme>}
+        />
 
-        {/* New Plan Button */}
-        <div className="text-center mb-8">
-          <button
-            onClick={() => router.push('/travel-mode')}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
-          >
-            + Yeni Plan Oluştur
-          </button>
-        </div>
-
-        {/* Plans Grid */}
         {plans.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4"></div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-              Henüz Plan Yok
-            </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              İlk seyahat planınızı oluşturmaya ne dersiniz?
-            </p>
-            <button
-              onClick={() => router.push('/travel-mode')}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
-            >
-              Plan Oluştur
-            </button>
-          </div>
+          <BosDurum
+            baslik="Henüz bir planınız yok"
+            aciklama="İlk planınızı oluşturun; şehir ve tarihleri girmeniz yeterli, gerisini biz hazırlayalım."
+            eylem={<BagDugme href="/travel-mode">Plan oluştur</BagDugme>}
+          />
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {plans.map((plan) => {
+              // Tarihsiz planlarda `new Date(null)` 1970 üretiyor ve plan
+              // "Tamamlandı" görünüyordu; artık tarih çözülemezse kayıtlı
+              // durum olduğu gibi gösteriliyor.
               const currentStatus = getTripStatus(
-                new Date(plan.startDate), 
-                new Date(plan.endDate), 
+                tarihCoz(plan.startDate),
+                tarihCoz(plan.endDate),
                 plan.status
               );
-              
+
               return (
-              <div
-                key={plan.id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="p-6">
-                  {/* Plan Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                        {plan.city}
-                        {plan.country && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                            {plan.country}
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        {new Date(plan.startDate).toLocaleDateString('tr-TR')} - 
-                        {new Date(plan.endDate).toLocaleDateString('tr-TR')}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end space-y-1">
-                      <span className={`text-xs px-2 py-1 rounded ${getStatusColor(currentStatus)}`}>
-                        {getStatusLabel(currentStatus)}
-                      </span>
-                      {plan.ai_model === 'manual_planning' ? (
-                        <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs px-2 py-1 rounded">
-                          Manuel
-                        </span>
-                      ) : (
-                        <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded">
-                          AI
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Plan Details */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Süre:</span>
-                      <span className="font-medium">{plan.duration || 'Belirtilmemiş'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Tarz:</span>
-                      <span className="font-medium capitalize">{plan.travel_style || 'Standart'}</span>
-                    </div>
-                    {plan.total_cost && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Maliyet:</span>
-                        <span className="font-bold text-green-600 dark:text-green-400">
-                          ₺{plan.total_cost.toLocaleString('tr-TR')}
-                        </span>
+                <Kart key={plan.id} etkilesimli className="flex flex-col">
+                  <div className="p-5 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] leading-snug">
+                          {plan.city}
+                          {plan.country && (
+                            <span className="text-[var(--fg-muted)]">, {plan.country}</span>
+                          )}
+                        </h2>
+                        <p className="text-sm text-[var(--fg-muted)] mt-0.5">
+                          {tarihAraligi(plan.startDate, plan.endDate)}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Oluşturulma:</span>
-                      <span className="text-xs">
-                        {new Date(plan.createdAt).toLocaleDateString('tr-TR')}
-                      </span>
+                      <Rozet ton={getStatusTone(currentStatus)}>
+                        {getStatusLabel(currentStatus)}
+                      </Rozet>
                     </div>
+
+                    {/* Maliyet kartın en önemli sayısı: ayrı ve büyük. */}
+                    {plan.total_cost ? (
+                      <p className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] tabular-nums mt-4">
+                        ₺{plan.total_cost.toLocaleString('tr-TR')}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-[var(--fg-subtle)] mt-4">Bütçe hesaplanmamış</p>
+                    )}
+
+                    <dl className="mt-4 space-y-1.5 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[var(--fg-muted)]">Süre</dt>
+                        <dd className="text-[var(--fg)]">{plan.duration || 'Belirtilmemiş'}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[var(--fg-muted)]">Tarz</dt>
+                        <dd className="text-[var(--fg)] capitalize">
+                          {plan.travel_style || 'Standart'}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[var(--fg-muted)]">Oluşturulma</dt>
+                        <dd className="text-[var(--fg)]">
+                          {new Date(plan.createdAt).toLocaleDateString('tr-TR')}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[var(--fg-muted)]">Kaynak</dt>
+                        <dd className="text-[var(--fg)]">
+                          {plan.ai_model === 'manual_planning' ? 'Manuel' : 'Yapay zekâ'}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="space-y-2">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => viewPlan(plan.id)}
-                        className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors duration-200 text-sm font-medium"
+                  <div className="px-5 pb-5 pt-1 flex flex-wrap items-center gap-2">
+                    <Dugme boy="sm" onClick={() => viewPlan(plan.id)}>
+                      Görüntüle
+                    </Dugme>
+
+                    {canCancel(currentStatus) && (
+                      <Dugme
+                        boy="sm"
+                        tur="ikincil"
+                        onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
                       >
-                        Görüntüle
-                      </button>
-                      <button
-                        onClick={() => deletePlan(plan.id)}
-                        className="bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm font-medium"
+                        İptal et
+                      </Dugme>
+                    )}
+                    {canMarkAsDone(currentStatus) && (
+                      <Dugme
+                        boy="sm"
+                        tur="ikincil"
+                        onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
                       >
-                        Sil
-                      </button>
-                    </div>
-                    
-                    {/* Status Action Buttons */}
-                    <div className="flex space-x-2">
-                      {canCancel(currentStatus) && (
-                        <button
-                          onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
-                          className="flex-1 bg-orange-500 text-white py-2 px-3 rounded-lg hover:bg-orange-600 transition-colors duration-200 text-xs font-medium"
-                        >
-                          İptal Et
-                        </button>
-                      )}
-                      {canMarkAsDone(currentStatus) && (
-                        <button
-                          onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
-                          className="flex-1 bg-purple-500 text-white py-2 px-3 rounded-lg hover:bg-purple-600 transition-colors duration-200 text-xs font-medium"
-                        >
-                          Tamamlandı
-                        </button>
-                      )}
-                      
-                      {/* COMPLETED planlar için özel butonlar */}
-                      {currentStatus === TripStatus.COMPLETED && (
-                        <>
-                          <button
-                            onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
-                            className="flex-1 bg-green-500 text-white py-2 px-3 rounded-lg hover:bg-green-600 transition-colors duration-200 text-xs font-medium"
-                          >
-                            ? Uygulandı
-                          </button>
-                          <button
-                            onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
-                            className="flex-1 bg-red-500 text-white py-2 px-3 rounded-lg hover:bg-red-600 transition-colors duration-200 text-xs font-medium"
-                          >
-                            ? İptal
-                          </button>
-                        </>
-                      )}
-                    </div>
+                        Tamamlandı
+                      </Dugme>
+                    )}
+                    {currentStatus === TripStatus.COMPLETED && (
+                      <Dugme
+                        boy="sm"
+                        tur="ikincil"
+                        onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
+                      >
+                        Uygulandı
+                      </Dugme>
+                    )}
+
+                    {/* Yıkıcı eylem en sona ve en sessiz biçime: yanlışlıkla
+                        tıklanması en pahalı olan düğme, en çok dikkat çeken
+                        kırmızı dolgu olmamalı. */}
+                    <Dugme
+                      boy="sm"
+                      tur="tehlike"
+                      className="ml-auto"
+                      onClick={() => deletePlan(plan.id)}
+                    >
+                      Sil
+                    </Dugme>
                   </div>
-                </div>
-              </div>
+                </Kart>
               );
             })}
           </div>
@@ -390,6 +387,3 @@ export default function MyPlansPage() {
     </div>
   );
 }
-
-
-

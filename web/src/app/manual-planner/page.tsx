@@ -5,6 +5,22 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { useSession } from "next-auth/react";
 import { logger } from "@/lib/logger";
+import { gunSayisi } from "@/lib/trip-dates";
+import {
+  GirisGerekli,
+  SayfaKabugu,
+  Yukleniyor,
+} from "@/components/ui";
+
+/**
+ * Manuel planlayıcıdaki tahmini kalemler.
+ *
+ * Bu iki değer eskiden hesap fonksiyonunun içine gömülü sihirli sayılardı
+ * (`dailyPlans.length * 150` ve `500`). Kullanıcı bunların nereden geldiğini
+ * göremiyordu; en azından tek yerde ve adlandırılmış duruyorlar.
+ */
+const GUNLUK_YEMEK_TAHMINI = 150;
+const DIGER_MASRAF_TAHMINI = 500;
 
 // TypeScript interfaces
 interface BasicInfo {
@@ -114,9 +130,9 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
   };
 
   return (
-    <div className="p-6 border border-gray-200 dark:border-gray-600 rounded-xl">
+    <div className="p-6 border border-[var(--line)] rounded-[var(--radius-lg)]">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+        <h3 className="text-lg font-semibold text-[var(--fg)]">
           {day.day}. Gün
         </h3>
         <label className="flex items-center space-x-2">
@@ -124,31 +140,31 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
             type="checkbox"
             checked={day.isEmpty}
             onChange={(e) => onPlanChange(dayIndex, 'isEmpty', e.target.checked)}
-            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            className="w-4 h-4 text-[var(--accent)] bg-[var(--surface-2)] border-[var(--line-strong)] rounded focus:ring-[var(--accent)] dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-[var(--surface-2)] dark:border-[var(--line-strong)]"
           />
-          <span className="text-sm text-gray-600 dark:text-gray-300">Boş gün</span>
+          <span className="text-sm text-[var(--fg-muted)]">Boş gün</span>
         </label>
       </div>
 
       {!day.isEmpty && (
         <>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
               Aktiviteler
             </label>
             <div className="space-y-3 mb-4">
               {day.activities.map((activity, actIndex) => (
-                <div key={activity.id} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div key={activity.id} className="p-4 bg-[var(--accent-soft)] rounded-lg border border-transparent">
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-blue-800 dark:text-blue-200">{activity.name}</h4>
+                    <h4 className="font-medium text-[var(--info)]">{activity.name}</h4>
                     <button
                       onClick={() => onRemoveActivity(dayIndex, actIndex)}
-                      className="text-red-500 hover:text-red-700 ml-2"
+                      className="text-[var(--danger)] hover:text-[var(--danger)] ml-2"
                     >
                       Sil
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm text-blue-700 dark:text-blue-300">
+                  <div className="grid grid-cols-3 gap-2 text-sm text-[var(--accent)]">
                     <div>
                       <span className="font-medium">Saat:</span> {activity.startTime} - {activity.endTime}
                     </div>
@@ -156,7 +172,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
                       <span className="font-medium">Maliyet:</span> ₺{activity.cost}
                     </div>
                     <div className="text-right">
-                      <span className="text-xs bg-blue-200 dark:bg-blue-800 px-2 py-1 rounded">
+                      <span className="text-xs bg-[var(--accent-soft)] dark:bg-[var(--accent-soft)] px-2 py-1 rounded">
                         {(() => {
                           const start = new Date(`1970-01-01T${activity.startTime}:00`);
                           const end = new Date(`1970-01-01T${activity.endTime}:00`);
@@ -167,7 +183,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
                     </div>
                   </div>
                   {activity.description && (
-                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 italic">
+                    <p className="text-sm text-[var(--accent)] mt-2 italic">
                       {activity.description}
                     </p>
                   )}
@@ -176,67 +192,67 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
             </div>
 
             {/* Aktivite Ekleme Formu */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-              <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3">Yeni Aktivite Ekle</h4>
+            <div className="p-4 bg-[var(--surface-2)] rounded-lg border-2 border-dashed border-[var(--line-strong)]">
+              <h4 className="font-medium text-[var(--fg-muted)] mb-3">Yeni Aktivite Ekle</h4>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-[var(--fg-muted)] mb-1">
                     Aktivite Adı *
                   </label>
                   <input
                     type="text"
                     value={newActivity.name}
                     onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
+                    className="w-full px-3 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface)] dark:text-[var(--fg)] text-sm"
                     placeholder="Ör: Müze ziyareti"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-[var(--fg-muted)] mb-1">
                     Maliyet (₺) *
                   </label>
                   <input
                     type="number"
                     value={newActivity.cost}
                     onChange={(e) => setNewActivity({...newActivity, cost: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
+                    className="w-full px-3 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface)] dark:text-[var(--fg)] text-sm"
                     placeholder="0"
                     min="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-[var(--fg-muted)] mb-1">
                     Başlangıç Saati *
                   </label>
                   <input
                     type="time"
                     value={newActivity.startTime}
                     onChange={(e) => setNewActivity({...newActivity, startTime: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
+                    className="w-full px-3 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface)] dark:text-[var(--fg)] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-[var(--fg-muted)] mb-1">
                     Bitiş Saati *
                   </label>
                   <input
                     type="time"
                     value={newActivity.endTime}
                     onChange={(e) => setNewActivity({...newActivity, endTime: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
+                    className="w-full px-3 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface)] dark:text-[var(--fg)] text-sm"
                   />
                 </div>
               </div>
               
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--fg-muted)] mb-1">
                   Açıklama (İsteğe bağlı)
                 </label>
                 <textarea
                   value={newActivity.description}
                   onChange={(e) => setNewActivity({...newActivity, description: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
+                  className="w-full px-3 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface)] dark:text-[var(--fg)] text-sm"
                   placeholder="Aktivite hakkında notlar..."
                   rows={2}
                 />
@@ -245,7 +261,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
               <button
                 onClick={handleAddActivity}
                 disabled={!newActivity.name.trim() || !newActivity.startTime || !newActivity.endTime}
-                className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+                className="w-full px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)] disabled:bg-[var(--line-strong)] disabled:cursor-not-allowed text-sm font-medium"
               >
                 Aktivite Ekle
               </button>
@@ -253,13 +269,13 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
               Günlük Notlar
             </label>
             <textarea
               value={day.notes}
               onChange={(e) => onPlanChange(dayIndex, 'notes', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
               rows={2}
               placeholder="Bu güne ait özel notlarınız..."
             />
@@ -267,12 +283,12 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
 
           {/* Günlük Özet */}
           {day.activities.length > 0 && (
-            <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+            <div className="mt-4 p-3 bg-[var(--ok-soft)] rounded-lg">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-green-700 dark:text-green-300">
+                <span className="text-[var(--ok)]">
                   <strong>Günlük Özet:</strong> {day.activities.length} aktivite
                 </span>
-                <span className="text-green-700 dark:text-green-300 font-bold">
+                <span className="text-[var(--ok)] font-bold">
                   Toplam: ₺{day.activities.reduce((sum, act) => (sum + act.cost), 0)}
                 </span>
               </div>
@@ -282,8 +298,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
       )}
 
       {day.isEmpty && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <span className="text-4xl"></span>
+        <div className="text-center py-8 text-[var(--fg-subtle)]">
           <p className="mt-2">Bu gün dinlenme günü olarak ayarlandı</p>
         </div>
       )}
@@ -293,7 +308,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
 
 export default function ManualPlannerPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [currentStep, setCurrentStep] = useState(1);
   
   // Bugünün tarihini al (YYYY-MM-DD formatında)
@@ -337,15 +352,15 @@ export default function ManualPlannerPage() {
     { id: 6, title: 'Özet & Kaydet', icon: '' }
   ];
 
-  // Calculate trip duration
+  /**
+   * Seyahat süresi: KAPSAYICI gün sayısı (bkz. src/lib/trip-dates.ts).
+   *
+   * Eski formül `Math.ceil((end - start) / GUN)` aralığı DIŞLAYICI sayıyordu:
+   * 1-5 Ocak için 4 dönüyordu. Sonuç olarak günlük plan sekmesinde son gün
+   * hiç görünmüyor, konaklama gecesi de bir eksik hesaplanıyordu.
+   */
   const getTripDuration = useCallback(() => {
-    if (!travelPlan.basicInfo.startDate || !travelPlan.basicInfo.endDate) return 0;
-    const start = new Date(travelPlan.basicInfo.startDate);
-    const end = new Date(travelPlan.basicInfo.endDate);
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
-    return daysDiff === 0 ? 1 : daysDiff;
+    return gunSayisi(travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate);
   }, [travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate]);
 
   // Create a simple string for activities cost tracking
@@ -365,17 +380,22 @@ export default function ManualPlannerPage() {
         return total + day.activities.reduce((dayTotal, activity) => dayTotal + activity.cost, 0);
       }, 0);
       
-      // Konaklama maliyeti (gece sayısı × gecelik fiyat)
+      // Konaklama maliyeti (gece sayısı × gecelik fiyat).
+      // Gece sayısı = gün sayısı - 1; gün sayısı artık kapsayıcı olduğu için
+      // bu değer de doğru (1-5 Ocak → 5 gün, 4 gece).
       const duration = getTripDuration();
       const nights = Math.max(duration - 1, 0);
       const accommodationCost = accommodation ? accommodation.price * nights : 0;
-      
+
+      // Yemek maliyeti GÜN SAYISINA bağlı. Eskiden `dailyPlans.length`
+      // kullanılıyordu; o dizi tarih değişiminden bir render sonra
+      // güncellendiği için toplam geçici olarak yanlış görünüyordu.
       const breakdown = {
         transport: transport?.price || 0,
         accommodation: accommodationCost,
         activities: totalActivityCost,
-        food: dailyPlans.length * 150, // Günlük ortalama yemek maliyeti
-        other: 500 // Diğer masraflar
+        food: duration * GUNLUK_YEMEK_TAHMINI,
+        other: DIGER_MASRAF_TAHMINI,
       };
 
       const estimatedTotal = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
@@ -673,27 +693,23 @@ export default function ManualPlannerPage() {
 
   const savePlan = async () => {
     try {
-      // Session bilgisini de ekle
-      const requestBody = {
-        ...travelPlan,
-        userInfo: session ? {
-          id: session.user?.id,
-          email: session.user?.email,
-        } : null
-      };
-
+      // İstemci kendi kimliğini göndermiyor; sunucu oturumdan çözüyor.
       const response = await fetch('/api/manual-travel-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(travelPlan)
       });
 
       if (response.ok) {
         toast.success('Seyahat planınız başarıyla kaydedildi!');
         router.push('/my-plans');
-      } else {
-        toast.error('Plan kaydedilirken bir hata oluştu');
+        return;
       }
+
+      // Sunucunun anlattığı hatayı gösteriyoruz; eskiden her hata aynı
+      // genel mesaja dönüşüyor ve kullanıcı neyi düzelteceğini bilmiyordu.
+      const hata = await response.json().catch(() => null);
+      toast.error(hata?.error || 'Plan kaydedilirken bir hata oluştu');
     } catch (error) {
       logger.error("Plan kaydedilemedi", error);
       toast.error('Plan kaydedilirken bir hata oluştu');
@@ -709,50 +725,25 @@ export default function ManualPlannerPage() {
   // Session kontrol için UI
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 dark:border-white mx-auto mb-4"></div>
-          <p className="text-xl text-gray-900 dark:text-white">Oturum kontrol ediliyor...</p>
-        </div>
-      </div>
+      <SayfaKabugu>
+        <Yukleniyor metin="Oturum kontrol ediliyor…" />
+      </SayfaKabugu>
     );
   }
 
   if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Manuel plan oluşturmak için önce giriş yapmanız gerekiyor.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
-          >
-            Giriş Yap
-          </button>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
-          >
-            Ana Sayfaya Dön
-          </button>
-        </div>
-      </div>
-    );
+    return <GirisGerekli />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-teal-900">
+    <div className="min-h-screen bg-[var(--bg)]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-3">
             Adım Adım Seyahat Planlama
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-[var(--fg-muted)]">
             Seyahatinizi detaylıca planlayın ve bütçenizi kontrol edin
           </p>
         </div>
@@ -765,15 +756,15 @@ export default function ManualPlannerPage() {
                 key={step.id}
                 className={`flex flex-col items-center min-w-0 ${
                   currentStep >= step.id
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-gray-400 dark:text-gray-600'
+                    ? 'text-[var(--accent)]'
+                    : 'text-[var(--fg-subtle)] dark:text-[var(--fg-muted)]'
                 }`}
               >
                 <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-xl mb-2 transition-all duration-300 ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-xl mb-2 transition-colors duration-150 ${
                     currentStep >= step.id
-                      ? 'bg-green-100 dark:bg-green-900 border-2 border-green-500'
-                      : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600'
+                      ? 'bg-[var(--ok-soft)] border-2 border-[var(--accent)]'
+                      : 'bg-[var(--surface-2)] border-2 border-[var(--line-strong)]'
                   }`}
                 >
                   {step.icon}
@@ -782,7 +773,7 @@ export default function ManualPlannerPage() {
                 {index < steps.length - 1 && (
                   <div
                     className={`hidden md:block absolute top-6 left-full w-16 h-0.5 ${
-                      currentStep > step.id ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                      currentStep > step.id ? 'bg-[var(--ok-soft)]' : 'bg-[var(--surface-3)] dark:bg-[var(--surface-3)]'
                     }`}
                     style={{ marginLeft: '1rem' }}
                   />
@@ -796,16 +787,16 @@ export default function ManualPlannerPage() {
         <div className="max-w-4xl mx-auto">
           {/* Step 2: Ulaşım */}
           {currentStep === 2 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
                 Ulaşım Seçenekleri
               </h2>
               
               {/* Mevcut seçim göster */}
               {travelPlan.transport && (
-                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">Seçili Ulaşım:</h3>
-                  <p className="text-green-700 dark:text-green-300">
+                <div className="mb-6 p-4 bg-[var(--ok-soft)] border border-transparent rounded-lg">
+                  <h3 className="text-[var(--ok)] font-semibold mb-2">Seçili Ulaşım:</h3>
+                  <p className="text-[var(--ok)]">
                     {travelPlan.transport.type} - {travelPlan.transport.provider} (₺{travelPlan.transport.price})
                   </p>
                 </div>
@@ -816,33 +807,33 @@ export default function ManualPlannerPage() {
                   <div
                     key={option.id}
                     onClick={() => handleTransportSelect(option.id)}
-                    className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                    className={`p-6 border-2 rounded-[var(--radius-lg)] cursor-pointer transition-colors duration-150 ${
                       travelPlan.transport?.id === option.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-md'
+                        ? 'border-[var(--accent)] bg-[var(--ok-soft)]'
+                        : 'border-[var(--line)] hover:border-[var(--line)] hover:shadow-md'
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center mb-2">
-                          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                          <h3 className="text-lg font-semibold text-[var(--fg)]">
                             {option.type} - {option.provider}
                           </h3>
                           {travelPlan.transport?.id === option.id && (
-                            <span className="ml-3 px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+                            <span className="ml-3 px-2 py-1 bg-[var(--accent)] text-[var(--accent-contrast)] text-xs rounded-full">
                               Seçili
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-600 dark:text-gray-300">
+                        <p className="text-[var(--fg-muted)]">
                           Süre: {option.duration} | {option.departure} - {option.arrival}
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        <span className="text-2xl font-bold text-[var(--accent)]">
                           ₺{option.price}
                         </span>
-                        <p className="text-sm text-gray-500">kişi başı</p>
+                        <p className="text-sm text-[var(--fg-subtle)]">kişi başı</p>
                       </div>
                     </div>
                   </div>
@@ -853,16 +844,16 @@ export default function ManualPlannerPage() {
 
           {/* Step 3: Konaklama */}
           {currentStep === 3 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
                 Konaklama Seçenekleri
               </h2>
               
               {/* Mevcut seçim göster */}
               {travelPlan.accommodation && (
-                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">Seçili Konaklama:</h3>
-                  <p className="text-green-700 dark:text-green-300">
+                <div className="mb-6 p-4 bg-[var(--ok-soft)] border border-transparent rounded-lg">
+                  <h3 className="text-[var(--ok)] font-semibold mb-2">Seçili Konaklama:</h3>
+                  <p className="text-[var(--ok)]">
                     {travelPlan.accommodation.name} - {travelPlan.accommodation.type} (₺{travelPlan.accommodation.price}/gece)
                   </p>
                 </div>
@@ -873,23 +864,23 @@ export default function ManualPlannerPage() {
                   <div
                     key={option.id}
                     onClick={() => handleAccommodationSelect(option.id)}
-                    className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                    className={`p-6 border-2 rounded-[var(--radius-lg)] cursor-pointer transition-colors duration-150 ${
                       travelPlan.accommodation?.id === option.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-md'
+                        ? 'border-[var(--accent)] bg-[var(--ok-soft)]'
+                        : 'border-[var(--line)] hover:border-[var(--line)] hover:shadow-md'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                      <h3 className="text-lg font-semibold text-[var(--fg)]">
                         {option.name}
                       </h3>
                       {travelPlan.accommodation?.id === option.id && (
-                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+                        <span className="px-2 py-1 bg-[var(--accent)] text-[var(--accent-contrast)] text-xs rounded-full">
                           Seçili
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                    <p className="text-sm text-[var(--fg-muted)] mb-2">
                       {option.type} • {option.location}
                     </p>
                     <div className="flex items-center mb-3">
@@ -897,7 +888,7 @@ export default function ManualPlannerPage() {
                         <span
                           key={i}
                           className={`text-sm ${
-                            i < option.rating ? 'text-yellow-400' : 'text-gray-300'
+                            i < option.rating ? 'text-[var(--warn)]' : 'text-[var(--fg-subtle)]'
                           }`}
                         >
                           ★
@@ -908,17 +899,17 @@ export default function ManualPlannerPage() {
                       {option.amenities.map((amenity) => (
                         <span
                           key={amenity}
-                          className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded"
+                          className="px-2 py-1 bg-[var(--info-soft)] text-[var(--info)] text-xs rounded"
                         >
                           {amenity}
                         </span>
                       ))}
                     </div>
                     <div className="text-center">
-                      <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                      <span className="text-xl font-bold text-[var(--accent)]">
                         ₺{option.price}
                       </span>
-                      <p className="text-sm text-gray-500">gecelik</p>
+                      <p className="text-sm text-[var(--fg-subtle)]">gecelik</p>
                     </div>
                   </div>
                 ))}
@@ -928,8 +919,8 @@ export default function ManualPlannerPage() {
 
           {/* Step 4: Günlük Planlar */}
           {currentStep === 4 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
                 Günlük Planlar
               </h2>
               
@@ -950,14 +941,14 @@ export default function ManualPlannerPage() {
 
           {/* Step 5: Maliyet Analizi */}
           {currentStep === 5 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
                 Maliyet Analizi
               </h2>
               
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Mevcut Bütçeniz (₺)
                   </label>
                   <input
@@ -967,19 +958,19 @@ export default function ManualPlannerPage() {
                       ...prev,
                       budget: { ...prev.budget, currentBudget: parseFloat(e.target.value) || 0 }
                     }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                     placeholder="Örn: 10000"
                   />
                 </div>
                 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                  <h3 className="text-lg font-semibold text-[var(--fg)] mb-4">
                     Tahmini Harcama Dağılımı
                   </h3>
                   <div className="space-y-3">
                     {Object.entries(travelPlan.budget.breakdown).map(([key, value]) => (
                       <div key={key} className="flex justify-between">
-                        <span className="capitalize text-gray-600 dark:text-gray-300">
+                        <span className="capitalize text-[var(--fg-muted)]">
                           {key === 'transport' ? 'Ulaşım' :
                            key === 'accommodation' ? 'Konaklama' :
                            key === 'activities' ? 'Aktiviteler' :
@@ -999,12 +990,12 @@ export default function ManualPlannerPage() {
 
               <div className="mt-6 p-4 rounded-lg">
                 {travelPlan.budget.currentBudget > travelPlan.budget.estimatedTotal ? (
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
+                  <div className="bg-[var(--ok-soft)] border border-transparent text-[var(--ok)]">
                     <h4 className="font-semibold">Bütçeniz Yeterli!</h4>
                     <p>Kalan tutar: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal}</p>
                   </div>
                 ) : (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
+                  <div className="bg-[var(--danger-soft)] border border-transparent text-[var(--danger)]">
                     <h4 className="font-semibold">Bütçe Aşımı!</h4>
                     <p>Eksik tutar: ₺{travelPlan.budget.estimatedTotal - travelPlan.budget.currentBudget}</p>
                   </div>
@@ -1015,16 +1006,16 @@ export default function ManualPlannerPage() {
 
           {/* Step 6: Özet & Kaydet */}
           {currentStep === 6 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                ? Plan Özeti
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
+                Plan Özeti
               </h2>
               
               <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Temel Bilgiler */}
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                  <div className="p-4 bg-[var(--surface-2)] rounded-lg">
+                    <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Temel Bilgiler
                     </h3>
                     <div className="space-y-2 text-sm">
@@ -1037,8 +1028,8 @@ export default function ManualPlannerPage() {
                   </div>
                   
                   {/* Ulaşım Bilgileri */}
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                  <div className="p-4 bg-[var(--accent-soft)] rounded-lg">
+                    <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Seçilen Ulaşım
                     </h3>
                     {travelPlan.transport ? (
@@ -1051,15 +1042,15 @@ export default function ManualPlannerPage() {
                         <p><strong>Toplam:</strong> ₺{travelPlan.transport.price * travelPlan.basicInfo.travelers}</p>
                       </div>
                     ) : (
-                      <p className="text-gray-500 italic">Henüz ulaşım seçilmedi</p>
+                      <p className="text-[var(--fg-subtle)] italic">Henüz ulaşım seçilmedi</p>
                     )}
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Konaklama Bilgileri */}
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                  <div className="p-4 bg-[var(--ok-soft)] rounded-lg">
+                    <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Seçilen Konaklama
                     </h3>
                     {travelPlan.accommodation ? (
@@ -1076,7 +1067,7 @@ export default function ManualPlannerPage() {
                             {travelPlan.accommodation.amenities.map((amenity) => (
                               <span
                                 key={amenity}
-                                className="px-2 py-1 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs rounded"
+                                className="px-2 py-1 bg-[var(--accent-soft)] dark:bg-[var(--accent-soft)] text-[var(--info)] text-xs rounded"
                               >
                                 {amenity}
                               </span>
@@ -1085,20 +1076,20 @@ export default function ManualPlannerPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-gray-500 italic">Henüz konaklama seçilmedi</p>
+                      <p className="text-[var(--fg-subtle)] italic">Henüz konaklama seçilmedi</p>
                     )}
                   </div>
                   
                   {/* Bütçe Özeti */}
-                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                  <div className="p-4 bg-yellow-50 dark:bg-[var(--warn-soft)] rounded-lg">
+                    <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Bütçe Özeti
                     </h3>
                     <div className="space-y-2 text-sm">
                       <p><strong>Mevcut Bütçe:</strong> ₺{travelPlan.budget.currentBudget}</p>
                       <p><strong>Tahmini Toplam:</strong> ₺{travelPlan.budget.estimatedTotal}</p>
                       <div className="pt-2 border-t">
-                        <p className="text-xs text-gray-600 dark:text-gray-400">Detaylı Dağılım:</p>
+                        <p className="text-xs text-[var(--fg-muted)]">Detaylı Dağılım:</p>
                         <p className="text-xs">• Ulaşım: ₺{travelPlan.budget.breakdown.transport}</p>
                         <p className="text-xs">• Konaklama: ₺{travelPlan.budget.breakdown.accommodation}</p>
                         <p className="text-xs">• Aktiviteler: ₺{travelPlan.budget.breakdown.activities}</p>
@@ -1107,11 +1098,11 @@ export default function ManualPlannerPage() {
                       </div>
                       <div className="pt-2 border-t">
                         {travelPlan.budget.currentBudget >= travelPlan.budget.estimatedTotal ? (
-                          <p className="text-green-600 dark:text-green-400 font-semibold">
-                            ? Bütçe Yeterli! (Kalan: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal})
+                          <p className="text-[var(--accent)] font-semibold">
+                            Bütçe Yeterli! (Kalan: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal})
                           </p>
                         ) : (
-                          <p className="text-red-600 dark:text-red-400 font-semibold">
+                          <p className="text-[var(--danger)] font-semibold">
                             Bütçe Aşımı! (Eksik: ₺{travelPlan.budget.estimatedTotal - travelPlan.budget.currentBudget})
                           </p>
                         )}
@@ -1122,18 +1113,18 @@ export default function ManualPlannerPage() {
 
                 {/* Günlük Planlar Özeti */}
                 {travelPlan.dailyPlans.length > 0 && (
-                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                  <div className="p-4 bg-purple-50 dark:bg-[var(--surface-2)] rounded-lg">
+                    <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Günlük Planlar Özeti
                     </h3>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {travelPlan.dailyPlans.map((day, index) => (
-                        <div key={index} className="p-3 bg-white dark:bg-gray-700 rounded border">
+                        <div key={index} className="p-3 bg-[var(--surface)] rounded border">
                           <h4 className="font-medium text-sm">{day.day}. Gün</h4>
                           {day.isEmpty ? (
-                            <p className="text-xs text-gray-500 italic">Dinlenme günü</p>
+                            <p className="text-xs text-[var(--fg-subtle)] italic">Dinlenme günü</p>
                           ) : (
-                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                            <p className="text-xs text-[var(--fg-muted)]">
                               {day.activities.length} aktivite planlandı
                             </p>
                           )}
@@ -1146,40 +1137,40 @@ export default function ManualPlannerPage() {
             </div>
           )}
           {currentStep === 1 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
                 Temel Bilgiler
               </h2>
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Hedef Şehir *
                   </label>
                   <input
                     type="text"
                     value={travelPlan.basicInfo.destination}
                     onChange={(e) => handleBasicInfoChange('destination', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                     placeholder="Örn: İstanbul"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Ülke
                   </label>
                   <input
                     type="text"
                     value={travelPlan.basicInfo.country}
                     onChange={(e) => handleBasicInfoChange('country', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                     placeholder="Örn: Türkiye"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Başlangıç Tarihi *
                   </label>
                   <input
@@ -1187,12 +1178,12 @@ export default function ManualPlannerPage() {
                     value={travelPlan.basicInfo.startDate}
                     min={today}
                     onChange={(e) => handleBasicInfoChange('startDate', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Bitiş Tarihi *
                   </label>
                   <input
@@ -1200,18 +1191,18 @@ export default function ManualPlannerPage() {
                     value={travelPlan.basicInfo.endDate}
                     min={travelPlan.basicInfo.startDate || today}
                     onChange={(e) => handleBasicInfoChange('endDate', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Kişi Sayısı
                   </label>
                   <select
                     value={travelPlan.basicInfo.travelers}
                     onChange={(e) => handleBasicInfoChange('travelers', parseInt(e.target.value))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                   >
                     {[1, 2, 3, 4, 5, 6].map(num => (
                       <option key={num} value={num}>{num} kişi</option>
@@ -1220,13 +1211,13 @@ export default function ManualPlannerPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                     Seyahat Tarzı
                   </label>
                   <select
                     value={travelPlan.basicInfo.travelStyle}
                     onChange={(e) => handleBasicInfoChange('travelStyle', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                   >
                     <option value="budget">Ekonomik</option>
                     <option value="standard">Standart</option>
@@ -1238,8 +1229,8 @@ export default function ManualPlannerPage() {
               </div>
 
               {getTripDuration() > 0 && (
-                <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-green-800 dark:text-green-200">
+                <div className="mt-6 p-4 bg-[var(--ok-soft)] rounded-lg">
+                  <p className="text-[var(--ok)]">
                     <strong>Seyahat Süresi:</strong> {getTripDuration()} gün
                   </p>
                 </div>
@@ -1252,13 +1243,13 @@ export default function ManualPlannerPage() {
             <button
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-[var(--surface-2)] text-[var(--fg)] border border-[var(--line-strong)] rounded-lg hover:bg-[var(--surface-3)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Önceki
             </button>
             
             <div className="text-center">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-[var(--fg-subtle)]">
                 {currentStep} / {steps.length}
               </span>
             </div>
@@ -1266,7 +1257,7 @@ export default function ManualPlannerPage() {
             {currentStep < steps.length ? (
               <button
                 onClick={nextStep}
-                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                className="px-6 py-3 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)]"
               >
                 Sonraki
               </button>
@@ -1274,13 +1265,13 @@ export default function ManualPlannerPage() {
               <div className="space-x-4">
                 <button
                   onClick={cancelPlan}
-                  className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                  className="px-6 py-3 bg-[var(--danger)] text-white rounded-lg hover:bg-[var(--danger-hover)]"
                 >
                   İptal Et
                 </button>
                 <button
                   onClick={savePlan}
-                  className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                  className="px-6 py-3 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)]"
                 >
                   Kaydet
                 </button>

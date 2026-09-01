@@ -56,6 +56,21 @@ export const dayPlanInputSchema = z.object({
 export const budgetItemInputSchema = z.object({
   description: z.string().max(200),
   amount: z.number().min(0).max(10_000_000),
+  /**
+   * Tutarın dayandığı kaynak bağlantısı (agentic yolda `get_hotel_prices` /
+   * `get_transport_prices` sonuçlarından geliyor). Bilgi yoksa boş string.
+   *
+   * NEDEN `.default("")` ve `.url()` DEĞİL:
+   *  - `.optional()` kullanılamıyor; strict modda tüm alanlar `required`
+   *    olmalı (dosya başındaki tasarım kuralı). `.default("")` ise JSON
+   *    Schema'da alanı `required` bırakıyor AMA Zod tarafında eksik gelen
+   *    yanıtı da kabul ediyor — yani `json_object`/düz prompt
+   *    stratejilerinde alanı atlayan modeller yüzünden plan reddedilmiyor.
+   *  - `.url()` burada değil, serileştirmede uygulanıyor: geçersiz bir URL
+   *    yüzünden koca bir planı çöpe atmak yerine o alan sessizce
+   *    düşürülüyor (bkz. plan-budget.ts `guvenliKaynakUrl`).
+   */
+  source: z.string().max(300).default(""),
 });
 
 export const budgetCategoryInputSchema = z.object({

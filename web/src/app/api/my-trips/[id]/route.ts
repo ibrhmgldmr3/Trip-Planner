@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
 import { logger } from "@/lib/logger";
 
 
@@ -12,33 +11,14 @@ export async function GET(
   try {
     const { id: tripId } = await context.params;
     
-    // Session kontrolü
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Giriş yapmanız gerekiyor" },
-        { status: 401 }
-      );
-    }
-
-    // Kullanıcıyı email ile bul
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Kullanıcı bulunamadı" },
-        { status: 404 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     // Trip'i bul (Trip tablosundan, sadece DONE olanları)
     const trip = await prisma.trip.findUnique({
       where: { 
         id: tripId,
-        userId: user.id,
+        userId: auth.user.id,
         status: 'DONE'
       },
     });
@@ -71,33 +51,14 @@ export async function DELETE(
   try {
     const { id: tripId } = await context.params;
     
-    // Session kontrolü
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Giriş yapmanız gerekiyor" },
-        { status: 401 }
-      );
-    }
-
-    // Kullanıcıyı email ile bul
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Kullanıcı bulunamadı" },
-        { status: 404 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     // Trip var mı ve sahibi mi? (Trip tablosundan, sadece DONE olanları)
     const trip = await prisma.trip.findUnique({
       where: { 
         id: tripId,
-        userId: user.id,
+        userId: auth.user.id,
         status: 'DONE'
       },
     });

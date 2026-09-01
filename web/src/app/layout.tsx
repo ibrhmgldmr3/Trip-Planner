@@ -1,24 +1,50 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto } from "next/font/google";
+import { headers } from "next/headers";
+import { Geist, Geist_Mono, Roboto, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import MobileMenu from "@/components/MobileMenu";
 import AuthProvider from "@/providers/AuthProvider";
 import ThemeProvider from "@/context/ThemeContext";
 
+/**
+ * DİKKAT — `latin-ext` ZORUNLU.
+ *
+ * Alt küme yalnızca "latin" iken ğ, ş, İ, ı, Ğ, Ş glifleri fontta yok
+ * sayılıyor ve tarayıcı o harfleri yedek fonta (Arial) düşürüyordu.
+ * Sonuç: Türkçe metinlerde harf harf değişen bir tipografi. Uygulamanın
+ * dili `tr`; bu alt küme bir tercih değil, gereklilik.
+ */
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
 const roboto = Roboto({
   weight: ["400", "500", "700"],
   variable: "--font-roboto",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+});
+
+/**
+ * Başlık fontu.
+ *
+ * Başlıklar serif, gövde sans: ikisi arasındaki fark hiyerarşiyi punto ve
+ * kalınlık büyütmeden kuruyor. Eskiden hiyerarşi yalnızca boyutla
+ * anlatılıyordu (kart içinde `text-2xl font-bold` başlıklar) ve sayfa
+ * bağırıyordu.
+ */
+const sourceSerif = Source_Serif_4({
+  variable: "--font-serif",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -46,19 +72,44 @@ const temaScript = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // CSP nonce'u middleware üretiyor ve istek başlığına koyuyor. Satır-içi
+  // tema script'i bu nonce olmadan CSP zorlama modunda çalışmaz.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="tr"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} ${sourceSerif.variable}`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: temaScript }} />
+        {/*
+          BİLİNEN, KABUL EDİLMİŞ UYUMSUZLUK — geliştirme konsolunda
+          "nonce" için bir hydration uyarısı görürsünüz.
+
+          Sebep: tarayıcılar ayrıştırmadan sonra `nonce` ÖZNİTELİĞİNİ
+          güvenlik gereği gizliyor; `getAttribute("nonce")` boş string
+          dönüyor. React sunucudaki `nonce="..."` ile istemcideki `nonce=""`i
+          karşılaştırıp fark buluyor. `suppressHydrationWarning` React 19'da
+          bu özniteliği kapsamıyor (denendi, uyarı sürüyor).
+
+          Neden böyle bırakıldı: uyarı DÜZELTİLEBİLİR sınıfta — script zaten
+          çalışmış durumda, işlevsel etkisi yok. Nonce'u kaldırmak ise CSP
+          zorlama moduna geçildiğinde tema script'ini tamamen bloke ederdi
+          (FOUC + yanlış tema). Güvenlik, konsol temizliğinden önce gelir.
+          Kalıcı çözüm nonce yerine CSP hash'i kullanmak; script sabit
+          olduğu için mümkün, ama ayrı bir iş.
+        */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: temaScript }}
+        />
       </head>
       <body className="min-h-screen">
         <AuthProvider>

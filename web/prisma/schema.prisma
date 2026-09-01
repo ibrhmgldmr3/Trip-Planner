@@ -25,18 +25,11 @@ model User {
   sessions           Session[]
   trips              Trip[]
 
-  // Sahiplik için tek gerçek kaynak: id üzerinden bağ.
-  tripPlans               TripPlan[]       @relation("UserToTripPlan")
-
-  // Back-relations (email üzerinden) - KULLANIMDAN KALDIRILDI
-  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
-  aiConversationsByEmail  AiConversation[] @relation("UserToAiConversationByEmail")
-  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
-  accommodationsByEmail   Accommodation[]  @relation("UserToAccommodationByEmail")
-  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
-  transportationsByEmail  Transportation[] @relation("UserToTransportationByEmail")
-  /// @deprecated Sahiplik userId üzerinden kuruluyor. Ayrı bir migration'da düşürülecek.
-  tripPlansByEmail        TripPlan[]       @relation("UserToTripPlanByEmail")
+  // Sahiplik için TEK gerçek kaynak: id üzerinden bağ.
+  // E-posta üzerinden kurulan eski ilişkiler 20260831 migration'ında
+  // düşürüldü; e-posta değiştiğinde kayıtlar kopuyordu.
+  tripPlans          TripPlan[] @relation("UserToTripPlan")
+  planJobs           PlanJob[]
 }
 
 model Account {
@@ -124,15 +117,10 @@ model AiConversation {
   summary    String?
   tags       String?
 
+  // Sahiplik tripId -> Trip.userId üzerinden türetiliyor.
   trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI (sahiplik tripId -> Trip.userId üzerinden)
-  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu sütun ayrı bir migration'da düşürülecek.
-  userEmail  String?
-  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu ilişki ayrı bir migration'da düşürülecek.
-  userByEmail User?   @relation("UserToAiConversationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([userEmail])
+  @@index([tripId])
 }
 
 model Accommodation {
@@ -156,15 +144,10 @@ model Accommodation {
   status        String   @default("pending")
   confirmation  String?
 
+  // Sahiplik tripId -> Trip.userId üzerinden türetiliyor.
   trip          Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI (sahiplik tripId -> Trip.userId üzerinden)
-  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu sütun ayrı bir migration'da düşürülecek.
-  userEmail     String?
-  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu ilişki ayrı bir migration'da düşürülecek.
-  userByEmail   User?    @relation("UserToAccommodationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([userEmail])
+  @@index([tripId, checkIn])
 }
 
 model Transportation {
@@ -185,27 +168,29 @@ model Transportation {
   updatedAt          DateTime @updatedAt
   status             String   @default("pending")
 
+  // Sahiplik tripId -> Trip.userId üzerinden türetiliyor.
   trip               Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI (sahiplik tripId -> Trip.userId üzerinden)
-  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu sütun ayrı bir migration'da düşürülecek.
-  userEmail          String?
-  /// @deprecated Sahiplik Trip.userId üzerinden türetiliyor. Bu ilişki ayrı bir migration'da düşürülecek.
-  userByEmail        User?    @relation("UserToTransportationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([userEmail])
+  @@index([tripId, departureTime])
 }
 
 model DailyPlan {
   id         String   @id @default(cuid())
   tripId     String
-  date       DateTime
+  date       DateTime @db.Date
   title      String?
   notes      String?
-  activities Json
+  activities Json     @default("[]")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  // Bir seyahatte bir tarih için EN FAZLA bir günlük plan.
+  // Bu kısıt olmadan aynı gün için iki kayıt oluşabiliyor ve toplamlar
+  // sessizce ikiye katlanıyordu. `@db.Date` saat bileşenini tamamen
+  // atarak kısıtı saat farklarına dayanıklı hale getiriyor.
+  @@unique([tripId, date])
+  @@index([tripId])
 }
 
 model BudgetItem {
@@ -222,6 +207,9 @@ model BudgetItem {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   trip          Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([tripId, category])
 }
 
 model TripPlan {
@@ -261,19 +249,64 @@ model TripPlan {
   /// null = eski (markdown) satır. 1 = tripPlanStructuredSchema v1.
   plan_schema_version Int?
 
+  /// İlişkisel modele taşındıysa dolu; taşıma tarihi.
+  /// null = plan hâlâ yalnızca JSON sütunlarında yaşıyor.
+  migratedAt       DateTime?
+
   trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
   user             User?       @relation("UserToTripPlan", fields: [userId], references: [id], onDelete: Cascade)
-
-  // Email ile User'a bağ - KULLANIMDAN KALDIRILDI
-  /// @deprecated userId kullanın. Bu sütun ayrı bir migration'da düşürülecek.
-  userEmail        String?
-  /// @deprecated userId kullanın. Bu ilişki ayrı bir migration'da düşürülecek.
-  userByEmail      User?     @relation("UserToTripPlanByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
 
   @@index([city, country])
   @@index([generated_at])
   @@index([userId])
-  @@index([userEmail])
+  @@index([userId, status])
+}
+
+/**
+ * Arka planda çalışan AI plan üretimi işi.
+ *
+ * NEDEN VAR: plan üretimi en kötü durumda 2 model x 3 strateji + onarım +
+ * markdown yedeği = 8 ardışık LLM çağrısı yapıyor ve bu zincir 240 saniyeye
+ * kadar sürebiliyor. Bunu tek bir HTTP isteğinin içinde tutmak, o süre
+ * boyunca bir bağlantıyı ve bir sunucu işçisini meşgul etmek demek;
+ * kullanıcı sekmeyi kapatırsa iş de yarıda kalıyordu.
+ *
+ * Artık POST bir iş kaydı açıp hemen dönüyor, üretim `after()` içinde
+ * sürüyor ve istemci durumu sorguluyor.
+ */
+model PlanJob {
+  id          String        @id @default(cuid())
+  userId      String
+  status      PlanJobStatus @default(QUEUED)
+
+  /// Doğrulanmış istek gövdesi; yeniden deneme buradan besleniyor.
+  request     Json
+
+  /// Üretim bittiğinde oluşan TripPlan.
+  tripPlanId  String?
+
+  /// Kullanıcıya gösterilecek hata (teknik ayrıntı log'a gider).
+  error       String?
+
+  /// Kaba ilerleme göstergesi: hangi stratejide olunduğu.
+  step        String?
+
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+enum PlanJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
 }
 
 enum TripStatus {

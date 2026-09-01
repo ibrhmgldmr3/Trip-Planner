@@ -7,6 +7,11 @@ import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
+import {
+  GirisGerekli,
+  SayfaKabugu,
+  Yukleniyor,
+} from "@/components/ui";
 
 interface TripFormData {
   city: string;
@@ -41,10 +46,44 @@ interface TripPlanResponse {
   };
 }
 
+/**
+ * İş adımlarının kullanıcıya gösterilecek karşılığı.
+ *
+ * Sunucu `step` alanına teknik bir etiket yazıyor (`yapilandirilmis-uretim`
+ * gibi); kullanıcı onu görmemeli.
+ */
+const ADIM_METINLERI: Record<string, string> = {
+  basladi: "Hazırlık yapılıyor...",
+  "agentic-uretim": "AI rotaları ve önerileri araştırıyor...",
+  "yapilandirilmis-uretim": "AI rotaları ve önerileri araştırıyor...",
+  "markdown-yedegi": "Alternatif yöntem deneniyor...",
+  "konumlar-cozuluyor": "Konumlar haritaya işleniyor...",
+  kaydediliyor: "Plan kaydediliyor...",
+  tamamlandi: "Tamamlandı",
+};
+
+/**
+ * Adım metnini çözer. `arac:web_search` gibi araç adına göre değişen
+ * adımlar sabit haritada tek tek tanımlanmıyor — yeni bir araç eklendiğinde
+ * bu sayfanın güncellenmesi gerekmesin diye `arac:` önekiyle başlayan her
+ * adım aynı genel mesajı gösteriyor.
+ */
+function adimMetni(step: string): string | null {
+  if (ADIM_METINLERI[step]) return ADIM_METINLERI[step];
+  if (step.startsWith("arac:")) return "Güncel bilgi aranıyor...";
+  return null;
+}
+
+/** İş bitene kadar bekle; her yoklama arasında `bekleMs` kadar durakla. */
+function bekle(ms: number): Promise<void> {
+  return new Promise((cozumle) => setTimeout(cozumle, ms));
+}
+
 export default function PlannerPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [ilerlemeMetni, setIlerlemeMetni] = useState<string>("");
   const [tripPlan, setTripPlan] = useState<TripPlanResponse | null>(null);
   const [formData, setFormData] = useState<TripFormData>({
     city: "",
@@ -74,39 +113,14 @@ export default function PlannerPage() {
   // Session kontrol
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-indigo-100 dark:from-purple-900 dark:via-blue-900 dark:to-indigo-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 dark:border-white mx-auto mb-4"></div>
-          <p className="text-xl text-gray-900 dark:text-white">Oturum kontrol ediliyor...</p>
-        </div>
-      </div>
+      <SayfaKabugu>
+        <Yukleniyor metin="Oturum kontrol ediliyor…" />
+      </SayfaKabugu>
     );
   }
 
   if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-indigo-100 dark:from-purple-900 dark:via-blue-900 dark:to-indigo-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Plan oluşturmak için önce giriş yapmanız gerekiyor.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
-          >
-            Giriş Yap
-          </button>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
-          >
-            Ana Sayfaya Dön
-          </button>
-        </div>
-      </div>
-    );
+    return <GirisGerekli />;
   }
 
   // Form kontrollerini güncelleme fonksiyonları
@@ -166,44 +180,97 @@ export default function PlannerPage() {
       }
     }
     
-    setIsGenerating(true);
-    
-    try {
-      // Session bilgisini de Günder
-      const requestBody = {
-        ...formData,
-        // Session bilgisini ekle
-        userInfo: session ? {
-          id: session.user?.id,
-          email: session.user?.email,
-        } : null
-      };
+    // Uç kimlik doğrulaması zorunlu kılıyor. Kontrolü BURADA yapmazsak
+    // kullanıcı formu doldurup gönderiyor ve ancak yanıt dönünce 401
+    // görüyordu.
+    if (!session) {
+      toast.error("Plan oluşturmak için giriş yapmalısınız");
+      router.push("/login?callbackUrl=/ai-planner");
+      return;
+    }
 
-      // Chat API'yi kullanıyoruz
+    setIsGenerating(true);
+
+    try {
+      // DİKKAT: istemci kendi kimliğini GÖNDERMİYOR. Sunucu kullanıcıyı
+      // oturumdan çözüyor; gövdedeki id/e-posta zaten yok sayılıyordu ve
+      // gönderilmesi yanıltıcı bir güvenlik izlenimi veriyordu.
+      // Uç artık planı DÖNDÜRMÜYOR: bir iş kaydı açıp 202 + jobId veriyor
+      // (bkz. src/lib/plan-job.ts). Üretim 4 dakikaya kadar sürebildiği için
+      // istek-yanıt döngüsünden çıkarıldı.
       const response = await fetch("/api/trip-plan-model", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(formData),
       });
-      
-      const data = await response.json();
-      
+
+      const baslangic = await response.json();
+
       if (!response.ok) {
-        throw new Error(data.error || "Plan oluşturulurken bir Hata oluştu");
+        throw new Error(baslangic.error || "Plan oluşturulurken bir hata oluştu");
       }
-      
-      setTripPlan(data);
+
+      const jobId: string | undefined = baslangic.jobId;
+      if (!jobId) {
+        throw new Error("Plan üretimi başlatılamadı");
+      }
+
+      setIlerlemeMetni(ADIM_METINLERI.basladi);
+
+      // Yoklama: 2 sn aralıkla, en fazla 5 dakika. Üst sınır sunucudaki
+      // toplam süre bütçesinden (240 sn) biraz uzun; asılı kalan işler
+      // sunucu tarafında zaten FAILED'a çekiliyor.
+      const YOKLAMA_ARALIGI_MS = 2000;
+      const AZAMI_SURE_MS = 5 * 60 * 1000;
+      const bitis = Date.now() + AZAMI_SURE_MS;
+
+      let sonuc: TripPlanResponse | null = null;
+
+      while (Date.now() < bitis) {
+        await bekle(YOKLAMA_ARALIGI_MS);
+
+        const durum = await fetch(`/api/plan-jobs/${jobId}`);
+        if (!durum.ok) {
+          throw new Error("Plan durumu okunamadı");
+        }
+
+        const govde = await durum.json();
+        const is = govde.job;
+
+        if (is?.step) {
+          const metin = adimMetni(is.step);
+          if (metin) setIlerlemeMetni(metin);
+        }
+
+        if (is?.status === "FAILED") {
+          throw new Error(is.error || "Plan oluşturulamadı");
+        }
+
+        if (is?.status === "SUCCEEDED" && govde.plan) {
+          sonuc = { success: true, plan: govde.plan };
+          break;
+        }
+      }
+
+      if (!sonuc) {
+        throw new Error(
+          "Plan üretimi beklenenden uzun sürdü. Planlarım sayfasından birazdan kontrol edebilirsiniz."
+        );
+      }
+
+      setTripPlan(sonuc);
       toast.success("Seyahat planınız hazırlandı!");
-      
+
       // Otomatik olarak sonuç bölümüne kaydır
       document.getElementById("trip-plan-result")?.scrollIntoView({ behavior: "smooth" });
     } catch (error) {
       logger.error("Seyahat planı oluşturulamadı", error);
-      toast.error(error instanceof Error ? error.message : "Plan oluşturulurken bir Hata oluştu");
+      toast.error(error instanceof Error ? error.message : "Plan oluşturulurken bir hata oluştu");
     } finally {
       setIsGenerating(false);
+      setIlerlemeMetni("");
     }
   };
 
@@ -213,15 +280,23 @@ export default function PlannerPage() {
     toast.error("Bu özellik henüz geliştirilme aşamasındadır");
   };
 
-  // Planı kaydet
+  /**
+   * Planı görüntülemeye götürür.
+   *
+   * DÜZELTİLEN HATA: bu buton eskiden hiçbir şey yapmadan
+   * "Plan kaydedildi!" mesajı gösteriyordu. Plan zaten üretilir üretilmez
+   * sunucuda kaydediliyor; buton artık kullanıcıyı kaydedilmiş plana
+   * yönlendiriyor.
+   */
   const handleSavePlan = () => {
-    if (!session) {
-      toast.error("Planı kaydetmek için giriş yapmalısınız");
-      router.push("/login?callbackUrl=/ai-planner");
+    const planId = tripPlan?.plan?.tripPlanId;
+
+    if (!planId) {
+      toast.error("Plan kaydedilemedi; lütfen tekrar oluşturmayı deneyin");
       return;
     }
-    
-    toast.success("Plan kaydedildi! Yakında profil sayfanızdan erişebileceksiniz.");
+
+    router.push(`/plan-detail/${planId}`);
   };
 
   // Planı kopyala
@@ -263,68 +338,67 @@ export default function PlannerPage() {
   };
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-blue-900 relative">
+    <main className="min-h-screen p-4 md:p-8 bg-[var(--bg)] relative">
       <Toaster position="top-center" />
       
       {/* Loading Overlay */}
       {isGenerating && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md mx-4 text-center">
+          <div className="bg-[var(--surface)] p-8 rounded-[var(--radius-lg)] border border-[var(--line)] max-w-md mx-4 text-center">
             <div className="relative w-16 h-16 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-blue-200 rounded-full animate-ping"></div>
-              <div className="absolute inset-0 border-4 border-transparent border-t-blue-600 rounded-full animate-spin"></div>
-              <div className="absolute inset-2 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="absolute inset-2 bg-[var(--info-soft)] rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
+            <h3 className="text-xl font-semibold text-[var(--fg-muted)] mb-2">
               Seyahat Planınız Hazırlanıyor
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              AI en iyi rotaları ve önerileri sizin için araştırıyor...
+            <p className="text-[var(--fg-muted)] mb-4">
+              {ilerlemeMetni || "AI en iyi rotaları ve önerileri sizin için araştırıyor..."}
             </p>
-            <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            <p className="text-xs text-[var(--fg-subtle)] dark:text-[var(--fg-subtle)] mb-4">
+              Bu işlem birkaç dakika sürebilir. Sekmeyi kapatsanız bile plan
+              arka planda hazırlanmaya devam eder ve Planlarım&apos;da görünür.
+            </p>
+            <div className="flex items-center justify-center space-x-2 text-sm text-[var(--fg-subtle)]">
             </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto text-gray-800 dark:text-gray-200">
+      <div className="max-w-6xl mx-auto text-[var(--fg-muted)]">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 dark:text-blue-300">
+            <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)]">
               Seyahat Planlaması
             </h1>
-            <p className="text-gray-800 dark:text-gray-300 mt-2 max-w-2xl">
+            <p className="text-[var(--fg)] dark:text-[var(--fg-muted)] mt-2 max-w-2xl">
               Tarihinizi, bütçenizi ve tercihlerinizi belirleyerek kişiselleştirilmiş seyahat planınızı oluşturun.
             </p>
           </div>
           <Link 
             href="/"
-            className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors self-start"
+            className="mt-4 md:mt-0 px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors self-start"
           >
             Ana Sayfaya Dön
           </Link>
         </div>
 
         {/* Form Section */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-6 text-blue-700 dark:text-blue-300">Seyahat Bilgileriniz</h2>
+        <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)] mb-8">
+          <h2 className="text-xl font-semibold mb-6 text-[var(--accent)]">Seyahat Bilgileriniz</h2>
           
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Destination */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="city" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Gidilecek Şehir</label>
+                <label htmlFor="city" className="block text-sm font-medium text-[var(--accent)] mb-1">Gidilecek Şehir</label>
                 <input 
                   type="text" 
                   id="city" 
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]" 
                   placeholder="Örn: İstanbul"
                   value={formData.city}
                   onChange={handleInputChange}
@@ -333,11 +407,11 @@ export default function PlannerPage() {
               </div>
               
               <div>
-                <label htmlFor="country" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Ülke</label>
+                <label htmlFor="country" className="block text-sm font-medium text-[var(--accent)] mb-1">Ülke</label>
                 <input 
                   type="text" 
                   id="country" 
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]" 
                   placeholder="Örn: Türkiye"
                   value={formData.country}
                   onChange={handleInputChange}
@@ -348,11 +422,11 @@ export default function PlannerPage() {
             {/* Dates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Başlangıç Tarihi</label>
+                <label htmlFor="startDate" className="block text-sm font-medium text-[var(--accent)] mb-1">Başlangıç Tarihi</label>
                 <input 
                   type="date" 
                   id="startDate" 
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]" 
                   value={formData.startDate}
                   min={today}
                   onChange={handleInputChange}
@@ -360,11 +434,11 @@ export default function PlannerPage() {
               </div>
               
               <div>
-                <label htmlFor="endDate" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Bitiş Tarihi</label>
+                <label htmlFor="endDate" className="block text-sm font-medium text-[var(--accent)] mb-1">Bitiş Tarihi</label>
                 <input 
                   type="date" 
                   id="endDate" 
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]" 
                   value={formData.endDate}
                   min={formData.startDate || today}
                   onChange={handleInputChange}
@@ -375,10 +449,10 @@ export default function PlannerPage() {
             {/* Travel Style & Budget */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="travelStyle" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Seyahat Tarzı</label>
+                <label htmlFor="travelStyle" className="block text-sm font-medium text-[var(--accent)] mb-1">Seyahat Tarzı</label>
                 <select
                   id="travelStyle"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]"
                   value={formData.travelStyle}
                   onChange={handleInputChange}
                 >
@@ -391,10 +465,10 @@ export default function PlannerPage() {
               </div>
               
               <div>
-                <label htmlFor="budget" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Bütçe</label>
+                <label htmlFor="budget" className="block text-sm font-medium text-[var(--accent)] mb-1">Bütçe</label>
                 <select
                   id="budget"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]"
                   value={formData.budget}
                   onChange={handleInputChange}
                 >
@@ -409,10 +483,10 @@ export default function PlannerPage() {
             {/* Accommodation & Transportation */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="accommodation" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Konaklama Tercihi</label>
+                <label htmlFor="accommodation" className="block text-sm font-medium text-[var(--accent)] mb-1">Konaklama Tercihi</label>
                 <select
                   id="accommodation"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                  className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]"
                   value={formData.accommodation}
                   onChange={handleInputChange}
                 >
@@ -425,17 +499,17 @@ export default function PlannerPage() {
               </div>
               
               <div>
-                <span className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Ulaşım Tercihleri</span>
+                <span className="block text-sm font-medium text-[var(--accent)] mb-2">Ulaşım Tercihleri</span>
                 <div className="flex flex-wrap gap-4">
                   {["Uçak", "Otobüs", "Tren", "Araba", "Toplu Taşıma"].map((item) => (
                     <label key={item} className="inline-flex items-center">
                       <input 
                         type="checkbox" 
-                        className="form-checkbox text-blue-600 dark:bg-gray-700 dark:border-gray-600"
+                        className="form-checkbox text-[var(--accent)] dark:bg-[var(--surface-2)] dark:border-[var(--line-strong)]"
                         checked={formData.transportation.includes(item)}
                         onChange={() => handleCheckboxChange("transportation", item)}
                       />
-                      <span className="ml-2 text-gray-800 dark:text-gray-300">{item}</span>
+                      <span className="ml-2 text-[var(--fg)] dark:text-[var(--fg-muted)]">{item}</span>
                     </label>
                   ))}
                 </div>
@@ -444,17 +518,17 @@ export default function PlannerPage() {
 
             {/* Interests */}
             <div>
-              <span className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">İlgi Alanları</span>
+              <span className="block text-sm font-medium text-[var(--accent)] mb-2">İlgi Alanları</span>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {["Tarihi Yerler", "Müzeler", "Doğa", "Gastronomi", "Alışveriş", "Eğlence", "Plajlar", "Fotoğrafçılık", "Yerel Kültür"].map((item) => (
                   <label key={item} className="inline-flex items-center">
                     <input 
                       type="checkbox" 
-                      className="form-checkbox text-blue-600 dark:bg-gray-700 dark:border-gray-600"
+                      className="form-checkbox text-[var(--accent)] dark:bg-[var(--surface-2)] dark:border-[var(--line-strong)]"
                       checked={formData.interests.includes(item)}
                       onChange={() => handleCheckboxChange("interests", item)}
                     />
-                    <span className="ml-2 text-gray-800 dark:text-gray-300">{item}</span>
+                    <span className="ml-2 text-[var(--fg)] dark:text-[var(--fg-muted)]">{item}</span>
                   </label>
                 ))}
               </div>
@@ -462,11 +536,11 @@ export default function PlannerPage() {
 
             {/* Special Requirements */}
             <div>
-              <label htmlFor="specialRequirements" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Özel Gereksinimler</label>
+              <label htmlFor="specialRequirements" className="block text-sm font-medium text-[var(--accent)] mb-1">Özel Gereksinimler</label>
               <textarea 
                 id="specialRequirements" 
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                className="w-full px-4 py-2 border border-[var(--line-strong)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] bg-[var(--surface)] text-[var(--fg-muted)]" 
                 placeholder="Seyahatinizle ilgili özel gereksinimler veya notlar..."
                 value={formData.specialRequirements}
                 onChange={handleInputChange}
@@ -478,13 +552,11 @@ export default function PlannerPage() {
               <button 
                 type="submit"
                 disabled={isGenerating}
-                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transform hover:scale-105"
+                className="px-8 py-4 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] font-semibold hover:bg-[var(--accent-hover)] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {isGenerating ? (
                   <>
                     <div className="relative mr-3">
-                      <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <div className="absolute inset-0 w-6 h-6 border-2 border-transparent border-t-blue-200 rounded-full animate-pulse"></div>
                     </div>
                     <span className="animate-pulse">AI Seyahat Planınızı oluşturuyor...</span>
                   </>
@@ -505,7 +577,7 @@ export default function PlannerPage() {
         {tripPlan && (
           <div id="trip-plan-result" className="space-y-6">
             {/* Plan Header Card */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-xl shadow-lg">
+            <div className="bg-[var(--accent)] text-white p-6 rounded-[var(--radius-lg)] border border-[var(--line)]">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start space-x-4">
                   <div className="bg-white/20 p-3 rounded-lg">
@@ -517,18 +589,18 @@ export default function PlannerPage() {
                   <div>
                     <h2 className="text-2xl font-bold mb-2">
                        {tripPlan.plan.city}
-                      {tripPlan.plan.country && <span className="text-blue-100"> · {tripPlan.plan.country}</span>}
+                      {tripPlan.plan.country && <span className="text-[var(--accent)]"> · {tripPlan.plan.country}</span>}
                     </h2>
                     {tripPlan.plan.startDate && tripPlan.plan.endDate && (
-                      <p className="text-blue-100 mb-1">
+                      <p className="text-[var(--accent)] mb-1">
                         {new Date(tripPlan.plan.startDate).toLocaleDateString('tr-TR')} - {new Date(tripPlan.plan.endDate).toLocaleDateString('tr-TR')}
                       </p>
                     )}
                     {tripPlan.plan.duration && (
-                      <p className="text-blue-100"> {tripPlan.plan.duration}</p>
+                      <p className="text-[var(--accent)]"> {tripPlan.plan.duration}</p>
                     )}
                     {tripPlan.plan.metadata && (
-                      <p className="text-blue-100 text-sm mt-2">
+                      <p className="text-[var(--accent)] text-sm mt-2">
                          {new Date(tripPlan.plan.metadata.generatedAt).toLocaleString('tr-TR')} tarihinde oluşturuldu
                       </p>
                     )}
@@ -538,7 +610,7 @@ export default function PlannerPage() {
                 <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
                   <button
                     onClick={handleSavePlan}
-                    className="px-4 py-2 bg-white text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50 transition flex items-center justify-center shadow-md"
+                    className="px-4 py-2 bg-white text-[var(--accent)] rounded-lg text-sm font-medium hover:bg-blue-50 transition flex items-center justify-center"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -560,7 +632,7 @@ export default function PlannerPage() {
             </div>
 
             {/* Plan Content Card */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] overflow-hidden">
               <div className="p-6">
                 <div className="prose prose-lg prose-blue dark:prose-invert max-w-none">
                   <style jsx global>{`
@@ -573,14 +645,13 @@ export default function PlannerPage() {
                       font-weight: 800;
                     }
                     .prose h2 {
-                      color: #1e40af;
-                      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-                      padding: 1rem 1.5rem;
-                      border-radius: 0.75rem;
-                      border-left: 4px solid #3b82f6;
-                      margin: 2rem 0 1rem 0;
+                      color: var(--fg);
+                      font-family: var(--font-serif);
+                      padding-bottom: 0.5rem;
+                      border-bottom: 1px solid var(--line);
+                      margin: 2.5rem 0 1rem 0;
                       font-size: 1.5rem;
-                      font-weight: 700;
+                      font-weight: 600;
                     }
                     .prose h3 {
                       color: #1e40af;
@@ -637,11 +708,11 @@ export default function PlannerPage() {
                       font-weight: 500;
                     }
                     .prose blockquote {
-                      background: #ecfdf5;
-                      border-left: 4px solid #10b981;
-                      padding: 1rem 1.5rem;
+                      background: var(--surface-2);
+                      border-left: 1px solid var(--accent);
+                      padding: 0.75rem 1.25rem;
                       margin: 1.5rem 0;
-                      border-radius: 0 0.5rem 0.5rem 0;
+                      border-radius: 0 var(--radius) var(--radius) 0;
                       font-style: normal;
                     }
                     .prose blockquote p {
@@ -871,27 +942,27 @@ export default function PlannerPage() {
               </div>
               
               {/* Plan Footer */}
-              <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+              <div className="bg-[var(--surface-2)] px-6 py-4 border-t border-[var(--line)]">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center text-sm text-[var(--fg-muted)]">
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>Bu plan AI tarafından oluşturulmuştur. Güncel bilgileri kontrol etmeyi unutmayın.</span>
                   </div>
                   {tripPlan.plan.metadata?.model && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 sm:mt-0 space-y-1">
+                    <div className="text-xs text-[var(--fg-subtle)] mt-2 sm:mt-0 space-y-1">
                       <div>Model: {tripPlan.plan.metadata.model}</div>
                       {tripPlan.plan.tripPlanId && (
                         <div className="flex items-center space-x-1">
                           <span> DB ID:</span>
-                          <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded text-xs">
+                          <code className="bg-[var(--surface-2)] px-1 rounded text-xs">
                             {tripPlan.plan.tripPlanId}
                           </code>
                         </div>
                       )}
                       {tripPlan.plan.metadata.savedToDatabase && (
-                        <div className="text-green-600 dark:text-green-400">
+                        <div className="text-[var(--accent)]">
                           Veritabanında saklandı
                         </div>
                       )}
@@ -902,9 +973,9 @@ export default function PlannerPage() {
             </div>
 
             {/* Quick Actions Card */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)]">
+              <h3 className="text-lg font-semibold text-[var(--fg-muted)] mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Hızlı İşlemler
@@ -912,7 +983,7 @@ export default function PlannerPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button 
                   onClick={handleSharePlan}
-                  className="flex items-center justify-center px-4 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition"
+                  className="flex items-center justify-center px-4 py-3 bg-blue-50 dark:bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg hover:bg-[var(--accent-soft)] dark:hover:bg-[var(--accent-soft)] transition"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
@@ -922,7 +993,7 @@ export default function PlannerPage() {
                 
                 <button 
                   onClick={handleCopyPlan}
-                  className="flex items-center justify-center px-4 py-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition"
+                  className="flex items-center justify-center px-4 py-3 bg-[var(--ok-soft)] text-[var(--ok)] rounded-lg hover:bg-[var(--ok-soft)] dark:hover:bg-[var(--ok-soft)] transition"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -932,7 +1003,7 @@ export default function PlannerPage() {
                 
                 <button 
                   onClick={() => window.print()}
-                  className="flex items-center justify-center px-4 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition"
+                  className="flex items-center justify-center px-4 py-3 bg-purple-50 dark:bg-[var(--surface-2)] text-[var(--fg)] dark:text-[var(--fg)] rounded-lg hover:bg-[var(--surface-2)] dark:hover:bg-[var(--surface-2)] transition"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -942,7 +1013,7 @@ export default function PlannerPage() {
                 
                 <button 
                   onClick={() => setTripPlan(null)}
-                  className="flex items-center justify-center px-4 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition"
+                  className="flex items-center justify-center px-4 py-3 bg-[var(--danger-soft)] text-[var(--danger)] rounded-lg hover:bg-[var(--danger-soft)] dark:hover:bg-[var(--danger-soft)] transition"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -957,14 +1028,14 @@ export default function PlannerPage() {
         
         
         {/* Sonuç Bölümü */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-blue-900/60 p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700 dark:text-blue-300">Sonuç</h2>
-          <p className="text-gray-800 dark:text-gray-300 font-medium mb-4">
+        <div className="bg-[var(--bg)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)] mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-[var(--accent)]">Sonuç</h2>
+          <p className="text-[var(--fg)] dark:text-[var(--fg-muted)] font-medium mb-4">
             Bu sistem, yapay zeka destekli tatil planlama çözümleri arasında kullanıcı dostu, özelleştirilebilir ve ekonomik bir seçenek sunmayı hedeflemektedir. İlk etapta temel işlevler (şehir seçimi, mekan önerisi, rota, bütçe) geliştirilecek; sonraki aşamalarda çoklu şehir planlama, sosyal paylaşım, konaklama entegrasyonu gibi ek özellikler eklenebilir.
           </p>
         </div>
         
-        <div className="mt-8 text-sm text-gray-800 dark:text-gray-400 text-center">
+        <div className="mt-8 text-sm text-[var(--fg)] dark:text-[var(--fg-subtle)] text-center">
           &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
         </div>
       </div>

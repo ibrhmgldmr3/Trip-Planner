@@ -2,6 +2,13 @@ import {
   BUTCE_KATEGORILERI,
   type TripPlanStructured,
 } from "@/lib/trip-plan-schema";
+import { isoGunTarihi, gunlukOrtalama } from "@/lib/trip-dates";
+import {
+  guvenliKaynakUrl,
+  REZERV_ORANI,
+  type KaynakDogrulayici,
+  type Koordinat,
+} from "@/lib/plan-budget";
 
 /**
  * Yapılandırılmış planı, mevcut tüketicilerin (plan-detail, budget,
@@ -28,6 +35,8 @@ interface SerializedActivity {
   description: string;
   category: string;
   location: string;
+  /** Üretimden sonra geocoding adımında dolduruluyor (bkz. geocoding.ts). */
+  coordinates?: Koordinat;
 }
 
 interface SerializedDay {
@@ -39,7 +48,7 @@ interface SerializedDay {
 }
 
 interface SerializedBudgetCategory {
-  items: Array<{ description: string; amount: number; isPaid: boolean }>;
+  items: Array<{ description: string; amount: number; isPaid: boolean; source?: string }>;
   total: number;
 }
 
@@ -70,18 +79,6 @@ function saatiNormalizeEt(value: string): string {
 
   const hour = Math.min(23, Number.parseInt(match[1], 10));
   return `${String(hour).padStart(2, "0")}:${match[2]}`;
-}
-
-/** Gün numarasından ISO tarih üretir; başlangıç tarihi yoksa boş döner. */
-function gunTarihi(startDate: string | undefined, dayIndex: number): string {
-  if (!startDate) return "";
-
-  const start = new Date(startDate);
-  if (Number.isNaN(start.getTime())) return "";
-
-  const date = new Date(start.getTime());
-  date.setDate(date.getDate() + dayIndex);
-  return date.toISOString().slice(0, 10);
 }
 
 function paraFormatla(value: number): string {
@@ -207,7 +204,7 @@ function gunleriSerilestir(plan: TripPlanStructured, startDate?: string): Serial
 
     return {
       day: gunNo,
-      date: gunTarihi(startDate, index),
+      date: isoGunTarihi(startDate, index),
       notes: day.notes.trim(),
       isEmpty: day.activities.length === 0,
       activities: day.activities.map((activity, activityIndex) => ({
@@ -230,18 +227,31 @@ function gunleriSerilestir(plan: TripPlanStructured, startDate?: string): Serial
  * Modelin verdiği `total` kategori toplamlarıyla uyuşmuyorsa kategori
  * toplamı esas alınır (modeller toplamayı sık yanlış yapıyor).
  */
-function butceyiSerilestir(plan: TripPlanStructured): SerializedBudget {
+function butceyiSerilestir(
+  plan: TripPlanStructured,
+  gunSayisi: number,
+  kaynakDogrulayici?: KaynakDogrulayici
+): SerializedBudget {
   const categories: Record<string, SerializedBudgetCategory> = {};
   let kategoriToplami = 0;
 
   for (const kategori of BUTCE_KATEGORILERI) {
     const details = plan.budget.categories[kategori];
-    const items = details.items.map((item) => ({
-      description: item.description.trim() || "Kalem",
-      amount: Math.max(0, Math.round(item.amount)),
-      // Tahmini kalemler ödenmemiş sayılır; budget sayfası bu alanı bekliyor.
-      isPaid: false,
-    }));
+    const items = details.items.map((item) => {
+      // Model uydurma ya da tehlikeli bir şema (`javascript:`) üretmiş
+      // olabilir; geçersizse alan sessizce düşüyor, kalem korunuyor.
+      // `kaynakDogrulayici` verildiğinde ayrıca adresin gerçekten bir araç
+      // sonucundan geldiği doğrulanıyor (Faz F beyaz listesi).
+      const kaynak = guvenliKaynakUrl(item.source, kaynakDogrulayici);
+
+      return {
+        description: item.description.trim() || "Kalem",
+        amount: Math.max(0, Math.round(item.amount)),
+        // Tahmini kalemler ödenmemiş sayılır; budget sayfası bu alanı bekliyor.
+        isPaid: false,
+        ...(kaynak ? { source: kaynak } : {}),
+      };
+    });
 
     const kalemToplami = items.reduce((sum, item) => sum + item.amount, 0);
     const total = Math.max(0, Math.round(details.total)) || kalemToplami;
@@ -256,9 +266,12 @@ function butceyiSerilestir(plan: TripPlanStructured): SerializedBudget {
     kategoriToplami > 0 && Math.abs(modelToplami - kategoriToplami) > kategoriToplami * 0.1;
   const total = sapmaBuyuk || modelToplami === 0 ? kategoriToplami : modelToplami;
 
-  const gunSayisi = Math.max(1, plan.days.length);
+  // Gün sayısı ÖNCE gerçek tarih aralığından geliyor; modelin döndürdüğü
+  // gün sayısı istenenden azsa (sık oluyor) günlük ortalama şişerdi.
+  const bolen = gunSayisi > 0 ? gunSayisi : Math.max(1, plan.days.length);
   const modelGunluk = Math.max(0, Math.round(plan.budget.dailyAverage));
-  const dailyAverage = modelGunluk > 0 && modelGunluk <= total ? modelGunluk : Math.round(total / gunSayisi);
+  const dailyAverage =
+    modelGunluk > 0 && modelGunluk <= total ? modelGunluk : gunlukOrtalama(total, bolen);
 
   return {
     categories,
@@ -266,8 +279,10 @@ function butceyiSerilestir(plan: TripPlanStructured): SerializedBudget {
     extraItemsTotal: 0,
     // plan-detail `totalCostWithExtras`a öncelik veriyor.
     totalCostWithExtras: total,
-    // plan-detail'in kendi konvansiyonu: önerilen bütçe = toplam * 1.2
-    suggestedBudget: Math.round(total * 1.2),
+    // Katsayı tek yerde: plan-budget.ts. Bütçe sayfası eskiden 1.25
+    // kullanıyordu ve aynı plan iki ekranda farklı "önerilen bütçe"
+    // gösteriyordu.
+    suggestedBudget: Math.round(total * REZERV_ORANI),
     dailyAverage,
   };
 }
@@ -275,10 +290,24 @@ function butceyiSerilestir(plan: TripPlanStructured): SerializedBudget {
 /** Yapılandırılmış planı DB kolonlarına ve tam markdown'a çevirir. */
 export function serializeStructuredPlan(
   plan: TripPlanStructured,
-  options: { startDate?: string; endDate?: string } = {}
+  options: {
+    startDate?: string;
+    endDate?: string;
+    gunSayisi?: number;
+    /**
+     * Bu üretimde araçların döndürdüğü adresler. Verildiğinde bütçe
+     * kalemlerinin `source` alanı bu listeyle sınırlanıyor; verilmezse
+     * (araçsız üretim) yalnızca şema kontrolü yapılıyor.
+     */
+    kaynakDogrulayici?: KaynakDogrulayici;
+  } = {}
 ): SerializedTripPlan {
   const days = gunleriSerilestir(plan, options.startDate);
-  const budget = butceyiSerilestir(plan);
+  const budget = butceyiSerilestir(
+    plan,
+    options.gunSayisi ?? days.length,
+    options.kaynakDogrulayici
+  );
 
   const sehir_bilgisi = sehirBilgisiMarkdown(plan);
   const yemek_rehberi = yemekRehberiMarkdown(plan);

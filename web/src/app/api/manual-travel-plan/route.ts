@@ -1,145 +1,155 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
+import { rateLimitAsync } from "@/lib/rate-limit";
+import { manualPlanSchema, ilkHataMesaji } from "@/lib/api-schemas";
+import { gunSayisi, isoGunTarihi, gunlukOrtalama, tarihiCoz } from "@/lib/trip-dates";
 import { logger } from "@/lib/logger";
 
-
-interface ManualTravelPlan {
-  basicInfo: {
-    destination: string;
-    country: string;
-    startDate: string;
-    endDate: string;
-    travelers: number;
-    travelStyle: string;
-  };
-  transport: {
-    id: string;
-    type: string;
-    provider: string;
-    price: number;
-    duration: string;
-    departure: string;
-    arrival: string;
-  } | null;
-  accommodation: {
-    id: string;
-    name: string;
-    type: string;
-    rating: number;
-    price: number;
-    location: string;
-    amenities: string[];
-  } | null;
-  dailyPlans: Array<{
-    day: number;
-    activities: string[];
-    notes: string;
-    isEmpty: boolean;
-  }>;
-  budget: {
-    currentBudget: number;
-    estimatedTotal: number;
-    breakdown: {
-      transport: number;
-      accommodation: number;
-      activities: number;
-      food: number;
-      other: number;
-    };
-  };
-}
-
+/**
+ * Manuel plan kaydı.
+ *
+ * Bu dosyada düzeltilen sorunlar:
+ *  1. Uç KİMLİK DOĞRULAMASIZDI. Herkes POST atıp veritabanına satır
+ *     yazabiliyordu (userId null kalıyor, plan hiçbir kullanıcıya
+ *     görünmüyor ama tabloda birikiyordu).
+ *  2. Gövde hiç doğrulanmıyordu; `planData.basicInfo.destination` erişimi
+ *     `basicInfo` yoksa TypeError fırlatıyor, catch bloğu da yanıtta
+ *     `error.stack` döndürüyordu.
+ *  3. Süre `Math.ceil((end - start) / GUN)` ile DIŞLAYICI hesaplanıyordu;
+ *     1-5 Ocak seyahati 4 gün sayılıyor ve `daily_cost` şişiyordu.
+ *  4. Bitiş tarihi başlangıçtan önce olabiliyordu; `duration` negatif
+ *     çıkınca `daily_cost` de negatif kaydediliyordu.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const planData: ManualTravelPlan = await request.json();
-    
-    // Veri doğrulaması
-    if (!planData.basicInfo.destination || !planData.basicInfo.startDate || !planData.basicInfo.endDate) {
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
+
+    // Yazma ucu: kullanıcı başına makul bir tavan.
+    const quota = await rateLimitAsync(`manual-plan:${userId}`, 30, 60 * 60 * 1000);
+    if (!quota.success) {
       return NextResponse.json(
-        { error: "Hedef şehir ve tarihler gereklidir" },
+        { error: "Çok fazla plan kaydettiniz, bir süre sonra tekrar deneyin" },
+        { status: 429, headers: { "Retry-After": String(quota.retryAfter) } }
+      );
+    }
+
+    const parsed = manualPlanSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: ilkHataMesaji(parsed.error, "Plan bilgileri geçersiz") },
         { status: 400 }
       );
     }
 
-    // Session'daki id bayat bir JWT'den gelebilir; TripPlan.user_id'ye FK
-    // eklendiği için kullanıcıyı veritabanından doğruluyoruz.
-    let userId: string | null = null;
-    let userEmail: string | null = null;
+    const planData = parsed.data;
+    const { basicInfo, budget } = planData;
 
-    try {
-      const session = await getServerSession(authOptions);
-      if (session?.user?.email) {
-        const user = await prisma.user.findUnique({
-          where: { email: session.user.email },
-          select: { id: true, email: true },
-        });
-        userId = user?.id ?? null;
-        userEmail = user?.email ?? null;
-      }
-    } catch (sessionError) {
-      logger.error("Oturum bilgisi alınamadı", sessionError);
+    const startDate = tarihiCoz(basicInfo.startDate);
+    const endDate = tarihiCoz(basicInfo.endDate);
+
+    if (!startDate || !endDate) {
+      return NextResponse.json({ error: "Geçersiz tarih formatı" }, { status: 400 });
     }
 
-    // Günlük planları JSON string'e çevir
-    const dailyPlansJson = JSON.stringify(planData.dailyPlans);
-    
-    // Ulaşım bilgileri JSON string'e çevir
-    const transportJson = planData.transport ? JSON.stringify(planData.transport) : null;
-    
-    // Konaklama bilgileri JSON string'e çevir
-    const accommodationJson = planData.accommodation ? JSON.stringify(planData.accommodation) : null;
+    if (endDate < startDate) {
+      return NextResponse.json(
+        { error: "Bitiş tarihi başlangıç tarihinden önce olamaz" },
+        { status: 400 }
+      );
+    }
 
-    // Seyahat süresini hesapla
-    const startDate = new Date(planData.basicInfo.startDate);
-    const endDate = new Date(planData.basicInfo.endDate);
-    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    // Gidiş ve dönüş aynı gün ise 1 gün olarak hesapla
-    const duration = daysDiff === 0 ? 1 : daysDiff;
+    const duration = gunSayisi(startDate, endDate);
+    const estimatedTotal = Math.max(0, Math.round(budget.estimatedTotal));
 
-    // Veritabanına kaydet
+    // Günlük planlara tarih ekleyip tüketicilerin (daily-planner, plan-detail)
+    // beklediği şekle getiriyoruz; bu iki sayfa `date` alanını okuyor.
+    const gunler = planData.dailyPlans.map((day, index) => ({
+      day: day.day > 0 ? day.day : index + 1,
+      date: isoGunTarihi(startDate, index),
+      activities: day.activities,
+      notes: day.notes,
+      isEmpty: day.activities.length === 0,
+    }));
+
+    // Bütçe, plan-detail ve budget sayfalarının tanıdığı kategori şekline
+    // çevriliyor. Eskiden ham `breakdown` objesi yazılıyordu; o şekilde
+    // `categories` anahtarı olmadığı için iki sayfa da kalemleri gösteremiyordu.
+    const kategoriAdlari: Record<keyof typeof budget.breakdown, string> = {
+      transport: "ulaşım",
+      accommodation: "konaklama",
+      activities: "aktiviteler",
+      food: "yemek",
+      other: "diğer",
+    };
+
+    const categories: Record<
+      string,
+      { items: Array<{ description: string; amount: number; isPaid: boolean }>; total: number }
+    > = {};
+
+    for (const [anahtar, tutar] of Object.entries(budget.breakdown)) {
+      const ad = kategoriAdlari[anahtar as keyof typeof budget.breakdown];
+      const miktar = Math.max(0, Math.round(tutar));
+      categories[ad] = {
+        items: miktar > 0 ? [{ description: `${ad} (manuel)`, amount: miktar, isPaid: false }] : [],
+        total: miktar,
+      };
+    }
+
+    const kategoriToplami = Object.values(categories).reduce((sum, c) => sum + c.total, 0);
+    const toplam = estimatedTotal > 0 ? estimatedTotal : kategoriToplami;
+    const gunlukMaliyet = gunlukOrtalama(toplam, duration);
+
+    const butceJson = {
+      categories,
+      currency: "TRY",
+      extraItemsTotal: 0,
+      totalCostWithExtras: toplam,
+      suggestedBudget: Math.round(toplam * 1.2),
+      dailyAverage: gunlukMaliyet,
+    };
+
     const savedPlan = await prisma.tripPlan.create({
       data: {
-        // Temel bilgiler
-        city: planData.basicInfo.destination,
-        country: planData.basicInfo.country || null,
-        startDate: startDate,
-        endDate: endDate,
+        city: basicInfo.destination,
+        country: basicInfo.country || null,
+        startDate,
+        endDate,
         duration: `${duration} gün`,
-        
-        // Manuel plan verileri (JSON olarak)
-        gun_plani: dailyPlansJson,
-        
-        // Seçilen hizmetler
-        transportation: transportJson,
-        accommodation: accommodationJson,
-        
-        // Bütçe bilgileri
-        total_cost: planData.budget.estimatedTotal,
-        budget_level: planData.basicInfo.travelStyle,
-        
-        // Meta veriler
+
+        gun_plani: JSON.stringify(gunler),
+
+        // Seçilen hizmetler ham JSON olarak saklanıyor (geriye uyumluluk).
+        transportation: planData.transport ? JSON.stringify(planData.transport) : null,
+        accommodation: planData.accommodation ? JSON.stringify(planData.accommodation) : null,
+
+        total_cost: toplam,
+        daily_cost: gunlukMaliyet,
+        budget_level: basicInfo.travelStyle || null,
+
         ai_model: "manual_planning",
-        raw_markdown: `# ${planData.basicInfo.destination} Seyahat Planı\n\n## Tarih: ${planData.basicInfo.startDate} - ${planData.basicInfo.endDate}\n\n## Kişi Sayısı: ${planData.basicInfo.travelers}\n\n## Toplam Maliyet: ₺${planData.budget.estimatedTotal}`,
-        
-        // Diğer alanlar
-        travel_style: planData.basicInfo.travelStyle,
-        interests: JSON.stringify(['manuel_planlama']),
-        
-        // Maliyet detayları
-        daily_cost: Math.round(planData.budget.estimatedTotal / duration),
-        
-        // Plan türü
-        sehir_bilgisi: `Manuel olarak planlanmış ${planData.basicInfo.destination} seyahati`,
-        pratik_bilgiler: `${planData.basicInfo.travelers} kişi için ${duration} günlük plan`,
-        butce_tahmini: JSON.stringify(planData.budget.breakdown),
-        
-        // Sahiplik userId üzerinden. userEmail geçiş süresince yazılmaya
-        // devam ediyor; ayrı bir migration'da düşürülecek.
-        userId: userId,
-        userEmail: userEmail,
-      }
+        raw_markdown: [
+          `# ${basicInfo.destination} Seyahat Planı`,
+          `## Tarih: ${basicInfo.startDate} - ${basicInfo.endDate}`,
+          `## Kişi Sayısı: ${basicInfo.travelers}`,
+          `## Toplam Maliyet: ₺${toplam.toLocaleString("tr-TR")}`,
+        ].join("\n\n"),
+
+        travel_style: basicInfo.travelStyle || null,
+        interests: JSON.stringify(["manuel_planlama"]),
+
+        sehir_bilgisi: `Manuel olarak planlanmış ${basicInfo.destination} seyahati`,
+        pratik_bilgiler: `${basicInfo.travelers} kişi için ${duration} günlük plan`,
+        butce_tahmini: JSON.stringify(butceJson),
+
+        // Sahiplik yalnızca userId üzerinden. `userEmail` sütunu
+        // 20260831 migration'ında düşürüldü.
+        userId,
+      },
     });
 
     logger.info("Manuel plan kaydedildi", { planId: savedPlan.id });
@@ -150,34 +160,19 @@ export async function POST(request: NextRequest) {
       message: "Seyahat planınız başarıyla kaydedildi!",
       plan: {
         id: savedPlan.id,
-        destination: planData.basicInfo.destination,
-        duration: duration,
-        totalCost: planData.budget.estimatedTotal,
-        createdAt: savedPlan.createdAt
-      }
-    });
-
-  } catch (error: unknown) {
-    logger.error("Manuel plan kaydedilemedi", error);
-    
-    const errorDetails = error instanceof Error 
-      ? { 
-          name: error.name, 
-          message: error.message,
-          stack: error.stack 
-        }
-      : { 
-          unknown: "Bilinmeyen hata tipi",
-          value: String(error)
-        };
-    
-    return NextResponse.json(
-      { 
-        error: "Plan kaydedilirken bir hata oluştu",
-        details: errorDetails
+        destination: basicInfo.destination,
+        duration,
+        totalCost: toplam,
+        createdAt: savedPlan.createdAt,
       },
+    });
+  } catch (error: unknown) {
+    // Ayrıntı yalnızca sunucu log'una; istemciye stack trace sızdırmıyoruz.
+    logger.error("Manuel plan kaydedilemedi", error);
+
+    return NextResponse.json(
+      { error: "Plan kaydedilirken bir hata oluştu" },
       { status: 500 }
     );
   }
 }
-

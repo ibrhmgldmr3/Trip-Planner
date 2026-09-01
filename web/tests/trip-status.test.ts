@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TripStatus } from "@prisma/client";
+// TripStatus artik @prisma/client'tan degil, yerel modulden geliyor:
+// bu sayede test (ve client bundle'i) Prisma uretimine bagimli degil.
 import {
+  TripStatus,
+  TRIP_STATUSES,
   canCancel,
   canMarkAsDone,
+  canTransition,
   getStatusColor,
   getStatusLabel,
   getTripStatus,
+  isTripStatus,
+  transitionError,
 } from "@/lib/trip-status";
 
 /** Yerel saatte gün başına sabitlenmiş tarih üretir (UTC kaymasını önler). */
@@ -172,6 +178,90 @@ describe("canMarkAsDone", () => {
         canCancel(status) && canMarkAsDone(status),
         `${status} için iki eylem birden açık`
       ).toBe(false);
+    }
+  });
+});
+
+
+describe("isTripStatus", () => {
+  it("bilinen durumlari kabul eder", () => {
+    for (const durum of TRIP_STATUSES) {
+      expect(isTripStatus(durum)).toBe(true);
+    }
+  });
+
+  it("bilinmeyen degerleri reddeder", () => {
+    expect(isTripStatus("PLANLANDI")).toBe(false);
+    expect(isTripStatus("")).toBe(false);
+    expect(isTripStatus(null)).toBe(false);
+    expect(isTripStatus(undefined)).toBe(false);
+    expect(isTripStatus(1)).toBe(false);
+    expect(isTripStatus({})).toBe(false);
+  });
+});
+
+describe("canTransition", () => {
+  it("ayni duruma gecis idempotenttir", () => {
+    for (const durum of TRIP_STATUSES) {
+      expect(canTransition(durum, durum)).toBe(true);
+    }
+  });
+
+  it("PLANNED'dan izin verilen gecisler", () => {
+    expect(canTransition(TripStatus.PLANNED, TripStatus.ACTIVE)).toBe(true);
+    expect(canTransition(TripStatus.PLANNED, TripStatus.COMPLETED)).toBe(true);
+    expect(canTransition(TripStatus.PLANNED, TripStatus.CANCELLED)).toBe(true);
+    // Henuz baslamamis plan "Gerceklesti" olamaz.
+    expect(canTransition(TripStatus.PLANNED, TripStatus.DONE)).toBe(false);
+  });
+
+  it("COMPLETED'dan DONE'a gecilebilir", () => {
+    expect(canTransition(TripStatus.COMPLETED, TripStatus.DONE)).toBe(true);
+  });
+
+  it("CANCELLED ve DONE uc durumdur", () => {
+    for (const hedef of TRIP_STATUSES) {
+      if (hedef === TripStatus.CANCELLED) continue;
+      expect(canTransition(TripStatus.CANCELLED, hedef)).toBe(false);
+    }
+    for (const hedef of TRIP_STATUSES) {
+      if (hedef === TripStatus.DONE) continue;
+      expect(canTransition(TripStatus.DONE, hedef)).toBe(false);
+    }
+  });
+
+  it("geriye donuk gecisler kapali", () => {
+    expect(canTransition(TripStatus.ACTIVE, TripStatus.PLANNED)).toBe(false);
+    expect(canTransition(TripStatus.COMPLETED, TripStatus.ACTIVE)).toBe(false);
+  });
+
+  it("canCancel ile tutarli", () => {
+    for (const durum of TRIP_STATUSES) {
+      if (durum === TripStatus.CANCELLED) continue;
+      expect(canTransition(durum, TripStatus.CANCELLED)).toBe(canCancel(durum));
+    }
+  });
+
+  it("canMarkAsDone ile tutarli", () => {
+    for (const durum of TRIP_STATUSES) {
+      if (durum === TripStatus.DONE) continue;
+      expect(canTransition(durum, TripStatus.DONE)).toBe(canMarkAsDone(durum));
+    }
+  });
+});
+
+describe("transitionError", () => {
+  it("iki durumun Turkce etiketini icerir", () => {
+    const mesaj = transitionError(TripStatus.CANCELLED, TripStatus.ACTIVE);
+    expect(mesaj).toContain(getStatusLabel(TripStatus.CANCELLED));
+    expect(mesaj).toContain(getStatusLabel(TripStatus.ACTIVE));
+  });
+});
+
+describe("getStatusColor", () => {
+  it("her durum icin bos olmayan bir sinif dizisi doner", () => {
+    for (const durum of TRIP_STATUSES) {
+      expect(getStatusColor(durum).length).toBeGreaterThan(0);
     }
   });
 });

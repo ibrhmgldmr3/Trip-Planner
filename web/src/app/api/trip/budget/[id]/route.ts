@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
+import { requireOwnedSubresource } from "@/lib/trip-ownership";
 import { logger } from "@/lib/logger";
 
 export async function GET(
@@ -9,11 +9,10 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
 
     const { id: itemId } = await context.params;
 
@@ -24,24 +23,22 @@ export async function GET(
       );
     }
 
-    // Fetch the budget item with its trip to verify ownership
+    const sahiplik = await requireOwnedSubresource(
+      prisma.budgetItem,
+      itemId,
+      userId,
+      "Bütçe kalemi bulunamadı"
+    );
+    if (!sahiplik.ok) return sahiplik.response;
+
     const budgetItem = await prisma.budgetItem.findUnique({
       where: { id: itemId },
-      include: { trip: true }
     });
 
     if (!budgetItem) {
       return NextResponse.json(
-        { error: "Budget item not found" },
+        { error: "Bütçe kalemi bulunamadı" },
         { status: 404 }
-      );
-    }
-
-    // Verify ownership
-    if (budgetItem.trip.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "You don't have permission to access this item" },
-        { status: 403 }
       );
     }
 

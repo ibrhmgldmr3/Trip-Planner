@@ -5,6 +5,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Toaster, toast } from "react-hot-toast";
 import { logger } from "@/lib/logger";
+import {
+  GirisGerekli,
+} from "@/components/ui";
 
 interface Trip {
   id: string;
@@ -88,7 +91,7 @@ export default function MyTripsPage() {
 
   // Status rengi (DONE için özel renk)
   const getStatusColor = (): string => {
-    return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+    return 'bg-[var(--ok-soft)] text-[var(--ok)] dark:bg-[var(--ok-soft)] dark:text-[var(--ok)]';
   };
 
   // Status text (DONE için özel text)
@@ -99,10 +102,9 @@ export default function MyTripsPage() {
   // Loading durumu
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-xl text-[var(--fg-muted)]">
             Seyahatler yükleniyor...
           </p>
         </div>
@@ -112,41 +114,18 @@ export default function MyTripsPage() {
 
   // Giriş yapmamış kullanıcı
   if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
-          >
-            Giriş Yap
-          </button>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
-          >
-            Ana Sayfaya Dön
-          </button>
-        </div>
-      </div>
-    );
+    return <GirisGerekli />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Bir Hata Oluştu</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+          <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">Bir Hata Oluştu</h2>
+          <p className="text-[var(--fg-muted)] mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-2 rounded-lg hover:bg-[var(--accent-hover)]"
           >
             Tekrar Dene
           </button>
@@ -156,15 +135,15 @@ export default function MyTripsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
+    <div className="min-h-screen bg-[var(--bg)]">
       <Toaster position="top-right" />
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-3">
              Gerçekleşen Seyahatlerim
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-[var(--fg-muted)]">
             Başarıyla tamamladığınız seyahatlerinizin geçmişi
           </p>
         </div>
@@ -173,19 +152,19 @@ export default function MyTripsPage() {
         <div className="text-center mb-8 flex justify-center space-x-4">
           <button
             onClick={() => router.push('/profile')}
-            className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors"
+            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             Profile Dön
           </button>
           <button
             onClick={() => router.push('/my-plans')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             Planlarım
           </button>
           <button
             onClick={() => router.push('/travel-mode')}
-            className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
+            className="bg-[var(--accent)] text-white px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             + Yeni Plan Oluştur
           </button>
@@ -194,22 +173,21 @@ export default function MyTripsPage() {
         {/* Trips List */}
         {trips.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4"></div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+            <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
               Henüz Gerçekleştirilmiş Seyahat Yok
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-[var(--fg-muted)] mb-6">
               Bir planı &quot;DONE&quot; olarak işaretlediğinizde buraya eklenir.
             </p>
             <button
               onClick={() => router.push('/my-plans')}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
+              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] mr-4"
             >
               Planlarımı Gör
             </button>
             <button
               onClick={() => router.push('/travel-mode')}
-              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600"
+              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)]"
             >
               + Yeni Plan Oluştur
             </button>
@@ -220,17 +198,17 @@ export default function MyTripsPage() {
               {trips.map((trip) => (
                 <div
                   key={trip.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden"
+                  className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] hover:shadow-xl transition-shadow overflow-hidden"
                 >
                   <div className="p-6">
                     {/* Header */}
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white">
+                        <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
                           {trip.city}
                         </h3>
                         {trip.country && (
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                          <p className="text-sm text-[var(--fg-muted)]">
                             {trip.country}
                           </p>
                         )}
@@ -242,14 +220,12 @@ export default function MyTripsPage() {
 
                     {/* Dates */}
                     <div className="mb-4">
-                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
-                        <span className="mr-2"></span>
+                      <div className="flex items-center text-sm text-[var(--fg-muted)] mb-2">
                         <span>
                           {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
                         </span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                        <span className="mr-2"></span>
+                      <div className="flex items-center text-sm text-[var(--fg-muted)]">
                         <span>
                           {trip.duration || `${calculateDuration(trip.startDate, trip.endDate)} gün`}
                         </span>
@@ -260,14 +236,12 @@ export default function MyTripsPage() {
                     {(trip.total_cost || trip.budget_level) && (
                       <div className="mb-4 space-y-2">
                         {trip.total_cost && (
-                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                            <span className="mr-2"></span>
+                          <div className="flex items-center text-sm text-[var(--fg-muted)]">
                             <span>₺{trip.total_cost.toLocaleString('tr-TR')}</span>
                           </div>
                         )}
                         {trip.budget_level && (
-                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                            <span className="mr-2"></span>
+                          <div className="flex items-center text-sm text-[var(--fg-muted)]">
                             <span>
                               {trip.budget_level.charAt(0).toUpperCase() + trip.budget_level.slice(1)}
                               {trip.travel_style && ` • ${trip.travel_style}`}
@@ -281,7 +255,7 @@ export default function MyTripsPage() {
                         tek koşul completedAt alanının dolu olması */}
                     {trip.completedAt && (
                       <div className="mb-4">
-                        <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+                        <div className="flex items-center text-sm text-[var(--accent)]">
                           <span>Tamamlandı: {formatDate(trip.completedAt)}</span>
                         </div>
                       </div>
@@ -291,7 +265,7 @@ export default function MyTripsPage() {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => router.push(`/plan-detail/${trip.id}`)}
-                        className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                        className="flex-1 bg-[var(--accent)] text-[var(--accent-contrast)] py-2 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors text-sm"
                       >
                         Detay Görüntüle
                       </button>
@@ -299,8 +273,8 @@ export default function MyTripsPage() {
                   </div>
 
                   {/* Created Date */}
-                  <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="px-6 py-3 bg-[var(--surface-2)] border-t border-[var(--line)]">
+                    <p className="text-xs text-[var(--fg-subtle)]">
                       Oluşturulma: {formatDate(trip.createdAt)}
                     </p>
                   </div>
@@ -313,31 +287,31 @@ export default function MyTripsPage() {
         {/* Summary Stats */}
         {trips.length > 0 && (
           <div className="max-w-4xl mx-auto mt-12">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6 text-center">
+            <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
+              <h3 className="text-xl font-bold text-[var(--fg)] mb-6 text-center">
                 Gerçekleştirilen Seyahat Özeti
               </h3>
               
               <div className="grid md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <div className="text-center p-4 bg-[var(--ok-soft)] rounded-lg">
+                  <div className="text-2xl font-bold text-[var(--accent)]">
                     {trips.length}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Gerçekleşen Seyahat</div>
+                  <div className="text-sm text-[var(--fg-muted)]">Gerçekleşen Seyahat</div>
                 </div>
                 
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="text-center p-4 bg-[var(--accent-soft)] rounded-lg">
+                  <div className="text-2xl font-bold text-[var(--accent)]">
                     ₺{trips.reduce((sum, trip) => sum + (trip.total_cost || 0), 0).toLocaleString('tr-TR')}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Toplam Harcama</div>
+                  <div className="text-sm text-[var(--fg-muted)]">Toplam Harcama</div>
                 </div>
                 
-                <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                <div className="text-center p-4 bg-purple-50 dark:bg-[var(--surface-2)] rounded-lg">
+                  <div className="text-2xl font-bold text-[var(--fg)]">
                     {Array.from(new Set(trips.map(t => t.city))).length}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Gezilen Şehir</div>
+                  <div className="text-sm text-[var(--fg-muted)]">Gezilen Şehir</div>
                 </div>
               </div>
             </div>

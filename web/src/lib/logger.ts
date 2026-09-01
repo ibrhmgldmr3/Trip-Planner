@@ -76,6 +76,25 @@ const BULK_TEXT_KEY =
 
 const EMAIL_VALUE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Metnin İÇİNDE geçen API anahtarı kalıpları.
+ *
+ * Alan adına bakan `SECRET_KEY` burada yetmiyor: sağlayıcı hata gövdeleri
+ * `detay` alanına düz metin olarak akıyor ve bazı sağlayıcılar isteği
+ * yankılıyor. Tavily anahtarı istek GÖVDESİNDE (`api_key`) gidiyor, yani
+ * yankılanan bir hata gövdesi anahtarı log'a taşıyabilirdi.
+ *
+ * Kalıplar bilinen öneklere bağlı — genel "uzun rastgele dize" kuralı
+ * plan metinlerini de maskeleyip log'u okunmaz hâle getirirdi.
+ */
+const SECRET_VALUE =
+  /(sk-[A-Za-z0-9_-]{8,}|tvly-[A-Za-z0-9_-]{8,}|tgp_v1_[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|Bearer\s+[A-Za-z0-9._-]{12,})/g;
+
+/** Metindeki anahtar kalıplarını maskeler. */
+export function maskSecrets(value: string): string {
+  return value.replace(SECRET_VALUE, "[gizli]");
+}
+
 const MAX_DEPTH = 3;
 const MAX_ARRAY_ITEMS = 20;
 const MAX_STRING = 512;
@@ -114,7 +133,10 @@ function serializeError(cause: unknown): LogContext {
   if (cause instanceof Error) {
     return {
       name: cause.name,
-      message: truncate(cause.message.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, maskEmail), 300),
+      message: truncate(
+        maskSecrets(cause.message.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, maskEmail)),
+        300
+      ),
       stack: cause.stack ? truncate(cause.stack, 2000) : undefined,
     };
   }
@@ -134,10 +156,12 @@ export function redact(value: unknown, key = "", depth = 0): unknown {
     if (SECRET_KEY.test(key)) return "[gizli]";
     if (EMAIL_KEY.test(key)) return maskEmail(value);
     if (USER_ID_KEY.test(key)) return maskId(value);
-    if (BULK_TEXT_KEY.test(key)) return truncate(value);
     // Alan adı ipucu vermese bile değerin kendisi e-posta olabilir.
     if (EMAIL_VALUE.test(value)) return maskEmail(value);
-    return truncate(value, MAX_STRING);
+    // Maskeleme KIRPMADAN ÖNCE: kırpılmış bir metnin içinde kalan anahtar
+    // yine sızıntıdır.
+    if (BULK_TEXT_KEY.test(key)) return truncate(maskSecrets(value));
+    return truncate(maskSecrets(value), MAX_STRING);
   }
 
   if (typeof value === "number" || typeof value === "boolean") {
@@ -214,7 +238,16 @@ function emit(level: LogLevel, message: string, cause?: unknown, context?: LogCo
   }
 
   // Geliştirmede okunabilir biçim; detay objesi devtools'ta açılabilir kalsın.
-  const prefix = `${time} [${level}/${scope}] ${message}`;
+  //
+  // `cause`'un mesajı BURADA, düz metin satırının içine de yazılıyor:
+  // Next.js'in dev hata paneli `console.error`'a Error OLMAYAN bir nesne
+  // argümanı geldiğinde onu genişletmiyor, "{}" olarak gösteriyor — asıl
+  // mesaj `detail.err` içinde gömülü kalıp panelde hiç görünmüyordu.
+  let prefix = `${time} [${level}/${scope}] ${message}`;
+  if (cause !== undefined) {
+    prefix += ` — ${cause instanceof Error ? cause.message : String(cause)}`;
+  }
+
   if (Object.keys(detail).length > 0) {
     write(prefix, detail);
   } else {

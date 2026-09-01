@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
+import { tripCreateSchema, tripUpdateSchema, ilkHataMesaji } from "@/lib/api-schemas";
+import { tarihiCoz } from "@/lib/trip-dates";
 import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       const trip = await prisma.trip.findUnique({
         where: {
           id,
-          userId: session.user.id as string,
+          userId: userId,
         },
         include: {
           activities: true,
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     // Otherwise fetch all trips for the user
     const trips = await prisma.trip.findMany({
       where: {
-        userId: session.user.id as string,
+        userId: userId,
       },
       orderBy: {
         startDate: 'desc',
@@ -74,19 +74,33 @@ export async function GET(req: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
+
+    const parsed = tripCreateSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: ilkHataMesaji(parsed.error, "Seyahat bilgileri geçersiz") },
+        { status: 400 }
+      );
     }
 
-    const data = await request.json();
-    const { title, description, startDate, endDate, city, country, budget } = data;
+    const { title, description, startDate, endDate, city, country, budget } = parsed.data;
 
-    // Validate required fields
-    if (!title || !startDate || !endDate || !city) {
+    const baslangic = tarihiCoz(startDate);
+    const bitis = tarihiCoz(endDate);
+
+    if (!baslangic || !bitis) {
+      return NextResponse.json({ error: "Geçersiz tarih formatı" }, { status: 400 });
+    }
+
+    // Eskiden bu kontrol hiç yoktu: bitiş tarihi başlangıçtan önce olan
+    // seyahatler kaydedilebiliyor, sonra gün sayısı hesapları bozuluyordu.
+    if (bitis < baslangic) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Bitiş tarihi başlangıç tarihinden önce olamaz" },
         { status: 400 }
       );
     }
@@ -95,13 +109,13 @@ export async function POST(request: NextRequest) {
     const trip = await prisma.trip.create({
       data: {
         title,
-        description,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        description: description ?? null,
+        startDate: baslangic,
+        endDate: bitis,
         city,
-        country,
-        budget: budget ? parseFloat(budget) : null,
-        userId: session.user.id as string,
+        country: country ?? null,
+        budget: budget ?? null,
+        userId,
       },
     });
 
@@ -117,27 +131,27 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
-    const data = await request.json();
-    const { id, title, description, startDate, endDate, city, country, budget, status } = data;
+    const userId = auth.user.id;
 
-    if (!id) {
+    const parsed = tripUpdateSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Trip ID is required" },
+        { error: ilkHataMesaji(parsed.error, "Seyahat bilgileri geçersiz") },
         { status: 400 }
       );
     }
+
+    const { id, title, description, startDate, endDate, city, country, budget, status } =
+      parsed.data;
 
     // Check if trip exists and belongs to the user
     const existingTrip = await prisma.trip.findUnique({
       where: {
         id,
-        userId: session.user.id as string,
+        userId,
       },
     });
 
@@ -148,17 +162,33 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const baslangic = startDate ? tarihiCoz(startDate) : existingTrip.startDate;
+    const bitis = endDate ? tarihiCoz(endDate) : existingTrip.endDate;
+
+    if (!baslangic || !bitis) {
+      return NextResponse.json({ error: "Geçersiz tarih formatı" }, { status: 400 });
+    }
+
+    if (bitis < baslangic) {
+      return NextResponse.json(
+        { error: "Bitiş tarihi başlangıç tarihinden önce olamaz" },
+        { status: 400 }
+      );
+    }
+
     // Update trip
     const updatedTrip = await prisma.trip.update({
       where: { id },
       data: {
         title: title ?? existingTrip.title,
         description: description ?? existingTrip.description,
-        startDate: startDate ? new Date(startDate) : existingTrip.startDate,
-        endDate: endDate ? new Date(endDate) : existingTrip.endDate,
+        startDate: baslangic,
+        endDate: bitis,
         city: city ?? existingTrip.city,
         country: country ?? existingTrip.country,
-        budget: budget !== undefined ? parseFloat(budget) : existingTrip.budget,
+        // `parseFloat(budget)` sayısal olmayan girdide NaN üretiyordu;
+        // artık şema sayı olmayanı zaten reddediyor.
+        budget: budget ?? existingTrip.budget,
         status: status ?? existingTrip.status,
       },
     });
@@ -175,11 +205,10 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
 
     const url = new URL(request.url);
     const id = url.searchParams.get("id");
@@ -195,7 +224,7 @@ export async function DELETE(request: NextRequest) {
     const existingTrip = await prisma.trip.findUnique({
       where: {
         id,
-        userId: session.user.id as string,
+        userId: userId,
       },
     });
 

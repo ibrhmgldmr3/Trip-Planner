@@ -376,35 +376,35 @@ export default function TransportationPage() {
     });
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto text-gray-700 dark:text-gray-300">
+    <main className="min-h-screen p-4 md:p-8 bg-[var(--surface-2)]">
+      <div className="max-w-6xl mx-auto text-[var(--fg-muted)]">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-700 dark:text-blue-400">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--accent)] dark:text-[var(--accent)]">
               Ulaşım Seçenekleri
             </h1>
-            <p className="text-gray-700 dark:text-gray-300 mt-2 max-w-2xl">
+            <p className="text-[var(--fg-muted)] mt-2 max-w-2xl">
               Seyahatiniz için en uygun ulaşım seçeneklerini bulun ve karşılaştırın.
             </p>
           </div>
           <Link 
             href="/"
-            className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors self-start"
+            className="mt-4 md:mt-0 px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors self-start"
           >
             Ana Sayfaya Dön
           </Link>
         </div>
 
         {/* Search Form */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700 dark:text-blue-400">Ulaşım Ara</h2>
+        <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)] mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-[var(--accent)] dark:text-[var(--accent)]">Ulaşım Ara</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="from" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Nereden</label>
+              <label htmlFor="from" className="block text-sm font-medium text-[var(--accent)] mb-1">Nereden</label>
               <select 
                 id="from" 
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               >
@@ -416,10 +416,10 @@ export default function TransportationPage() {
             </div>
             
             <div>
-              <label htmlFor="to" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Nereye</label>
+              <label htmlFor="to" className="block text-sm font-medium text-[var(--accent)] mb-1">Nereye</label>
               <select 
                 id="to" 
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               >
@@ -431,11 +431,11 @@ export default function TransportationPage() {
             </div>
             
             <div>
-              <label htmlFor="date" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Tarih</label>
+              <label htmlFor="date" className="block text-sm font-medium text-[var(--accent)] mb-1">Tarih</label>
               <input 
                 type="date" 
                 id="date" 
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 min="2025-08-26"
@@ -444,10 +444,10 @@ export default function TransportationPage() {
             </div>
             
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Ulaşım Tipi</label>
+              <label htmlFor="type" className="block text-sm font-medium text-[var(--accent)] mb-1">Ulaşım Tipi</label>
               <select 
                 id="type" 
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
               >
@@ -462,7 +462,7 @@ export default function TransportationPage() {
           <div className="mt-4 flex justify-end">
             <button 
               type="button"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg font-medium hover:bg-[var(--accent-hover)] transition-colors"
             >
               Ara
             </button>
@@ -470,14 +470,14 @@ export default function TransportationPage() {
         </div>
 
         {/* Results */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+        <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)]">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-blue-700 dark:text-blue-400">Sonuçlar ({filteredTransportations.length})</h2>
+            <h2 className="text-xl font-semibold text-[var(--accent)] dark:text-[var(--accent)]">Sonuçlar ({filteredTransportations.length})</h2>
             
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Sırala:</span>
+              <span className="text-sm text-[var(--fg-muted)] font-medium">Sırala:</span>
               <select 
-                className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md text-sm"
+                className="px-2 py-1 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md text-sm"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
@@ -491,12 +491,11 @@ export default function TransportationPage() {
           <div className="space-y-4">
             {filteredTransportations.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4"></div>
-                <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Sonuç Bulunamadı</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                <h3 className="text-xl font-semibold text-[var(--fg-muted)] mb-2">Sonuç Bulunamadı</h3>
+                <p className="text-[var(--fg-muted)] mb-4">
                   Seçtiğiniz tarih ve güzergah için ulaşım seçeneği bulunmuyor.
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[var(--fg-subtle)]">
                   Farklı bir tarih veya güzergah deneyebilirsiniz.
                 </p>
               </div>
@@ -504,14 +503,14 @@ export default function TransportationPage() {
               filteredTransportations.map(transport => (
                 <div 
                   key={transport.id} 
-                  className="border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-[var(--line)] bg-[var(--surface-2)] rounded-lg p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex flex-col md:flex-row md:justify-between md:items-center">
                     <div className="flex items-center mb-4 md:mb-0">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-3 ${
-                        transport.type === "Uçak" ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300" : 
-                        transport.type === "Otobüs" ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300" : 
-                        "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                        transport.type === "Uçak" ? "bg-[var(--info-soft)] text-[var(--accent)]" : 
+                        transport.type === "Otobüs" ? "bg-[var(--ok-soft)] text-[var(--ok)]" : 
+                        "bg-[var(--surface-2)] text-[var(--fg)] dark:text-[var(--fg)]"
                       }`}>
                         {transport.type === "Uçak" ? (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -528,39 +527,39 @@ export default function TransportationPage() {
                         )}
                       </div>
                       <div>
-                        <div className="font-medium text-blue-700 dark:text-blue-300">{transport.company}</div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">{transport.type}</div>
+                        <div className="font-medium text-[var(--accent)]">{transport.company}</div>
+                        <div className="text-sm text-[var(--fg-muted)] font-medium">{transport.type}</div>
                       </div>
                     </div>
                     
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
                       <div className="text-center">
-                        <div className="font-bold text-blue-700 dark:text-blue-300">{transport.departureTime}</div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">{transport.from}</div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">{new Date(transport.departureDate).toLocaleDateString('tr-TR')}</div>
+                        <div className="font-bold text-[var(--accent)]">{transport.departureTime}</div>
+                        <div className="text-sm text-[var(--fg-muted)] font-medium">{transport.from}</div>
+                        <div className="text-xs text-[var(--fg-muted)]">{new Date(transport.departureDate).toLocaleDateString('tr-TR')}</div>
                       </div>
                       
                       <div className="hidden md:block">
-                        <div className="w-24 h-[2px] bg-gray-300 dark:bg-gray-600 relative">
-                          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-700 dark:text-gray-300 font-medium">
+                        <div className="w-24 h-[2px] bg-[var(--surface-3)] dark:bg-[var(--surface-3)] relative">
+                          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-[var(--fg-muted)] font-medium">
                             {transport.duration}
                           </div>
                         </div>
                       </div>
                       
                       <div className="text-center">
-                        <div className="font-bold text-blue-700 dark:text-blue-300">{transport.arrivalTime}</div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">{transport.to}</div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">{new Date(transport.arrivalDate).toLocaleDateString('tr-TR')}</div>
+                        <div className="font-bold text-[var(--accent)]">{transport.arrivalTime}</div>
+                        <div className="text-sm text-[var(--fg-muted)] font-medium">{transport.to}</div>
+                        <div className="text-xs text-[var(--fg-muted)]">{new Date(transport.arrivalDate).toLocaleDateString('tr-TR')}</div>
                       </div>
                       
                       <div className="md:ml-4">
-                        <div className="font-bold text-blue-700 dark:text-blue-300">{transport.price} TL</div>
-                        <div className="text-xs text-gray-700 dark:text-gray-300 font-medium">{transport.seats} koltuk kaldı</div>
+                        <div className="font-bold text-[var(--accent)]">{transport.price} TL</div>
+                        <div className="text-xs text-[var(--fg-muted)] font-medium">{transport.seats} koltuk kaldı</div>
                       </div>
                       
                       <button 
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                        className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm hover:bg-[var(--accent-hover)] transition-colors"
                       >
                         Seç
                       </button>
@@ -573,13 +572,13 @@ export default function TransportationPage() {
         </div>
         
         {/* Coming Soon Message */}
-        <div className="mt-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 rounded-lg text-center">
-          <p className="text-yellow-700 dark:text-yellow-300">
+        <div className="mt-8 bg-[var(--surface)] border border-[var(--line)] p-4 rounded-lg text-center">
+          <p className="text-[var(--warn)] dark:text-[var(--warn)]">
             <strong>Bilgilendirme:</strong> Bu özellik şu an demo amaçlıdır. Gerçek rezervasyon yakında aktif olacaktır.
           </p>
         </div>
         
-        <div className="mt-8 text-sm text-gray-700 dark:text-gray-300 font-medium text-center">
+        <div className="mt-8 text-sm text-[var(--fg-muted)] font-medium text-center">
           &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
         </div>
       </div>

@@ -5,141 +5,130 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { logger } from "@/lib/logger";
+import { Alan, Dugme, GIRDI_SINIFI, Kart, Yukleniyor } from "@/components/ui";
 
-// SearchParams için wrapper component
-function LoginForm() {
+/**
+ * Giriş sayfası.
+ *
+ * Bu turda:
+ *  - ÖLÜ "Beni hatırla" ONAY KUTUSU KALDIRILDI. Hiçbir şeye bağlı değildi:
+ *    `checked`/`onChange` yok, `handleSubmit` okumuyor, oturum süresini
+ *    etkilemiyordu. Çalışmayan bir söz vermek, hiç söz vermemekten kötü.
+ *  - Alan `id`'leri (`email`, `password`) ve `button[type="submit"]`
+ *    KORUNDU — e2e testleri bu seçicilere bağlı.
+ */
+
+function GirisFormu() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [hata, setHata] = useState("");
+  const [yukleniyor, setYukleniyor] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError("");
+    setYukleniyor(true);
+    setHata("");
 
     try {
-      const result = await signIn("credentials", {
+      const sonuc = await signIn("credentials", {
         redirect: false,
         email,
         password,
         callbackUrl,
       });
 
-      if (!result?.ok) {
-        setError(result?.error || "Giriş başarısız");
-        setIsLoading(false);
+      if (!sonuc?.ok) {
+        setHata(sonuc?.error || "Giriş başarısız");
+        setYukleniyor(false);
         return;
       }
 
-      // Login successful
       router.push(callbackUrl);
     } catch (err) {
       logger.error("Giriş yapılamadı", err);
-      setError("Bir hata oluştu. Lütfen tekrar deneyin.");
-      setIsLoading(false);
+      setHata("Bir hata oluştu. Lütfen tekrar deneyin.");
+      setYukleniyor(false);
     }
   };
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-blue-900 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 text-gray-800 dark:text-gray-200">
+    <main className="min-h-screen bg-[var(--bg)] px-4 py-12 md:py-20 flex items-start justify-center">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-blue-800 dark:text-blue-300 mb-2">
-            Giriş Yap
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)]">
+            Tekrar hoş geldiniz
           </h1>
-          <p className="text-gray-800 dark:text-gray-300">
-            Trip Planner hesabınıza giriş yapın
+          <p className="text-[var(--fg-muted)] mt-2">
+            Planlarınıza erişmek için giriş yapın.
           </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4" role="alert">
-            {error}
-          </div>
-        )}
+        <Kart>
+          <div className="p-6 md:p-7">
+            {hata && (
+              <p
+                role="alert"
+                className="mb-5 rounded-[var(--radius)] border border-[var(--danger)]/30 bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]"
+              >
+                {hata}
+              </p>
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-              E-posta
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="E-posta adresiniz"
-            />
-          </div>
+            <form onSubmit={gonder} className="space-y-5">
+              <Alan etiket="E-posta" htmlFor="email">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={GIRDI_SINIFI}
+                  placeholder="ornek@eposta.com"
+                />
+              </Alan>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-              Şifre
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Şifreniz"
-            />
-          </div>
+              <Alan etiket="Şifre" htmlFor="password">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={GIRDI_SINIFI}
+                  placeholder="••••••••"
+                />
+              </Alan>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-800 dark:text-gray-300">
-                Beni hatırla
-              </label>
+              <Dugme type="submit" boy="lg" disabled={yukleniyor} className="w-full">
+                {yukleniyor ? "Giriş yapılıyor…" : "Giriş yap"}
+              </Dugme>
+            </form>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-[var(--line)]" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-3 bg-[var(--surface)] text-sm text-[var(--fg-subtle)]">
+                  veya
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-md hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">veya</span>
-            </div>
-          </div>
-
-          <div className="mt-6">
             <button
               onClick={() => signIn("google", { callbackUrl })}
               type="button"
-              className="w-full px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-800 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center gap-2"
+              className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] text-sm font-medium transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   fill="#4285F4"
@@ -157,30 +146,29 @@ function LoginForm() {
                   fill="#EA4335"
                 />
               </svg>
-              Google ile Giriş Yap
+              Google ile devam et
             </button>
           </div>
-        </div>
+        </Kart>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-800 dark:text-gray-300">
-            Hesabınız yok mu?{" "}
-            <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-              Kayıt Ol
-            </Link>
-          </p>
-        </div>
+        <p className="text-sm text-[var(--fg-muted)] text-center mt-6">
+          Hesabınız yok mu?{" "}
+          <Link
+            href="/register"
+            className="text-[var(--accent)] font-medium hover:underline underline-offset-4"
+          >
+            Kayıt olun
+          </Link>
+        </p>
       </div>
     </main>
   );
 }
 
-// Ana sayfa bileşeni
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-700 dark:text-gray-300">Yükleniyor...</div>}>
-      <LoginForm />
+    <Suspense fallback={<Yukleniyor />}>
+      <GirisFormu />
     </Suspense>
   );
 }
-

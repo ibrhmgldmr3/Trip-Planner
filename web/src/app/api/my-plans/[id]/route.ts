@@ -2,13 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// NextAuth v4 ise:
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
 import { logger } from "@/lib/logger";
-
-// (Alternatif) NextAuth v5 (app router) kullanıyorsanız:
-// import { auth } from "@/auth";
 
 
 export async function DELETE(
@@ -18,32 +13,8 @@ export async function DELETE(
   try {
     const { id: planId } = await context.params;
 
-    // Session kontrolü
-    // NextAuth v4:
-    const session = await getServerSession(authOptions);
-
-    // NextAuth v5 kullanıyorsanız yukarıdakini kaldırıp şu satırı kullanın:
-    // const session = await auth();
-
-    if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Giriş yapmanız gerekiyor" },
-        { status: 401 }
-      );
-    }
-
-    // Kullanıcıyı email ile bul
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Kullanıcı bulunamadı" },
-        { status: 404 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     // Plan var mı ve sahibi mi?
     const plan = await prisma.tripPlan.findUnique({
@@ -58,7 +29,7 @@ export async function DELETE(
       );
     }
 
-    if (plan.userId !== user.id) {
+    if (plan.userId !== auth.user.id) {
       return NextResponse.json(
         { error: "Bu planı silme yetkiniz yok" },
         { status: 403 }
@@ -77,13 +48,8 @@ export async function DELETE(
   } catch (error: unknown) {
     logger.error("Plan silinemedi", error);
 
-    const errorDetails =
-      error instanceof Error
-        ? { name: error.name, message: error.message }
-        : { unknown: "Bilinmeyen hata tipi", value: String(error) };
-
     return NextResponse.json(
-      { error: "Plan silinemedi", details: errorDetails },
+      { error: "Plan silinemedi" },
       { status: 500 }
     );
   }

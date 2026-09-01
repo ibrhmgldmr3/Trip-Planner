@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { ilkHataMesaji } from "@/lib/api-schemas";
+import { requireUser } from "@/lib/auth-session";
 import { logger } from "@/lib/logger";
 
 // Schema for profile update
+// Uzunluk sınırları şart: bu alanların dördü `preferences` JSON sütununa
+// yazılıyor ve sınırsız bırakılırsa tek istekle megabaytlarca veri
+// saklanabiliyordu.
 const profileUpdateSchema = z.object({
-  name: z.string().min(2, "İsim en az 2 karakter olmalıdır").optional(),
-  phone: z.string().optional(),
-  bio: z.string().optional(),
-  location: z.string().optional(),
-  birthDate: z.string().optional(),
+  name: z.string().trim().min(2, "İsim en az 2 karakter olmalıdır").max(80).optional(),
+  phone: z.string().trim().max(30).optional(),
+  bio: z.string().trim().max(500).optional(),
+  location: z.string().trim().max(120).optional(),
+  birthDate: z.string().trim().max(40).optional(),
   preferredTransport: z.enum(["all", "plane", "bus", "train", "car", "boat"]).optional(),
   preferredCurrency: z.enum(["TRY", "USD", "EUR", "GBP"]).optional(),
-  interests: z.string().optional(),
+  interests: z.string().trim().max(500).optional(),
 });
 
 interface UserPreferences {
@@ -27,18 +31,12 @@ interface UserPreferences {
 
 export async function PUT(request: Request) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user?.id) {
-      return NextResponse.json(
-        { error: "Bu işlem için giriş yapmalısınız" },
-        { status: 401 }
-      );
-    }
+    // Kimlik doğrulaması: id'yi session'dan körü körüne almak yerine
+    // veritabanından çözüyoruz (bkz. src/lib/auth-session.ts).
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
-    // Get user id from session
-    const userId = session.user.id;
+    const userId = auth.user.id;
     
     // Parse request body
     const body = await request.json();
@@ -48,7 +46,7 @@ export async function PUT(request: Request) {
     
     if (!result.success) {
       return NextResponse.json(
-        { error: result.error.format()._errors[0] || "Form validation failed" },
+        { error: ilkHataMesaji(result.error, "Form bilgileri geçersiz") },
         { status: 400 }
       );
     }
@@ -90,7 +88,11 @@ export async function PUT(request: Request) {
         ...(preferredTransport && { preferredTransport }),
         ...(preferredCurrency && { preferredCurrency }),
         ...(interests && { interests }),
-        preferences: JSON.stringify(updatedPreferences),
+        // DİKKAT: `Json` sütununa OBJE yazılıyor, JSON.stringify DEĞİL.
+        // Eskiden metin yazılıyordu; `GET /api/profile` sütunu obje sanıp
+        // `preferences.phone` okuduğu için telefon/bio/konum/doğum tarihi
+        // kaydediliyor ama profil sayfasına hiç geri dönmüyordu.
+        preferences: updatedPreferences as Prisma.InputJsonValue,
       },
       select: {
         id: true,

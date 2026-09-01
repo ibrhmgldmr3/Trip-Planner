@@ -1,50 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireUser } from "@/lib/auth-session";
+import { requireOwnedTrip, requireOwnedSubresource } from "@/lib/trip-ownership";
+import {
+  budgetItemCreateSchema,
+  budgetItemUpdateSchema,
+  ilkHataMesaji,
+} from "@/lib/api-schemas";
+import { tarihiCoz } from "@/lib/trip-dates";
 import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
 
     const url = new URL(req.url);
     const tripId = url.searchParams.get("tripId");
     const category = url.searchParams.get("category");
 
-    if (!tripId) {
-      return NextResponse.json(
-        { error: "Trip ID is required" },
-        { status: 400 }
-      );
-    }
+    const sahiplik = await requireOwnedTrip(tripId, userId);
+    if (!sahiplik.ok) return sahiplik.response;
 
-    // Check if trip exists and belongs to the user
-    const trip = await prisma.trip.findFirst({
-      where: {
-        id: tripId,
-        userId: session.user.id as string,
-      },
-      include: {
-        budgetItems: true,
-      },
-    });
-
-    if (!trip) {
-      return NextResponse.json(
-        { error: "Trip not found or access denied" },
-        { status: 404 }
-      );
-    }
-
-    // Query conditions for budget items
-    const whereCondition = category 
-      ? { tripId, category } 
-      : { tripId };
+    const whereCondition = category
+      ? { tripId: sahiplik.trip.id, category }
+      : { tripId: sahiplik.trip.id };
 
     // Get budget items for the trip
     const budgetItems = await prisma.budgetItem.findMany({
@@ -81,50 +63,35 @@ export async function GET(req: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    // User must be authenticated
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "You must be logged in to create budget items" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
-    const data = await request.json();
-    const { tripId, category, description, amount, date, isEstimate, isPaid } = data;
+    const userId = auth.user.id;
 
-    if (!tripId || !category || !description || amount === undefined) {
+    // Eskiden `amount` hiç doğrulanmıyordu: metin gönderildiğinde Prisma
+    // tip hatası fırlatıyor ve uç 500 dönüyordu.
+    const parsed = budgetItemCreateSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: ilkHataMesaji(parsed.error, "Bütçe kalemi geçersiz") },
         { status: 400 }
       );
     }
 
-    // Verify trip ownership
-    const trip = await prisma.trip.findUnique({
-      where: {
-        id: tripId,
-        userId: session.user.id as string,
-      },
-    });
+    const { tripId, category, description, amount, date, isEstimate, isPaid } = parsed.data;
 
-    if (!trip) {
-      return NextResponse.json(
-        { error: "Trip not found or you don't have access" },
-        { status: 404 }
-      );
-    }
+    const sahiplik = await requireOwnedTrip(tripId, userId);
+    if (!sahiplik.ok) return sahiplik.response;
 
     // Create new budget item
     const budgetItem = await prisma.budgetItem.create({
       data: {
-        tripId,
+        tripId: sahiplik.trip.id,
         category,
         description,
         amount,
-        date: date ? new Date(date) : null,
-        isEstimate: isEstimate ?? false,
+        date: date ? tarihiCoz(date) : null,
+        isEstimate: isEstimate ?? true,
         isPaid: isPaid ?? false,
       },
     });
@@ -141,44 +108,39 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    // User must be authenticated
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "You must be logged in to update budget items" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
-    const data = await request.json();
-    const { id, category, description, amount, date, isEstimate, isPaid } = data;
+    const userId = auth.user.id;
 
-    if (!id) {
+    const parsed = budgetItemUpdateSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Budget item ID is required" },
+        { error: ilkHataMesaji(parsed.error, "Bütçe kalemi geçersiz") },
         { status: 400 }
       );
     }
 
-    // Get the budget item
-    const existingItem = await prisma.budgetItem.findUnique({
-      where: { id },
-      include: { trip: true },
-    });
+    const { id, category, description, amount, date, isEstimate, isPaid } = parsed.data;
 
+    // Sahiplik alt kayıt yardımcısıyla: kalem -> seyahat -> kullanıcı.
+    // Eskiden `include: { trip: true }` ile elle kontrol ediliyordu ve
+    // "yok" (404) ile "senin değil" (403) ayrımı yapılıyordu. İlişkisel
+    // modelin tamamı artık tek kural uyguluyor: ikisi de 404, çünkü 403
+    // id'yi bilen birine o kaydın var olduğunu doğrular.
+    const sahiplik = await requireOwnedSubresource(
+      prisma.budgetItem,
+      id,
+      userId,
+      "Bütçe kalemi bulunamadı"
+    );
+    if (!sahiplik.ok) return sahiplik.response;
+
+    const existingItem = await prisma.budgetItem.findUnique({ where: { id } });
     if (!existingItem) {
       return NextResponse.json(
-        { error: "Budget item not found" },
+        { error: "Bütçe kalemi bulunamadı" },
         { status: 404 }
-      );
-    }
-
-    // Verify ownership through the trip
-    if (existingItem.trip.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "You don't have permission to update this item" },
-        { status: 403 }
       );
     }
 
@@ -189,7 +151,7 @@ export async function PUT(request: NextRequest) {
         category: category ?? existingItem.category,
         description: description ?? existingItem.description,
         amount: amount ?? existingItem.amount,
-        date: date ? new Date(date) : existingItem.date,
+        date: date ? tarihiCoz(date) : existingItem.date,
         isEstimate: isEstimate ?? existingItem.isEstimate,
         isPaid: isPaid ?? existingItem.isPaid,
       },
@@ -207,15 +169,10 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    // User must be authenticated
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "You must be logged in to delete budget items" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.user.id;
 
     // Get the itemId from query parameters
     const { searchParams } = new URL(request.url);
@@ -228,26 +185,13 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Get the budget item
-    const existingItem = await prisma.budgetItem.findUnique({
-      where: { id: itemId },
-      include: { trip: true },
-    });
-
-    if (!existingItem) {
-      return NextResponse.json(
-        { error: "Budget item not found" },
-        { status: 404 }
-      );
-    }
-
-    // Verify ownership through the trip
-    if (existingItem.trip.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "You don't have permission to delete this item" },
-        { status: 403 }
-      );
-    }
+    const sahiplik = await requireOwnedSubresource(
+      prisma.budgetItem,
+      itemId,
+      userId,
+      "Bütçe kalemi bulunamadı"
+    );
+    if (!sahiplik.ok) return sahiplik.response;
 
     // Delete the budget item
     await prisma.budgetItem.delete({

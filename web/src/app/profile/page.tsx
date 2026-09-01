@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Image from "next/image";
 import { logger } from "@/lib/logger";
+import {
+  GirisGerekli,
+} from "@/components/ui";
 
 interface UserProfile {
   id: string;
@@ -131,10 +134,9 @@ export default function ProfilePage() {
   // Loading durumu
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-xl text-[var(--fg-muted)]">
             Profil yükleniyor...
           </p>
         </div>
@@ -144,40 +146,18 @@ export default function ProfilePage() {
 
   // Giriş yapmamış kullanıcı
   if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Bu sayfayı görüntülemek için önce giriş yapmanız gerekiyor.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 mr-4"
-          >
-            Giriş Yap
-          </button>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
-          >
-            Ana Sayfaya Dön
-          </button>
-        </div>
-      </div>
-    );
+    return <GirisGerekli />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900">
+    <div className="min-h-screen bg-[var(--bg)]">
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-3">
             Profilim
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-[var(--fg-muted)]">
             Hesap bilgilerinizi görüntüleyin ve düzenleyin
           </p>
         </div>
@@ -186,19 +166,19 @@ export default function ProfilePage() {
         <div className="text-center mb-8 flex justify-center space-x-4">
           <button
             onClick={() => router.push('/my-plans')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             Planlarım
           </button>
           <button
             onClick={() => router.push('/budget')}
-            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors"
+            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             Finansal Tercihler
           </button>
           <button
             onClick={() => router.push('/daily-planner')}
-            className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors"
+            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             Günlük Plan
           </button>
@@ -208,9 +188,9 @@ export default function ProfilePage() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Profile Info */}
             <div className="lg:col-span-2">
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+              <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+                  <h2 className="text-2xl font-bold text-[var(--fg)]">
                     Profil Bilgileri
                   </h2>
                   <div className="space-x-2">
@@ -218,14 +198,14 @@ export default function ProfilePage() {
                       <>
                         <button
                           onClick={() => setEditing(false)}
-                          className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          className="px-4 py-2 text-[var(--fg-muted)] hover:bg-[var(--surface-2)] dark:hover:bg-[var(--surface-2)] rounded-lg transition-colors"
                         >
                           İptal
                         </button>
                         <button
                           onClick={updateProfile}
                           disabled={saving}
-                          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                          className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
                         >
                           {saving ? 'Kaydediliyor...' : 'Kaydet'}
                         </button>
@@ -233,7 +213,7 @@ export default function ProfilePage() {
                     ) : (
                       <button
                         onClick={() => setEditing(true)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
                       >
                         Düzenle
                       </button>
@@ -250,23 +230,23 @@ export default function ProfilePage() {
                         alt="Profile"
                         width={120}
                         height={120}
-                        className="rounded-full border-4 border-purple-200 dark:border-purple-800"
+                        className="rounded-full border-4 border-[var(--line)] dark:border-[var(--line)]"
                       />
                     ) : (
-                      <div className="w-30 h-30 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-white text-4xl font-bold">
+                      <div className="w-30 h-30 rounded-full bg-[var(--bg)] flex items-center justify-center text-white text-4xl font-bold">
                         {profile?.name?.charAt(0) || session?.user?.name?.charAt(0) || '?'}
                       </div>
                     )}
                   </div>
                   
                   <div className="text-center md:text-left">
-                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+                    <h3 className="text-2xl font-bold text-[var(--fg)]">
                       {profile?.name || session?.user?.name}
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-300 mb-2">
+                    <p className="text-[var(--fg-muted)] mb-2">
                       {profile?.email || session?.user?.email}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-[var(--fg-subtle)]">
                       Üye olma tarihi: {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('tr-TR') : 'Bilinmiyor'}
                     </p>
                   </div>
@@ -276,7 +256,7 @@ export default function ProfilePage() {
                 <div className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                         Ad Soyad
                       </label>
                       {editing ? (
@@ -284,18 +264,18 @@ export default function ProfilePage() {
                           type="text"
                           value={editForm.name}
                           onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                           placeholder="Adınızı ve soyadınızı girin"
                         />
                       ) : (
-                        <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
+                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
                           {profile?.name || 'Belirtilmemiş'}
                         </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                         Telefon
                       </label>
                       {editing ? (
@@ -303,18 +283,18 @@ export default function ProfilePage() {
                           type="tel"
                           value={editForm.phone}
                           onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                           placeholder="Telefon numaranızı girin"
                         />
                       ) : (
-                        <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
+                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
                           {profile?.phone || 'Belirtilmemiş'}
                         </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                         Konum
                       </label>
                       {editing ? (
@@ -322,18 +302,18 @@ export default function ProfilePage() {
                           type="text"
                           value={editForm.location}
                           onChange={(e) => setEditForm({...editForm, location: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                           placeholder="Şehir, Ülke"
                         />
                       ) : (
-                        <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
+                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
                           {profile?.location || 'Belirtilmemiş'}
                         </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                         Doğum Tarihi
                       </label>
                       {editing ? (
@@ -341,10 +321,10 @@ export default function ProfilePage() {
                           type="date"
                           value={editForm.birthDate}
                           onChange={(e) => setEditForm({...editForm, birthDate: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                         />
                       ) : (
-                        <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
+                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
                           {profile?.birthDate ? new Date(profile.birthDate).toLocaleDateString('tr-TR') : 'Belirtilmemiş'}
                         </p>
                       )}
@@ -352,7 +332,7 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                       Hakkımda
                     </label>
                     {editing ? (
@@ -360,11 +340,11 @@ export default function ProfilePage() {
                         value={editForm.bio}
                         onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
                         rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                        className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                         placeholder="Kendiniz hakkında kısa bir açıklama yazın..."
                       />
                     ) : (
-                      <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white min-h-[100px]">
+                      <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)] min-h-[100px]">
                         {profile?.bio || 'Henüz bir açıklama eklenmemiş.'}
                       </p>
                     )}
@@ -373,14 +353,14 @@ export default function ProfilePage() {
                   {/* Preferred Transport */}
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                         Tercih Edilen Ulaşım
                       </label>
                       {editing ? (
                         <select
                           value={editForm.preferredTransport}
                           onChange={(e) => setEditForm({...editForm, preferredTransport: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                         >
                           <option value="all">Hepsi</option>
                           <option value="plane">Uçak</option>
@@ -390,7 +370,7 @@ export default function ProfilePage() {
                           <option value="boat">Gemi</option>
                         </select>
                       ) : (
-                        <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
+                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
                           {(() => {
                             const transport = profile?.preferredTransport || 'all';
                             switch(transport) {
@@ -407,14 +387,14 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                         Tercih Edilen Para Birimi
                       </label>
                       {editing ? (
                         <select
                           value={editForm.preferredCurrency}
                           onChange={(e) => setEditForm({...editForm, preferredCurrency: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                         >
                           <option value="TRY">Türk Lirası (TRY)</option>
                           <option value="USD">Amerikan Doları (USD)</option>
@@ -422,7 +402,7 @@ export default function ProfilePage() {
                           <option value="GBP">İngiliz Sterlini (GBP)</option>
                         </select>
                       ) : (
-                        <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white">
+                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
                           {(() => {
                             const currency = profile?.preferredCurrency || 'TRY';
                             switch(currency) {
@@ -439,7 +419,7 @@ export default function ProfilePage() {
 
                   {/* Interests */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                       İlgi Alanları
                     </label>
                     {editing ? (
@@ -447,21 +427,21 @@ export default function ProfilePage() {
                         value={editForm.interests}
                         onChange={(e) => setEditForm({...editForm, interests: e.target.value})}
                         rows={3}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                        className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
                         placeholder="Örn: Tarih, müze, doğa yürüyüşü, gastronomi, fotoğrafçılık..."
                       />
                     ) : (
-                      <p className="px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-white min-h-[80px]">
+                      <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)] min-h-[80px]">
                         {profile?.interests || 'İlgi alanları belirtilmemiş.'}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
                       E-posta
                     </label>
-                    <p className="px-4 py-3 bg-gray-100 dark:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300">
+                    <p className="px-4 py-3 bg-[var(--surface-2)] dark:bg-[var(--surface-3)] rounded-lg text-[var(--fg-muted)]">
                       {profile?.email || session?.user?.email} (Değiştirilemez)
                     </p>
                   </div>
@@ -473,40 +453,40 @@ export default function ProfilePage() {
             <div className="space-y-6">
               {/* Travel Stats */}
               {stats && (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
+                <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
+                  <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-5">
                     Seyahat İstatistiklerim
                   </h3>
                   
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <span className="text-gray-700 dark:text-gray-300">Toplam Plan</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">{stats.totalTrips}</span>
+                    <div className="flex justify-between items-center p-3 bg-[var(--accent-soft)] rounded-lg">
+                      <span className="text-[var(--fg-muted)]">Toplam Plan</span>
+                      <span className="font-bold text-[var(--accent)]">{stats.totalTrips}</span>
                     </div>
                     
-                    <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <span className="text-gray-700 dark:text-gray-300">Tamamlanan</span>
-                      <span className="font-bold text-green-600 dark:text-green-400">{stats.completedTrips}</span>
+                    <div className="flex justify-between items-center p-3 bg-[var(--ok-soft)] rounded-lg">
+                      <span className="text-[var(--fg-muted)]">Tamamlanan</span>
+                      <span className="font-bold text-[var(--accent)]">{stats.completedTrips}</span>
                     </div>
                     
-                    <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <span className="text-gray-700 dark:text-gray-300">Toplam Bütçe</span>
-                      <span className="font-bold text-purple-600 dark:text-purple-400">
+                    <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-[var(--surface-2)] rounded-lg">
+                      <span className="text-[var(--fg-muted)]">Toplam Bütçe</span>
+                      <span className="font-bold text-[var(--fg)]">
                         ₺{stats.totalBudget.toLocaleString('tr-TR')}
                       </span>
                     </div>
                     
-                    <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                      <span className="text-gray-700 dark:text-gray-300">Ort. Süre</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400">
+                    <div className="flex justify-between items-center p-3 bg-[var(--warn-soft)] rounded-lg">
+                      <span className="text-[var(--fg-muted)]">Ort. Süre</span>
+                      <span className="font-bold text-[var(--warn)]">
                         {stats.averageTripDuration} gün
                       </span>
                     </div>
                     
                     {stats.favoriteDestination && (
-                      <div className="flex justify-between items-center p-3 bg-pink-50 dark:bg-pink-900/20 rounded-lg">
-                        <span className="text-gray-700 dark:text-gray-300">Favori Şehir</span>
-                        <span className="font-bold text-pink-600 dark:text-pink-400">
+                      <div className="flex justify-between items-center p-3 bg-pink-50 dark:bg-[var(--surface-2)] rounded-lg">
+                        <span className="text-[var(--fg-muted)]">Favori Şehir</span>
+                        <span className="font-bold text-[var(--fg)] dark:text-[var(--fg)]">
                           {stats.favoriteDestination}
                         </span>
                       </div>
@@ -516,29 +496,29 @@ export default function ProfilePage() {
               )}
 
               {/* Quick Actions */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
-                  ? Hızlı İşlemler
+              <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
+                <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-5">
+                  Hızlı İşlemler
                 </h3>
                 
                 <div className="space-y-3">
                   <button
                     onClick={() => router.push('/travel-mode')}
-                    className="w-full bg-gradient-to-r from-green-500 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-green-600 hover:to-blue-700 transition-all"
+                    className="w-full bg-[var(--accent)] text-white py-3 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
                   >
                     Yeni Plan Oluştur
                   </button>
                   
                   <button
                     onClick={() => router.push('/my-plans')}
-                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                    className="w-full bg-[var(--accent)] text-[var(--accent-contrast)] py-3 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
                   >
                     Planlarımı Görüntüle
                   </button>
                   
                   <button
                     onClick={() => router.push('/profile/my-trips')}
-                    className="w-full bg-purple-500 text-white py-3 px-4 rounded-lg hover:bg-purple-600 transition-colors"
+                    className="w-full bg-[var(--accent)] text-[var(--accent-contrast)] py-3 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
                   >
                      Seyahat Geçmişi
                   </button>
@@ -546,8 +526,8 @@ export default function ProfilePage() {
               </div>
 
               {/* Account Actions */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
+              <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
+                <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-5">
                   Hesap İşlemleri
                 </h3>
                 
@@ -558,7 +538,7 @@ export default function ProfilePage() {
                         signOut({ callbackUrl: '/' });
                       }
                     }}
-                    className="w-full bg-red-500 text-white py-3 px-4 rounded-lg hover:bg-red-600 transition-colors"
+                    className="w-full bg-[var(--danger)] text-white py-3 px-4 rounded-lg hover:bg-[var(--danger-hover)] transition-colors"
                   >
                     Çıkış Yap
                   </button>
