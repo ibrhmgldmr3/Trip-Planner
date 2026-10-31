@@ -354,7 +354,9 @@ describe("/api/plan-detail/[id]", () => {
     const { status } = await yanit(
       await GET(istek("/api/plan-detail/plan-ahmet"), params({ id: "plan-ahmet" }))
     );
-    expect(status).toBe(403);
+    // 403 DEĞİL 404: "senin değil" demek, id'yi bilen birine o planın var
+    // olduğunu doğrular. İlişkisel model uçlarıyla aynı kural.
+    expect(status).toBe(404);
   });
 
   it("başkasının planının bütçesini değiştirmez", async () => {
@@ -368,7 +370,7 @@ describe("/api/plan-detail/[id]", () => {
       )
     );
 
-    expect(status).toBe(403);
+    expect(status).toBe(404);
     expect(kayitlar("tripPlan").find((p) => p.id === "plan-ahmet")?.total_cost).toBe(10000);
   });
 
@@ -382,7 +384,7 @@ describe("/api/plan-detail/[id]", () => {
         params({ id: "plan-ahmet" })
       )
     );
-    expect(status).toBe(403);
+    expect(status).toBe(404);
   });
 
   it("kendi planını okur", async () => {
@@ -415,6 +417,21 @@ describe("/api/my-plans", () => {
     expect(plans[0].id).toBe("plan-burcu");
   });
 
+  it("taşınma alanlarını döndürür (B4 çift yol ayrımı)", async () => {
+    // Bütçe sayfası hangi veri yolunu kullanacağına `migratedAt`/`tripId`
+    // ile karar veriyor. Bu alanlar `select`ten düşerse sayfa TAŞINMIŞ bir
+    // planı taşınmamış sanıp JSON sütununu okur ve kullanıcının ilişkisel
+    // tabloda duran kalemleri ekranda hiç görünmez.
+    kur(BURCU);
+    const { GET } = await import("@/app/api/my-plans/route");
+
+    const { body } = await yanit(await GET());
+    const plans = body.plans as Array<Record<string, unknown>>;
+
+    expect(plans[0]).toHaveProperty("migratedAt");
+    expect(plans[0]).toHaveProperty("tripId");
+  });
+
   it("başkasının planını silmez", async () => {
     const { kayitlar } = kur(BURCU);
     const { DELETE } = await import("@/app/api/my-plans/[id]/route");
@@ -423,7 +440,7 @@ describe("/api/my-plans", () => {
       await DELETE(istek("/api/my-plans/plan-ahmet", "DELETE"), params({ id: "plan-ahmet" }))
     );
 
-    expect(status).toBe(403);
+    expect(status).toBe(404);
     expect(kayitlar("tripPlan").some((p) => p.id === "plan-ahmet")).toBe(true);
   });
 

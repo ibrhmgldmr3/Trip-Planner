@@ -1,0 +1,60 @@
+-- ŞEMA SAPMASI DÜZELTMESİ — iki kırık özellik.
+--
+-- NE OLDU
+--
+-- `prisma/schema.prisma` ile veritabanı birbirinden ayrışmış durumda: şema
+-- elle düzenlenmiş ama karşılığı migration YAZILMAMIŞ. Zaman çizelgesi:
+--
+--   20250821141901  TripStatus yaratıldı: PLANNED, ACTIVE, COMPLETED, CANCELLED
+--   20250829134513  DONE EKLENDİ  ← bilinçli bir ürün kararı
+--   20250904121801  DONE GERİ ALINDI ← enum 4 değerle yeniden yaratıldı,
+--                   ayrıca BudgetItem.category enum'a çevrildi
+--
+-- Son migration kendi başlığında zaten uyarıyor: "The values [DONE] on the
+-- enum TripStatus will be removed." Şema ise hâlâ 5 değer ilan ediyor ve kod
+-- DONE'ı birinci sınıf bir durum olarak kullanıyor (src/lib/trip-status.ts:
+-- geçiş tablosu, etiketler, `canMarkAsDone`).
+--
+-- SONUÇ: İKİ ÖZELLİK BU VERİTABANINDA KIRIK
+--
+-- 1. "Planı gerçekleşti işaretle" — `plan-status-service.ts` hem TripPlan'a
+--    hem yeni açtığı Trip'e `status: DONE` yazıyor. Postgres 22P02 veriyor:
+--    invalid input value for enum "TripStatus": "DONE".
+--    `GET /api/my-trips?status=DONE` de aynı sebeple çalışmıyor — yani
+--    "Seyahat geçmişi" ekranı hiçbir zaman veri göremiyordu.
+--
+-- 2. İlişkisel bütçe yolunun TAMAMI — `BudgetItem.category` veritabanında
+--    `BudgetCategory` enum'u (TRANSPORT, ACCOMMODATION, …) ama uygulamanın
+--    her yerinde kategori serbest Türkçe metin: "ulaşım", "konaklama",
+--    "yemek", "aktiviteler", "diğer". Bunları AI da üretiyor, manuel
+--    planlayıcı da (api/manual-travel-plan/route.ts `kategoriAdlari`),
+--    bütçe sayfası da. Taşıma çalıştırıcısı ilk `createMany`de patlıyordu:
+--    invalid input value for enum "BudgetCategory": "ulaşım".
+--
+-- Mock'lu testler bunu göremezdi: sahte Prisma istemcisi enum kısıtı
+-- uygulamıyor. Yalnızca gerçek veritabanına yazan bir çağrı ortaya çıkardı.
+--
+-- NEDEN ŞEMA KAZANIYOR, VERİTABANI DEĞİL
+--
+-- Alternatif — kodu enum'lara uydurmak — DONE durumunu tamamen kaldırmayı ve
+-- kategori adlarını uygulamanın her katmanında değiştirmeyi gerektirirdi.
+-- Oysa DONE bilinçli olarak eklenmiş bir durum ve serbest metin kategoriler
+-- model çıktısıyla birlikte çalışıyor. 20250904 migration'ı bir gerileme.
+--
+-- BU MIGRATION YALNIZCA EKLEYİCİ/GENİŞLETİCİ
+--
+-- Hiçbir sütun ya da tablo düşürülmüyor, hiçbir satır silinmiyor. Enum'dan
+-- metne geçiş mevcut değerleri olduğu gibi koruyor. Kalan sapma (şemada
+-- olmayan sütunlar, kullanılmayan enum tipleri) ayrı bir kararın konusu;
+-- bkz. docs/gelistirme-plani.md → B4.
+
+-- 1. DONE'ı geri getir.
+--    `IF NOT EXISTS`: bu migration DONE'ı zaten taşıyan bir veritabanında da
+--    (ör. 20250904 hiç uygulanmamışsa) hatasız çalışsın.
+ALTER TYPE "TripStatus" ADD VALUE IF NOT EXISTS 'DONE';
+
+-- 2. Bütçe kategorisini serbest metne çevir.
+--    `USING ... ::text` enum etiketini metne dönüştürüyor; mevcut satırlar
+--    değerlerini koruyor.
+ALTER TABLE "BudgetItem"
+  ALTER COLUMN "category" TYPE TEXT USING "category"::text;

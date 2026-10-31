@@ -14,9 +14,12 @@ import {
   Kart,
   Rozet,
   SayfaBasi,
+  SayfaKabugu,
+  Yukleniyor,
   cx,
 } from "@/components/ui";
 import { butceyiCoz, REZERV_ORANI, type PlanButcesi } from "@/lib/plan-budget";
+import { butceFarkiCikar, farkBosMu } from "@/lib/butce-esitleme";
 import { gunSayisi } from "@/lib/trip-dates";
 import { TripStatus, getStatusLabel, getStatusTone } from "@/lib/trip-status";
 
@@ -76,6 +79,22 @@ interface Trip {
   /** API `"5 gün"` biçiminde METİN döndürüyor; sayı değil. */
   duration?: string | null;
   status?: string | null;
+  /**
+   * İlişkisel modele taşınma damgası (B4).
+   *
+   * Doluysa bütçe `/api/trip/budget` üzerinden KALEM BAZLI okunup
+   * yazılıyor; boşsa `TripPlan.butce_tahmini` JSON sütunundan. İki yol
+   * bir süre yan yana yaşayacak — taşıma isteğe bağlı ve kullanıcı
+   * tetikliyor (bkz. components/PlanTasima.tsx).
+   */
+  migratedAt?: string | null;
+  /** Taşınmış planın bağlı olduğu `Trip` kimliği. */
+  tripId?: string | null;
+}
+
+/** Plan ilişkisel modelde mi yaşıyor? İki alan da dolu olmak zorunda. */
+function iliskiselMi(trip: Trip | null): trip is Trip & { tripId: string } {
+  return Boolean(trip?.migratedAt && trip?.tripId);
 }
 
 /** Iki tarihi kullaniciya gosterilecek araliga cevirir; null'a dayanikli. */
@@ -139,10 +158,63 @@ export default function BudgetPage() {
     return startDate >= today;
   };
 
+  /**
+   * Gezi kartındaki toplamı ekranda tazeler.
+   *
+   * NEDEN GEREKLİ: toplam artık SUNUCUDA türetiliyor (B4 · Adım 5) ve bu
+   * sayfa kaydettikten sonra plan listesini yeniden çekmiyor. Kartta eski
+   * rakam kalmasın diye aynı toplam, sunucudan OKUNAN kalem listesinden
+   * hesaplanıyor — ekrandaki taslak listeden değil; kısmi bir yazmada
+   * ikisi ayrışır ve doğru olan sunucudaki.
+   */
+  const geziToplaminiYansit = (kalemler: BudgetItem[]) => {
+    if (!selectedTrip) return;
+
+    const toplam = kalemler.reduce((sum, kalem) => sum + kalem.amount, 0);
+
+    setSelectedTrip((onceki) => (onceki ? { ...onceki, total_cost: toplam } : onceki));
+    setTrips((onceki) =>
+      onceki.map((trip) =>
+        trip.id === selectedTrip.id ? { ...trip, total_cost: toplam } : trip
+      )
+    );
+  };
+
   // Değişiklikleri kaydetme fonksiyonu
   const saveChanges = async () => {
     if (!selectedTrip || !isPlanEditable(selectedTrip)) {
       toast.error('Bu plan düzenlenebilir değil');
+      return;
+    }
+
+    // İLİŞKİSEL YOL: plan taşınmışsa kalemler kendi tablolarına yazılıyor.
+    if (iliskiselMi(selectedTrip)) {
+      try {
+        await iliskiselButceyiYaz(selectedTrip.tripId, budgetItems);
+
+        // ÇİFT YAZMA KALDIRILDI (B4 · Adım 5).
+        //
+        // Buradan sonra bir de `PATCH /api/plan-detail/[id]` çağrılıp
+        // `TripPlan.total_cost` güncelleniyordu; o sütun planlar listesinde,
+        // profil istatistiklerinde ve plan detayında okunduğu için taşınmış
+        // planın toplamı yoksa bayatlıyordu. Artık ÜÇÜ DE toplamı sunucuda
+        // `BudgetItem`lardan türetiyor (bkz. src/lib/iliskisel-plan-ozeti.ts),
+        // dolayısıyla yazılacak ikinci bir yer kalmadı. İki modeli aynı anda
+        // güncel tutmak, ayrışmaları için tek bir hata yolunun yetmesi
+        // demekti.
+
+        // Yazma atomik değil; doğruluk kaynağı sunucu. Yeniden okumak hem
+        // yeni kalemlerin GERÇEK kimliklerini getiriyor (istemcinin uydurduğu
+        // geçici id'lerle kalınsaydı bir sonraki kaydetme onları yeniden
+        // eklerdi) hem de kısmi bir yazmayı ekrana yansıtıyor.
+        geziToplaminiYansit(await fetchBudgetItems(selectedTrip));
+        toast.success('Değişiklikler kaydedildi');
+      } catch (error) {
+        logger.error("Bütçe kaydedilemedi", error);
+        toast.error(error instanceof Error ? error.message : 'Değişiklikler kaydedilemedi');
+        // Kısmi yazma olmuş olabilir: ekranı sunucuyla eşitle.
+        geziToplaminiYansit(await fetchBudgetItems(selectedTrip));
+      }
       return;
     }
 
@@ -212,6 +284,78 @@ export default function BudgetPage() {
 
     const data = await response.json();
     return data?.plan as { total_cost?: number; daily_cost?: number } | undefined;
+  };
+
+  /**
+   * Kalem listesini İLİŞKİSEL modele yazar (B4).
+   *
+   * Uç kalem bazlı (POST/PUT/DELETE), sayfa ise toplu kaydediyor. Fark
+   * `butceFarkiCikar` ile çıkarılıyor; değişmeyen kalem hiç istek üretmiyor.
+   *
+   * SIRA ÖNEMLİ: önce silme, sonra güncelleme, en son ekleme. Ekleme en
+   * sona bırakılıyor ki bir hata durumunda kullanıcının VAR OLAN kalemleri
+   * bozulmamış olsun; yeni kalem eklenememesi, mevcut kalemin yanlış
+   * tutarla kalmasından daha az zararlı.
+   *
+   * ATOMİK DEĞİL: uçta toplu bir işlem yok, dolayısıyla zincir ortasında
+   * kesilirse kısmi yazma oluşur. Bu yüzden hata durumunda liste sunucudan
+   * YENİDEN OKUNUYOR — ekranda kalan hayali bir durum, kullanıcının bir
+   * dahaki kaydetmesinde yanlış farkı hesaplattırırdı.
+   */
+  const iliskiselButceyiYaz = async (tripId: string, items: BudgetItem[]) => {
+    const sunucudakiler = await iliskiselKalemleriGetir(tripId);
+    const fark = butceFarkiCikar(items, sunucudakiler);
+
+    if (farkBosMu(fark)) return;
+
+    const kontrol = async (yanit: Response, mesaj: string) => {
+      if (yanit.ok) return;
+      const govde = await yanit.json().catch(() => null);
+      throw new Error(govde?.error || mesaj);
+    };
+
+    for (const id of fark.silinecek) {
+      await kontrol(
+        await fetch(`/api/trip/budget?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+        'Kalem silinemedi'
+      );
+    }
+
+    for (const kalem of fark.guncellenecek) {
+      await kontrol(
+        await fetch('/api/trip/budget', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: kalem.id,
+            category: kalem.category,
+            description: kalem.description,
+            amount: kalem.amount,
+            isPaid: kalem.isPaid,
+            isEstimate: kalem.isEstimate ?? true,
+          }),
+        }),
+        'Kalem güncellenemedi'
+      );
+    }
+
+    for (const kalem of fark.eklenecek) {
+      await kontrol(
+        await fetch('/api/trip/budget', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId,
+            category: kalem.category,
+            description: kalem.description,
+            amount: kalem.amount,
+            isPaid: kalem.isPaid,
+            isEstimate: kalem.isEstimate ?? true,
+          }),
+        }),
+        'Kalem eklenemedi'
+      );
+    }
   };
 
   
@@ -328,31 +472,87 @@ export default function BudgetPage() {
     [parseMarkdownBudget]
   );
 
-  /** Seçili planın bütçe kalemlerini yükler. */
+  /**
+   * İlişkisel modeldeki (`BudgetItem` tablosu) kalemleri okur.
+   *
+   * Kimlikler VERİTABANI KİMLİĞİ olarak geliyor; eşitleme farkı buna
+   * dayanıyor (bkz. src/lib/butce-esitleme.ts).
+   */
+  const iliskiselKalemleriGetir = useCallback(
+    async (tripId: string): Promise<BudgetItem[]> => {
+      const yanit = await fetch(`/api/trip/budget?tripId=${encodeURIComponent(tripId)}`);
+      if (!yanit.ok) throw new Error('Bütçe kalemleri yüklenemedi');
+
+      const govde = await yanit.json();
+      const satirlar = Array.isArray(govde?.budgetItems) ? govde.budgetItems : [];
+
+      return satirlar.map(
+        (satir: {
+          id: string;
+          category: string;
+          description: string;
+          amount: number;
+          currency?: string;
+          isEstimate?: boolean;
+          isPaid?: boolean;
+          date?: string | null;
+        }) => ({
+          id: satir.id,
+          category: satir.category,
+          description: satir.description,
+          amount: satir.amount,
+          currency: satir.currency ?? 'TRY',
+          isEstimate: satir.isEstimate ?? true,
+          isPaid: satir.isPaid ?? false,
+          // Tarih ISO damgası olarak geliyor; fark hesabı gün çözünürlüğünde.
+          ...(satir.date ? { date: String(satir.date).slice(0, 10) } : {}),
+        })
+      );
+    },
+    []
+  );
+
+  /**
+   * Seçili planın bütçe kalemlerini yükler.
+   *
+   * İKİ YOL (B4): plan ilişkisel modele taşınmışsa kalemler `BudgetItem`
+   * tablosundan, taşınmamışsa `TripPlan.butce_tahmini` JSON sütunundan
+   * okunuyor. Ayrımı `migratedAt` yapıyor — "id var mı" gibi dolaylı bir
+   * ipucu değil, taşımanın kendi damgası.
+   */
   const fetchBudgetItems = useCallback(
-    async (tripId: string) => {
-      if (!tripId) return;
+    async (trip: Trip): Promise<BudgetItem[]> => {
+      if (!trip?.id) return [];
 
       try {
-        const response = await fetch(`/api/plan-detail/${tripId}`);
-        if (!response.ok) throw new Error('Plan detayı yüklenemedi');
+        const items = iliskiselMi(trip)
+          ? await iliskiselKalemleriGetir(trip.tripId)
+          : await (async () => {
+              const response = await fetch(`/api/plan-detail/${trip.id}`);
+              if (!response.ok) throw new Error('Plan detayı yüklenemedi');
 
-        const data = await response.json();
-        const items = data?.success && data?.plan
-          ? kalemlereCevir(data.plan.butce_tahmini)
-          : [];
+              const data = await response.json();
+              return data?.success && data?.plan
+                ? kalemlereCevir(data.plan.butce_tahmini)
+                : [];
+            })();
 
         setBudgetItems(items);
         setOriginalBudgetItems([...items]);
         setHasChanges(false);
+
+        // Okunan liste ÇAĞIRANA da dönüyor: durum güncellemesi asenkron,
+        // kaydetme akışı ise toplamı hemen bilmek zorunda.
+        return items;
       } catch (err) {
         logger.error("Bütçe yüklenemedi", err);
         setBudgetItems([]);
         setOriginalBudgetItems([]);
         setHasChanges(false);
+        return [];
       }
     },
-    [kalemlereCevir]
+    [kalemlereCevir, iliskiselKalemleriGetir]
   );
 
   const fetchUserTrips = useCallback(async () => {
@@ -391,9 +591,12 @@ export default function BudgetPage() {
   // Seçili gezi değiştiğinde bütçeyi yeniden yükle. İlk gezi de buradan
   // yükleniyor; eskiden ayrıca fetchUserTrips içinden de çağrılıyor ve
   // aynı istek iki kez atılıyordu.
+  // Bağımlılık `selectedTrip.id`: nesne kimliğine bağlamak her render'da
+  // yeniden yükleme tetikler.
   useEffect(() => {
-    if (!selectedTrip?.id) return;
-    fetchBudgetItems(selectedTrip.id);
+    if (!selectedTrip) return;
+    fetchBudgetItems(selectedTrip);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrip?.id, fetchBudgetItems]);
 
   const addBudgetItem = () => {
@@ -500,13 +703,11 @@ export default function BudgetPage() {
   // Loading durumu
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-[var(--fg-muted)]">
-            Bütçe verileri yükleniyor...
-          </p>
-        </div>
-      </div>
+      <SayfaKabugu>
+        <Yukleniyor
+          metin={status === 'loading' ? 'Oturum kontrol ediliyor…' : 'Bütçe yükleniyor…'}
+        />
+      </SayfaKabugu>
     );
   }
 
@@ -517,21 +718,18 @@ export default function BudgetPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[var(--bg)]">
-        <div className="max-w-2xl mx-auto px-4 md:px-8 py-16">
-          <BosDurum
-            baslik="Bütçe yüklenemedi"
-            aciklama={error}
-            eylem={<Dugme onClick={() => window.location.reload()}>Tekrar dene</Dugme>}
-          />
-        </div>
-      </div>
+      <SayfaKabugu genislik="dar">
+        <BosDurum
+          baslik="Bütçe yüklenemedi"
+          aciklama={error}
+          eylem={<Dugme onClick={() => window.location.reload()}>Tekrar dene</Dugme>}
+        />
+      </SayfaKabugu>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
+    <SayfaKabugu>
         <SayfaBasi
           baslik="Bütçe"
           aciklama="Seyahat harcamalarınızı kalem kalem planlayın ve yolda takip edin."
@@ -584,7 +782,7 @@ export default function BudgetPage() {
                     {tarihAraligi(trip.startDate, trip.endDate)}
                   </p>
                   {trip.total_cost && (
-                    <p className="text-sm text-[var(--fg)] tabular-nums mt-1">
+                    <p className="text-sm text-[var(--fg)] sayisal mt-1">
                       ₺{trip.total_cost.toLocaleString('tr-TR')}
                     </p>
                   )}
@@ -612,10 +810,10 @@ export default function BudgetPage() {
                 hiçbir yerde demektir. */}
             <div className="grid sm:grid-cols-3 gap-3 mb-8">
               <Kart className="p-5">
-                <p className="text-xs uppercase tracking-wide text-[var(--fg-subtle)]">
+                <p className="lejant text-[var(--fg-subtle)]">
                   Toplam maliyet
                 </p>
-                <p className="font-[family-name:var(--font-serif)] text-3xl text-[var(--accent)] tabular-nums mt-1">
+                <p className="font-[family-name:var(--font-serif)] text-3xl text-[var(--accent)] sayisal mt-1">
                   ₺{totalCost.toLocaleString('tr-TR')}
                 </p>
                 <p className="text-sm text-[var(--fg-muted)] mt-2">
@@ -624,10 +822,10 @@ export default function BudgetPage() {
               </Kart>
 
               <Kart className="p-5">
-                <p className="text-xs uppercase tracking-wide text-[var(--fg-subtle)]">
+                <p className="lejant text-[var(--fg-subtle)]">
                   Önerilen bütçe
                 </p>
-                <p className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)] tabular-nums mt-1">
+                <p className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)] sayisal mt-1">
                   ₺{suggestedBudget.toLocaleString('tr-TR')}
                 </p>
                 <p className="text-sm text-[var(--fg-muted)] mt-2">
@@ -637,10 +835,10 @@ export default function BudgetPage() {
               </Kart>
 
               <Kart className="p-5">
-                <p className="text-xs uppercase tracking-wide text-[var(--fg-subtle)]">
+                <p className="lejant text-[var(--fg-subtle)]">
                   Ödenen
                 </p>
-                <p className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)] tabular-nums mt-1">
+                <p className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)] sayisal mt-1">
                   ₺{paidTotal.toLocaleString('tr-TR')}
                 </p>
                 <p className="text-sm text-[var(--fg-muted)] mt-2">
@@ -672,7 +870,7 @@ export default function BudgetPage() {
                           <span className="text-[var(--fg)]">
                             {categoryLabels[category] || category}
                           </span>
-                          <span className="text-[var(--fg-muted)] tabular-nums">
+                          <span className="text-[var(--fg-muted)] sayisal">
                             ₺{amount.toLocaleString('tr-TR')}
                             <span className="text-[var(--fg-subtle)] ml-2">
                               %{yuzde.toFixed(1)}
@@ -785,7 +983,7 @@ export default function BudgetPage() {
                         min={0}
                         value={newItem.amount}
                         onChange={(e) => setNewItem({...newItem, amount: Number(e.target.value)})}
-                        className={cx(GIRDI_SINIFI, "tabular-nums")}
+                        className={cx(GIRDI_SINIFI, "sayisal")}
                         placeholder="0"
                       />
                     </div>
@@ -860,7 +1058,7 @@ export default function BudgetPage() {
                       
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
-                          <div className="font-bold text-[var(--fg)]">₺{item.amount.toLocaleString('tr-TR')}</div>
+                          <div className="font-[family-name:var(--font-geist-mono)] text-[var(--fg)] sayisal">₺{item.amount.toLocaleString('tr-TR')}</div>
                           <div className="text-sm text-[var(--fg-muted)]">
                             {item.isEstimate ? 'Tahmini' : 'Kesin'}
                           </div>
@@ -905,9 +1103,16 @@ export default function BudgetPage() {
             </Kart>
 
             {/* Budget Tips */}
-            <div className="bg-[var(--accent)] p-6 rounded-[var(--radius-lg)] border border-transparent">
-              <h3 className="text-lg font-medium text-[var(--info)] mb-3">Bütçe İpuçları</h3>
-              <ul className="list-disc list-inside space-y-2 text-[var(--accent)]">
+            {/* DÜZELTİLEN GÖRÜNMEZ METİN HATASI: kutunun zemini
+                `bg-[var(--accent)]`, madde metni ise `text-[var(--accent)]`
+                idi — yani liste kendi zeminiyle AYNI renkti ve hiç
+                görünmüyordu (ekran görüntüsüyle doğrulandı). Başlık da
+                `--info` ile aksan zemin üzerine yazılmıştı. */}
+            <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)] shadow-[var(--shadow-kart)]">
+              <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-4">
+                Bütçe ipuçları
+              </h3>
+              <ul className="space-y-2.5 text-[var(--fg-muted)] leading-relaxed">
                 <li>Yerel marketlerden alışveriş yaparak yemek maliyetlerinizi düşürebilirsiniz</li>
                 <li>Şehir kartları ile ulaşım ve müze girişlerinde tasarruf sağlayabilirsiniz</li>
                 <li>Önceden rezervasyon yaparak konaklama maliyetlerini optimize edebilirsiniz</li>
@@ -931,8 +1136,7 @@ export default function BudgetPage() {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </SayfaKabugu>
   );
 }
 

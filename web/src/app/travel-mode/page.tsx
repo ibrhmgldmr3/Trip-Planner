@@ -4,16 +4,221 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 import {
+  Dugme,
   GirisGerekli,
+  Ikon,
+  Kocan,
+  KonturDoku,
+  Olcum,
+  SayfaBasi,
   SayfaKabugu,
   Yukleniyor,
+  cx,
 } from "@/components/ui";
+
+/**
+ * Planlama modu seçimi — yol ayrımı.
+ *
+ * Bu sayfa tek bir karar aldırıyor: hangi yoldan gideceksiniz. Kartografik
+ * karşılığı bir YOL AYRIMI, o yüzden her seçenek kendi rota eskiziyle
+ * geliyor — AI tek çekişte çizilen yumuşak bir hat, adım adım mod ise
+ * kendi koyduğunuz noktalardan geçen kırıklı bir hat. İki eskiz, iki
+ * çalışma biçimi; metni okumadan önce fark görülüyor.
+ *
+ * BU TURDA DÜZELTİLEN GERÇEK HATALAR:
+ *  - Aksan zemin üzerinde `text-[var(--accent)]` vardı: alt başlık kendi
+ *    zeminiyle aynı renkti, yani GÖRÜNMÜYORDU. Aynı yerde `text-[var(--ok)]`
+ *    de kullanılmıştı — yeşil metin teal zeminde okunmuyordu.
+ *  - Onay işaretleri unicode "✓" karakteriydi: fonttan fonta kayıyor ve
+ *    ekran okuyucuda metin olarak okunuyordu. Artık çizilmiş ikon.
+ *  - "Hangi Mod Size Uygun?" bölümü kartların söylediğini tekrar ediyordu.
+ *    İçerik kartların içine taşındı; kullanıcı kararı tek yerde veriyor.
+ *  - `text-3xl font-bold` + `rounded-3xl`: sayfa sistemin dışındaydı.
+ */
+
+/* -------------------------------------------------------------------------- */
+
+const yaziOrtak = {
+  fill: "none" as const,
+  viewBox: "0 0 24 24",
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+interface Kazanim {
+  baslik: string;
+  aciklama: string;
+  ikon: React.ReactNode;
+}
+
+interface Mod {
+  anahtar: "ai" | "manuel";
+  baslik: string;
+  ozet: string;
+  sure: string;
+  rota: string;
+  kazanimlar: Kazanim[];
+  kimIcin: string[];
+  eylem: string;
+}
+
+const MODLAR: Mod[] = [
+  {
+    anahtar: "ai",
+    baslik: "Yapay zekâ ile",
+    ozet:
+      "Şehri, tarihleri ve bütçenizi girin; günlük program, öneriler ve kalem kalem bütçe taslak olarak gelsin.",
+    sure: "2–3 dk",
+    rota: "/ai-planner",
+    kazanimlar: [
+      {
+        baslik: "Tek seferde taslak",
+        aciklama: "Program, yeme-içme ve bütçe birlikte üretilir.",
+        ikon: (
+          <svg {...yaziOrtak} className="h-4 w-4">
+            <path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z" />
+          </svg>
+        ),
+      },
+      {
+        baslik: "İlgi alanına göre",
+        aciklama: "Tarih, mutfak, müze — neye önem verdiğinizi söylersiniz.",
+        ikon: (
+          <svg {...yaziOrtak} className="h-4 w-4">
+            <path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z" />
+            <circle cx="12" cy="10" r="2.5" />
+          </svg>
+        ),
+      },
+      {
+        baslik: "Sonra düzenlenebilir",
+        aciklama: "Taslak kilitli değil; her kalemi kendiniz değiştirirsiniz.",
+        ikon: (
+          <svg {...yaziOrtak} className="h-4 w-4">
+            <path d="M4 20h4l10-10a2.5 2.5 0 10-3.5-3.5L4.5 16.5 4 20z" />
+          </svg>
+        ),
+      },
+    ],
+    kimIcin: [
+      "İlk kez seyahat planlıyorsanız",
+      "Hızlıca bir başlangıç noktası istiyorsanız",
+      "Yeni yerler keşfetmeye açıksanız",
+    ],
+    eylem: "Yapay zekâ ile planla",
+  },
+  {
+    anahtar: "manuel",
+    baslik: "Adım adım",
+    ozet:
+      "Ulaşım, konaklama ve aktiviteleri sırayla kendiniz girin. Her kalem sizin koyduğunuz gibi kalır.",
+    sure: "10–15 dk",
+    rota: "/manual-planner",
+    kazanimlar: [
+      {
+        baslik: "Tam kontrol",
+        aciklama: "Hiçbir kalem sizin onayınız olmadan plana girmez.",
+        ikon: (
+          <svg {...yaziOrtak} className="h-4 w-4">
+            <path d="M12 3l7 3v5.5c0 4.3-2.9 8.1-7 9.5-4.1-1.4-7-5.2-7-9.5V6l7-3z" />
+          </svg>
+        ),
+      },
+      {
+        baslik: "Bölüm bölüm",
+        aciklama: "Ulaşım, konaklama ve aktiviteler ayrı adımlarda.",
+        ikon: (
+          <svg {...yaziOrtak} className="h-4 w-4">
+            <path d="M4 6h16M4 12h16M4 18h9" />
+          </svg>
+        ),
+      },
+      {
+        baslik: "Kesin bütçe",
+        aciklama: "Gerçek fiyatları girersiniz, toplam tahmin değil ölçüdür.",
+        ikon: (
+          <svg {...yaziOrtak} className="h-4 w-4">
+            <path d="M3 7a2 2 0 012-2h11a1 1 0 011 1v2M3 7v11a2 2 0 002 2h14a1 1 0 001-1v-3M3 7h17a1 1 0 011 1v3h-5a2 2 0 100 4h5" />
+          </svg>
+        ),
+      },
+    ],
+    kimIcin: [
+      "Daha önce plan yaptıysanız",
+      "Bütçe konusunda titizseniz",
+      "Özel gereksinimleriniz varsa",
+    ],
+    eylem: "Adım adım planla",
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Rota eskizleri — iki çalışma biçiminin görsel farkı                        */
+/* -------------------------------------------------------------------------- */
+
+/** Yapay zekâ: tek çekişte çizilmiş yumuşak bir hat. */
+function EskizAi() {
+  return (
+    <svg viewBox="0 0 300 96" className="w-full h-auto block" aria-hidden="true">
+      <path
+        d="M22 74C70 74 78 22 150 22S238 66 278 30"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeDasharray="320"
+        className="rota-ciz"
+        style={{ ["--rota-uzunluk" as string]: "320" }}
+      />
+      <circle cx="22" cy="74" r="5" fill="var(--surface)" stroke="var(--accent)" strokeWidth="2" />
+      <circle cx="278" cy="30" r="5" fill="var(--accent)" />
+    </svg>
+  );
+}
+
+/** Adım adım: kendi koyduğunuz noktalardan geçen kırıklı hat. */
+function EskizManuel() {
+  const noktalar = [22, 86, 150, 214, 278];
+  const yukseklik = [74, 44, 60, 30, 52];
+
+  return (
+    <svg viewBox="0 0 300 96" className="w-full h-auto block" aria-hidden="true">
+      <polyline
+        points={noktalar.map((x, i) => `${x},${yukseklik[i]}`).join(" ")}
+        fill="none"
+        stroke="var(--route-vivid)"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray="320"
+        className="rota-ciz"
+        style={{ ["--rota-uzunluk" as string]: "320" }}
+      />
+      {noktalar.map((x, i) => (
+        <rect
+          key={x}
+          x={x - 4.5}
+          y={yukseklik[i] - 4.5}
+          width="9"
+          height="9"
+          fill="var(--surface)"
+          stroke="var(--route-vivid)"
+          strokeWidth="2"
+        />
+      ))}
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 
 export default function TravelModePage() {
   const router = useRouter();
   const { status } = useSession();
 
-  // Session kontrol
   if (status === 'loading') {
     return (
       <SayfaKabugu>
@@ -26,230 +231,123 @@ export default function TravelModePage() {
     return <GirisGerekli />;
   }
 
-  const handleAIMode = () => {
-    toast.success('AI destekli planlama moduna yönlendiriliyorsunuz...');
-    router.push('/ai-planner');
-  };
-
-  const handleManualMode = () => {
-    toast.success('Adım adım planlama moduna yönlendiriliyorsunuz...');
-    router.push('/manual-planner');
+  const modaGit = (mod: Mod) => {
+    toast.success(`${mod.baslik} planlamaya geçiliyor…`);
+    router.push(mod.rota);
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-[var(--fg)] mb-6">
-            Seyahat Planlama Modunu Seçin
-          </h1>
-          <p className="text-xl text-[var(--fg-muted)] max-w-3xl mx-auto">
-            Size en uygun planlama yöntemini seçerek hayalinizdeki seyahati planlamaya başlayın
-          </p>
-        </div>
+    <SayfaKabugu>
+      <SayfaBasi
+        baslik="Nasıl planlamak istersiniz?"
+        aciklama="İki yol da aynı plana çıkar. Fark, ilk taslağı kimin yazdığında: yapay zekâ mı, siz mi. Sonradan her kalemi düzenleyebilirsiniz."
+      />
 
-        {/* Mode Selection Cards */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          
-          {/* AI Mode Card */}
-          <div className="bg-[var(--surface)] rounded-3xl overflow-hidden transition-colors duration-150">
-            <div className="bg-[var(--accent)] p-8 text-white">
-              <div className="flex items-center justify-center mb-4">
-                <div className="bg-white/20 p-4 rounded-full">
-                  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                  </svg>
-                </div>
-              </div>
-              <h2 className="text-3xl font-bold text-center mb-2">AI Destekli Planlama</h2>
-              <p className="text-[var(--accent)] text-center text-lg">Yapay zeka ile otomatik plan</p>
-            </div>
-            
-            <div className="p-8">
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-[var(--info-soft)] p-2 rounded-full mt-1">
-                    <svg className="w-5 h-5 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">Hızlı ve Kolay</h3>
-                    <p className="text-[var(--fg-muted)]">Bilgilerinizi girin, AI size özel plan oluştursun</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="bg-[var(--info-soft)] p-2 rounded-full mt-1">
-                    <svg className="w-5 h-5 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">Akıllı Öneriler</h3>
-                    <p className="text-[var(--fg-muted)]">İlgi alanlarınıza göre kişiselleştirilmiş öneriler</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="bg-[var(--info-soft)] p-2 rounded-full mt-1">
-                    <svg className="w-5 h-5 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">Kapsamlı Plan</h3>
-                    <p className="text-[var(--fg-muted)]">Günlük aktiviteler, yemek önerileri ve bütçe</p>
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={handleAIMode}
-                className="w-full bg-[var(--accent)] text-white py-4 px-6 rounded-[var(--radius-lg)] font-semibold text-lg hover:bg-[var(--accent-hover)] transition-colors duration-150"
-              >
-                AI ile Planla
-              </button>
-              
-              <div className="mt-4 text-center">
-                <span className="text-sm text-[var(--fg-subtle)]">Yaklaşık 2-3 dakika</span>
-              </div>
-            </div>
-          </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        {MODLAR.map((mod) => {
+          const aiMi = mod.anahtar === "ai";
+          const vurgu = aiMi ? "var(--accent)" : "var(--route)";
 
-          {/* Manual Mode Card */}
-          <div className="bg-[var(--surface)] rounded-3xl overflow-hidden transition-colors duration-150">
-            <div className="bg-[var(--accent)] p-8 text-white">
-              <div className="flex items-center justify-center mb-4">
-                <div className="bg-white/20 p-4 rounded-full">
-                  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                  </svg>
+          return (
+            <section
+              key={mod.anahtar}
+              className={cx(
+                "relative flex flex-col overflow-hidden rounded-[var(--radius-lg)]",
+                "bg-[var(--surface)] border border-[var(--line)] shadow-[var(--shadow-kart)]",
+                "transition-[border-color,box-shadow] duration-200 hover:shadow-[var(--shadow-pop)]",
+                aiMi ? "hover:border-[var(--accent-border)]" : "hover:border-[var(--route-border)]"
+              )}
+            >
+              {/* Rota eskizi: iki modun farkı metinden önce görünüyor. */}
+              <div className="relative border-b border-[var(--line)] bg-[var(--surface-2)] px-6 pt-6 pb-2">
+                <KonturDoku yogunluk={0.6} />
+                <div className="relative">
+                  <p className="lejant" style={{ color: vurgu }}>
+                    {aiMi ? "Otomatik taslak" : "Elle kurulum"}
+                  </p>
+                  {aiMi ? <EskizAi /> : <EskizManuel />}
                 </div>
               </div>
-              <h2 className="text-3xl font-bold text-center mb-2">Adım Adım Planlama</h2>
-              <p className="text-[var(--ok)] text-center text-lg">Detaylı kontrol sizde olsun</p>
-            </div>
-            
-            <div className="p-8">
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-[var(--ok-soft)] p-2 rounded-full mt-1">
-                    <svg className="w-5 h-5 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">Tam Kontrol</h3>
-                    <p className="text-[var(--fg-muted)]">Her detayı kendiniz belirleyin</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="bg-[var(--ok-soft)] p-2 rounded-full mt-1">
-                    <svg className="w-5 h-5 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">Adım Adım Rehber</h3>
-                    <p className="text-[var(--fg-muted)]">Ulaşım, konaklama, aktiviteler ayrı ayrı</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="bg-[var(--ok-soft)] p-2 rounded-full mt-1">
-                    <svg className="w-5 h-5 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">Bütçe Analizi</h3>
-                    <p className="text-[var(--fg-muted)]">Detaylı maliyet hesaplama ve analiz</p>
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={handleManualMode}
-                className="w-full bg-[var(--accent)] text-white py-4 px-6 rounded-[var(--radius-lg)] font-semibold text-lg hover:bg-[var(--accent-hover)] transition-colors duration-150"
-              >
-                Adım Adım Planla
-              </button>
-              
-              <div className="mt-4 text-center">
-                <span className="text-sm text-[var(--fg-subtle)]">Yaklaşık 10-15 dakika</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Feature Comparison */}
-        <div className="mt-16 bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
-          <h3 className="text-2xl font-bold text-center text-[var(--fg)] mb-8">
-            Hangi Mod Size Uygun?
-          </h3>
-          
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <h4 className="text-lg font-semibold text-[var(--accent)] flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
-                AI Destekli Modunu Seçin
-              </h4>
-              <ul className="space-y-2 text-[var(--fg-muted)]">
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  İlk kez seyahat planlıyorsanız
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Hızlı plan istiyorsanız
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Yeni öneriler keşfetmek istiyorsanız
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Temel tercihleri belirtmek yeterliyse
-                </li>
-              </ul>
-            </div>
-            
-            <div className="space-y-4">
-              <h4 className="text-lg font-semibold text-[var(--accent)] flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                </svg>
-                Adım Adım Modunu Seçin
-              </h4>
-              <ul className="space-y-2 text-[var(--fg-muted)]">
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Deneyimli seyahat planlayıcısıysanız
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Her detayı kontrol etmek istiyorsanız
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Bütçe konusunda titizseniz
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[var(--accent)] mr-2">✓</span>
-                  Özel gereksinimleriniz varsa
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
+              <div className="flex flex-1 flex-col p-6">
+                <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)]">
+                  {mod.baslik}
+                </h2>
+                <p className="text-[var(--fg-muted)] mt-2 leading-relaxed">{mod.ozet}</p>
+
+                {/* Süre ölçülen bir değer: mono, tabular, lejant etiketli. */}
+                <div className="mt-5">
+                  <Olcum
+                    etiket="Yaklaşık süre"
+                    deger={mod.sure}
+                    ton={aiMi ? "aksan" : "rota"}
+                  />
+                </div>
+
+                <ul className="mt-6 space-y-3">
+                  {mod.kazanimlar.map((kazanim) => (
+                    <li key={kazanim.baslik} className="flex gap-3">
+                      <span
+                        className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-[var(--radius-sm)] border"
+                        style={{
+                          color: vurgu,
+                          borderColor: aiMi ? "var(--accent-border)" : "var(--route-border)",
+                          backgroundColor: aiMi ? "var(--accent-soft)" : "var(--route-soft)",
+                        }}
+                      >
+                        {kazanim.ikon}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-medium text-[var(--fg)]">
+                          {kazanim.baslik}
+                        </span>
+                        <span className="block text-sm text-[var(--fg-muted)] leading-relaxed">
+                          {kazanim.aciklama}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Koçan: "kime uygun" bölümü belgenin koparılabilir kısmı. */}
+                <div className="mt-6">
+                  <Kocan />
+                </div>
+
+                <p className="lejant text-[var(--fg-subtle)] mt-5">Şunlardan biriyseniz</p>
+                <ul className="mt-2.5 space-y-1.5">
+                  {mod.kimIcin.map((satir) => (
+                    <li key={satir} className="flex items-start gap-2 text-sm text-[var(--fg-muted)]">
+                      {/* Unicode "✓" değil, çizilmiş ikon. */}
+                      <Ikon.Onay className="h-4 w-4 shrink-0 mt-0.5" />
+                      {satir}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Eylem her zaman kartın dibinde: iki kart farklı uzunlukta
+                    olsa da düğmeler aynı hizada duruyor. */}
+                <div className="mt-auto pt-7">
+                  <Dugme
+                    tur={aiMi ? "birincil" : "rota"}
+                    boy="lg"
+                    className="w-full"
+                    onClick={() => modaGit(mod)}
+                  >
+                    {mod.eylem}
+                    <Ikon.Sag className="h-4 w-4" />
+                  </Dugme>
+                </div>
+              </div>
+            </section>
+          );
+        })}
       </div>
-    </div>
+
+      <p className="text-sm text-[var(--fg-subtle)] mt-8 text-center max-w-[60ch] mx-auto leading-relaxed">
+        Kararsızsanız yapay zekâ ile başlayın: gelen taslağı adım adım düzenlemek,
+        boş sayfadan başlamaktan hızlıdır.
+      </p>
+    </SayfaKabugu>
   );
 }
-
-

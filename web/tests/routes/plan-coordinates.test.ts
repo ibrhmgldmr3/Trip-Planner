@@ -135,7 +135,8 @@ describe("POST /api/plan-detail/[id]/coordinates", () => {
     const { plan } = kur(BURCU);
     const { status } = await yanit(await cagir("plan-ahmet"));
 
-    expect(status).toBe(403);
+    // 403 DEĞİL 404: ayrım, id'yi bilen birine planın varlığını doğrular.
+    expect(status).toBe(404);
     // En önemli iddia: plan DEĞİŞMEDİ.
     expect(plan().gun_plani).toContain("Kolezyum");
     expect(plan().gun_plani).not.toContain("coordinates");
@@ -201,5 +202,76 @@ describe("POST /api/plan-detail/[id]/coordinates", () => {
 
     expect(status).toBe(400);
     expect(geocodeMock.ekle).not.toHaveBeenCalled();
+  });
+});
+
+/* ========================================================================== */
+/* Taşınmış plan (B4 · Adım 5)                                                */
+/* ========================================================================== */
+
+describe("POST /api/plan-detail/[id]/coordinates — taşınmış plan", () => {
+  /**
+   * Taşınmış planda `TripPlan.gun_plani` SALT OKUNUR ARŞİV: oraya yazılan
+   * koordinat hiçbir ekranda görünmezdi, çünkü plan detayı ve harita gün
+   * planını artık `DailyPlan` satırlarından türetiyor. Bu uç da o yüzden
+   * yazacağı yeri planın taşınma damgasına bakarak seçiyor.
+   */
+  function tasinmisVeri(): SahteVeritabani {
+    const veri = veriKur();
+
+    veri.tripPlan[0].tripId = "gezi-ahmet";
+    veri.tripPlan[0].migratedAt = new Date(2026, 4, 10);
+
+    veri.dailyPlan[0].activities = [
+      { id: "d1-a1", title: "Kolezyum", time: "09:00", location: "Kolezyum" },
+    ];
+
+    return veri;
+  }
+
+  it("koordinatı DailyPlan satırına yazar", async () => {
+    const veri = tasinmisVeri();
+    const { prisma, kayitlar } = sahtePrismaKur(veri);
+    prismaMock.current = prisma;
+    authMock.requireUser.mockResolvedValue(oturum(AHMET));
+
+    const { status, body } = await yanit(await cagir("plan-ahmet"));
+
+    expect(status).toBe(200);
+    expect(body.cozulen).toBe(1);
+
+    const gun = kayitlar("dailyPlan").find((g) => g.id === "gun-ahmet");
+    const aktiviteler = gun?.activities as Array<Record<string, unknown>>;
+    expect(aktiviteler[0].coordinates).toEqual({ lat: 41.89, lng: 12.49 });
+  });
+
+  it("ARŞİV sütununa dokunmaz", async () => {
+    const veri = tasinmisVeri();
+    const { prisma, kayitlar } = sahtePrismaKur(veri);
+    prismaMock.current = prisma;
+    authMock.requireUser.mockResolvedValue(oturum(AHMET));
+
+    const oncekiGunPlani = veri.tripPlan[0].gun_plani;
+    await cagir("plan-ahmet");
+
+    const plan = kayitlar("tripPlan").find((p) => p.id === "plan-ahmet");
+    expect(plan?.gun_plani).toBe(oncekiGunPlani);
+  });
+
+  it("ilişkisel gün YOKSA arşive düşer", async () => {
+    // Taşımada boş günler kayıt üretmemiş olabilir; bu durumda uç eski
+    // davranışına dönüyor, "gün planı okunamıyor" demiyor.
+    const veri = tasinmisVeri();
+    veri.dailyPlan = [];
+
+    const { prisma, kayitlar } = sahtePrismaKur(veri);
+    prismaMock.current = prisma;
+    authMock.requireUser.mockResolvedValue(oturum(AHMET));
+
+    const { status } = await yanit(await cagir("plan-ahmet"));
+
+    expect(status).toBe(200);
+    const plan = kayitlar("tripPlan").find((p) => p.id === "plan-ahmet");
+    expect(String(plan?.gun_plani)).toContain("coordinates");
   });
 });

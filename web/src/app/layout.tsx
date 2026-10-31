@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Geist, Geist_Mono, Roboto, Source_Serif_4 } from "next/font/google";
+import { Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import MobileMenu from "@/components/MobileMenu";
 import AuthProvider from "@/providers/AuthProvider";
@@ -20,15 +20,12 @@ const geistSans = Geist({
   display: "swap",
 });
 
+/**
+ * Mono YALNIZCA ölçülen değerler için: saat, koordinat, para, mesafe ve
+ * harita lejantı etiketleri. "Teknik dursun" diye kullanılmıyor.
+ */
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin", "latin-ext"],
-  display: "swap",
-});
-
-const roboto = Roboto({
-  weight: ["400", "500", "700"],
-  variable: "--font-roboto",
   subsets: ["latin", "latin-ext"],
   display: "swap",
 });
@@ -40,6 +37,9 @@ const roboto = Roboto({
  * kalınlık büyütmeden kuruyor. Eskiden hiyerarşi yalnızca boyutla
  * anlatılıyordu (kart içinde `text-2xl font-bold` başlıklar) ve sayfa
  * bağırıyordu.
+ *
+ * NOT: Roboto kaldırıldı. Üç ağırlığı indiriliyordu ama hiçbir yerde
+ * kullanılmıyordu — yalnızca gövdenin yedek listesinde duruyordu.
  */
 const sourceSerif = Source_Serif_4({
   variable: "--font-serif",
@@ -48,10 +48,22 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Trip Planner - Seyahat Planlayıcı",
-  description: "Seyahatlerinizi planlamanın en kolay yolu",
-  keywords: "seyahat planlama, gezi rotası, harita, POI, şehir gezisi",
+  title: "Trip Planner — Seyahat Planlayıcı",
+  description:
+    "Şehir, tarih ve bütçenizi söyleyin; günlük program, rota ve kalem kalem bütçe çıkaralım.",
+  keywords: "seyahat planlama, gezi rotası, harita, POI, şehir gezisi, bütçe",
   authors: [{ name: "İbrahim Güldemir" }],
+};
+
+/**
+ * Tarayıcı arayüzü (adres çubuğu) sayfa zeminiyle aynı renkte olsun.
+ * Mobilde kâğıt zeminin ekranın tepesinde kesilmesini engelliyor.
+ */
+export const viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eff3f5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a1420" },
+  ],
 };
 
 /**
@@ -72,6 +84,40 @@ const temaScript = `
 })();
 `;
 
+/**
+ * Yön sözleşmesi.
+ *
+ * Üretim çıktısında da duruyor: tasarım kararının kaynağı, kodun yanında.
+ * React yorum düğümü basamadığı için gizli bir kapsayıcıya gömülüyor.
+ */
+const YON_SOZLESMESI = `<!--
+IMPECCABLE / kartografi-seyahat-gunlugu
+
+THESIS: Bir seyahat planlayıcısı ürettiği BELGEYE benzemeli. Yüzey harita ve
+seyahat evrakının dilini alır. Reddettiği düzen: altı eşit ikon+başlık+metin
+kartından oluşan SaaS ızgarası ve düz gri-beyaz zemin.
+
+OWN-WORLD: Soğuk mavi-gri deniz haritası kâğıdı #eff3f5 üzerinde 34px
+koordinat ızgarası. Mürekkep prusya mavisi #14456b, rota macenta #9c3f6a,
+damga pirinç #b8892c. Source Serif 4 başlık / Geist Sans gövde / Geist Mono
+yalnızca ölçülen değerlerde. Kontur SVG dokusu, delikli koçan ayraçları,
+eğik çift halkalı damgalar, pusula gülü işareti.
+
+STORY: Ziyaretçi ilk ekranda ürünün GERÇEK çıktısını görür — tarihli,
+damgalı, bütçesi hesaplanmış bir plan. Anlatılmaz, gösterilir.
+
+FIRST VIEWPORT: Solda serif başlık ve tek birincil eylem; sağda gerçek bir
+plan belgesi (üst bilgi + HAZIR damgası, koçan ayracı, iki ölçüm, macenta
+rota hattıyla üç duraklı program). Zeminde kontur ve ızgara.
+
+FORM: Belge/evrak formu; sıralı listede 1. sıra; kullanıcı kilidi
+"Kartografi / Seyahat Günlüğü".
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the
+finish review, the verdict, DESIGN.md, and every shipping raster carrying its
+provenance
+-->`;
+
 export default async function RootLayout({
   children,
 }: {
@@ -85,7 +131,7 @@ export default async function RootLayout({
     <html
       lang="tr"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} ${sourceSerif.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable}`}
     >
       <head>
         {/*
@@ -102,8 +148,6 @@ export default async function RootLayout({
           çalışmış durumda, işlevsel etkisi yok. Nonce'u kaldırmak ise CSP
           zorlama moduna geçildiğinde tema script'ini tamamen bloke ederdi
           (FOUC + yanlış tema). Güvenlik, konsol temizliğinden önce gelir.
-          Kalıcı çözüm nonce yerine CSP hash'i kullanmak; script sabit
-          olduğu için mümkün, ama ayrı bir iş.
         */}
         <script
           nonce={nonce}
@@ -112,6 +156,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-screen">
+        <div hidden dangerouslySetInnerHTML={{ __html: YON_SOZLESMESI }} />
         <AuthProvider>
           <ThemeProvider>
             <MobileMenu />
@@ -124,4 +169,3 @@ export default async function RootLayout({
     </html>
   );
 }
-

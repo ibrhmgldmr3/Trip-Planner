@@ -35,6 +35,25 @@ const eslintConfig = [
       "no-console": "off",
     },
   },
+  {
+    /**
+     * Harita sayfasında `any` YASAK.
+     *
+     * Bu dosya 11 yerde `(window as any).google` yazıyordu ve
+     * `@types/google.maps` kurulu olduğu hâlde kullanılmıyordu. Tiplendirme
+     * sırasında iki gerçek hata ortaya çıktı: `POI.geometry.location` elle
+     * yazılmış bir yapıyla `LatLngLiteral` arasında karışıyordu ve rota
+     * ölçüleri (`distanceMeters` / `durationMillis`) `undefined`
+     * gelebildiği hâlde koşulsuz bölünüyordu — ekranda "NaN km" yazıyordu.
+     *
+     * Kural dosyaya özel: projenin geri kalanında `any` zaten yok, ama en
+     * kırılgan ve en uzun ekran burası ve `any` buraya geri sızmamalı.
+     */
+    files: ["src/app/map/page.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
 ];
 
 export default eslintConfig;

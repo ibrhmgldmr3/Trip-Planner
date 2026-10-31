@@ -36,7 +36,8 @@ import {
 } from "@/lib/trip-plan-schema";
 import { serializeStructuredPlan } from "@/lib/trip-plan-serialize";
 import { geocodingYapilandirilmisMi, gunlereKoordinatEkle } from "@/lib/geocoding";
-import { gunleriCoz } from "@/lib/plan-budget";
+import { butceyiCoz, gunleriCoz } from "@/lib/plan-budget";
+import { butceyeSehirlerarasiUlasimEkle } from "@/lib/ulasim-butce";
 import { extractBudgetInfo, parseTripPlanSections } from "@/lib/legacy-plan-parser";
 import { type PlanRequestInput } from "@/lib/api-schemas";
 import { logger } from "@/lib/logger";
@@ -74,6 +75,7 @@ async function saveTripPlanToDatabase(
   formData: {
     city: string;
     country?: string;
+    originCity?: string;
     startDate?: string;
     endDate?: string;
     budget?: string;
@@ -98,6 +100,11 @@ async function saveTripPlanToDatabase(
       data: {
         city: formData.city.trim(),
         country: formData.country?.trim() || null,
+        // Kalkış şehri (B6). Bu sütun bu ana kadar yalnızca manuel
+        // planlayıcı tarafından dolduruluyordu; AI yolundan gelen her
+        // planda null kalıyor ve şehirlerarası ulaşım bütçeye hiç
+        // girmiyordu.
+        originCity: formData.originCity?.trim() || null,
         startDate: tarihiCoz(formData.startDate),
         endDate: tarihiCoz(formData.endDate),
         duration: formData.duration || null,
@@ -641,6 +648,7 @@ export async function planUret(
   const {
     city,
     country,
+    originCity,
     startDate,
     endDate,
     budget,
@@ -676,6 +684,19 @@ export async function planUret(
   });
 
   const hedef = `${city.trim()}${country?.trim() ? `, ${country.trim()}` : ""}`;
+
+  /**
+   * Güzergâh satırı (B6).
+   *
+   * MODELDEN FİYAT İSTENMİYOR, BAĞLAM VERİLİYOR. Şehirlerarası ulaşımın
+   * TUTARI aşağıda `seyahat-mesafe.ts` ile hesaplanıp bütçeye ekleniyor;
+   * burada modele yalnızca yolculuğun nereden başladığı söyleniyor ki ilk
+   * ve son günün programını varış/dönüş saatlerine göre kursun. Eskiden
+   * model her planı "şehirdesiniz" varsayımıyla yazıyordu.
+   */
+  const guzergah = originCity?.trim()
+    ? `\n- Yolculuk ${originCity.trim()} çıkışlı: ilk günü varışa, son günü dönüşe göre planla.`
+    : "";
   const tarihAraligi = startDate
     ? `${startDate} ile ${endDate} tarihleri arasında (${durationText})`
     : "esnek tarihlerde";
@@ -687,7 +708,7 @@ Tercihler:
 ${tercihler}
 
 Kurallar:
-- ${planGunSayisi > 0 ? `Tam olarak ${planGunSayisi} gün` : "3 gün"} planla; "days" dizisi bu kadar eleman içersin.
+- ${planGunSayisi > 0 ? `Tam olarak ${planGunSayisi} gün` : "3 gün"} planla; "days" dizisi bu kadar eleman içersin.${guzergah}
 - Her gün için sabah, öğleden sonra ve akşam aktivitelerini ayrı aktiviteler olarak ver.
 - Aktivite saatlerini "09:00" biçiminde yaz.
 - Tüm tutarlar Türk Lirası cinsinden sayı olsun (para birimi sembolü yazma).
@@ -796,6 +817,46 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     };
   }
 
+  // ŞEHİRLERARASI ULAŞIMI BÜTÇEYE EKLE (B6).
+  //
+  // NEDEN BURADA, İKİ YOLDAN SONRA: hem yapılandırılmış hem markdown
+  // üretimi `kolonlar`ı doldurmuş oluyor; ekleme tek yerde yapılınca iki
+  // yol da aynı bütçeyi üretiyor.
+  //
+  // BÜTÇE ÇÖZÜLEMİYORSA SESSİZCE GEÇİLİYOR: markdown yolunda
+  // `butce_tahmini` düz metin olabiliyor ve çözemediğimiz bir metne kalem
+  // eklemeye kalkmak veri kaybı olurdu. Ulaşımın eksik kalması, bütçenin
+  // tamamının bozulmasından iyidir.
+  if (originCity?.trim()) {
+    const mevcutButce = butceyiCoz(kolonlar.butce_tahmini);
+
+    if (mevcutButce) {
+      const sonuc = butceyeSehirlerarasiUlasimEkle(
+        mevcutButce,
+        originCity,
+        city,
+        transportationList,
+        planGunSayisi
+      );
+
+      if (sonuc) {
+        kolonlar = {
+          ...kolonlar,
+          butce_tahmini: JSON.stringify(sonuc.butce),
+          total_cost: sonuc.butce.totalCostWithExtras,
+          daily_cost: sonuc.butce.dailyAverage,
+        };
+
+        logger.debug("Şehirlerarası ulaşım bütçeye eklendi", {
+          tur: sonuc.secenek.tur,
+          tutar: sonuc.kalem.amount,
+        });
+      }
+    } else {
+      logger.warn("Bütçe çözülemedi, şehirlerarası ulaşım eklenemedi");
+    }
+  }
+
   // Aktivite konumlarını koordinata çevir (Faz D).
   //
   // NEDEN KAYITTAN ÖNCE: tek bir yazma işlemi kalıyor, kısmi durum (plan
@@ -830,6 +891,7 @@ Lütfen Markdown formatında, düzenli başlıklar ve listeler kullanarak yanıt
     {
       city: city.trim(),
       country: country?.trim(),
+      originCity: originCity?.trim(),
       startDate,
       endDate,
       budget,

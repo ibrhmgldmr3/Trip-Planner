@@ -11,16 +11,78 @@ import { z } from "zod";
  */
 
 /** `POST /api/register` gövdesi. */
+/**
+ * Şifre kuralı TEK YERDE.
+ *
+ * Kayıt ve şifre SIFIRLAMA aynı kuralı uygulamak zorunda; iki ayrı kopya,
+ * sıfırlama yoluyla kayıtta kabul edilmeyecek bir şifrenin konabilmesi
+ * demekti.
+ */
+export const sifreKurali = z
+  .string()
+  .min(8, "Şifre en az 8 karakter olmalıdır")
+  // bcrypt 72 byte'tan sonrasını sessizce yok sayar.
+  .max(72, "Şifre en fazla 72 karakter olabilir")
+  .regex(/[a-zA-Z]/, "Şifre en az bir harf içermelidir")
+  .regex(/[0-9]/, "Şifre en az bir rakam içermelidir");
+
+/** E-posta alanı; kayıt ve sıfırlama isteği aynı normalizasyonu paylaşıyor. */
+export const epostaKurali = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Geçerli bir e-posta giriniz")
+  .max(200);
+
 export const registerSchema = z.object({
   name: z.string().trim().min(2, "İsim en az 2 karakter olmalıdır").max(80),
-  email: z.string().trim().toLowerCase().email("Geçerli bir e-posta giriniz").max(200),
-  password: z
-    .string()
-    .min(8, "Şifre en az 8 karakter olmalıdır")
-    // bcrypt 72 byte'tan sonrasını sessizce yok sayar.
-    .max(72, "Şifre en fazla 72 karakter olabilir")
-    .regex(/[a-zA-Z]/, "Şifre en az bir harf içermelidir")
-    .regex(/[0-9]/, "Şifre en az bir rakam içermelidir"),
+  email: epostaKurali,
+  password: sifreKurali,
+});
+
+/** `POST /api/auth/reset-request` gövdesi (B9). */
+export const sifreSifirlamaIstegiSchema = z.object({
+  email: epostaKurali,
+});
+
+/**
+ * Jeton alanı: 32 bayt base64url, yani 43 karakter.
+ *
+ * Alt sınır 20 — daha kısa bir değerle veritabanına sorgu atmanın anlamı
+ * yok. Üst sınır, uzun bir metinle boşuna özet hesaplatmayı engelliyor.
+ */
+const jetonKurali = z.string().trim().min(20, "Bağlantı geçersiz").max(200);
+
+/** `POST /api/auth/reset` gövdesi (B9). */
+export const sifreSifirlamaSchema = z.object({
+  token: jetonKurali,
+  password: sifreKurali,
+});
+
+/** `POST /api/auth/verify` gövdesi (B9). */
+export const epostaDogrulamaSchema = z.object({
+  token: jetonKurali,
+});
+
+/**
+ * `DELETE /api/profile` gövdesi (B9).
+ *
+ * ONAY İSTENİYOR: hesap silme geri alınamaz ve kullanıcının bütün
+ * planlarını da götürüyor. Açık kalmış bir oturumun tek tıkla her şeyi
+ * silebilmesi kabul edilemez.
+ *
+ * TEK ALAN, İKİ ANLAM: şifreyle açılmış hesapta ŞİFRE, yalnızca Google
+ * ile açılmış hesapta E-POSTA ADRESİ. İkincisinde doğrulanacak bir şifre
+ * yok; adresi elle yazdırmak, kazara silmenin önüne geçen en yakın
+ * karşılık. Hangisinin beklendiğine sunucu karar veriyor — istemcinin
+ * "bu hesabın şifresi var mı" bilgisine göre dallanması, o bilgiyi
+ * dışarıya taşımak olurdu.
+ *
+ * Şifre KURALI uygulanmıyor: mevcut şifre eski kurallara göre konmuş
+ * olabilir ve doğrulama zaten bcrypt karşılaştırmasıyla yapılıyor.
+ */
+export const hesapSilmeSchema = z.object({
+  onay: z.string().min(1, "Onay alanı boş bırakılamaz").max(200),
 });
 
 /**
@@ -29,6 +91,14 @@ export const registerSchema = z.object({
  */
 export const planRequestSchema = z.object({
   city: z.string().trim().min(1, "Şehir bilgisi gereklidir").max(80),
+  /**
+   * Kalkış şehri (B6).
+   *
+   * OPSİYONEL: yurt dışı planlarında ve "zaten oradayım" senaryosunda
+   * karşılığı yok. Doluysa `TripPlan.origin_city` sütununa yazılıyor ve
+   * bütçeye şehirlerarası ulaşım kalemi ekleniyor.
+   */
+  originCity: z.string().trim().max(80).optional(),
   country: z.string().trim().max(80).optional(),
   startDate: z.string().max(40).optional(),
   endDate: z.string().max(40).optional(),
@@ -105,6 +175,11 @@ const manuelAktiviteSchema = z.object({
  */
 export const manualPlanSchema = z.object({
   basicInfo: z.object({
+    /**
+     * Kalkış şehri. Opsiyonel: bu alan sonradan eklendi ve daha eski
+     * istemciler göndermiyor — zorunlu kılmak onları kırardı.
+     */
+    origin: z.string().trim().max(80).optional().default(""),
     destination: z.string().trim().min(1, "Hedef şehir gereklidir").max(80),
     country: z.string().trim().max(80).optional().default(""),
     startDate: z.string().min(1, "Başlangıç tarihi gereklidir").max(40),
@@ -255,6 +330,22 @@ export const dailyActivitySchema = z.object({
   location: z.string().trim().max(200).optional(),
   cost: z.number().finite().min(0).max(10_000_000).optional(),
   category: z.string().trim().max(60).optional(),
+  /**
+   * Aktivitenin çözülmüş konumu.
+   *
+   * NEDEN İLİŞKİSEL TARAFTA DA VAR (B4 · Adım 5): harita sayfası rotayı bu
+   * koordinatlardan çiziyor ve taşınmış planlarda `gun_plani` artık
+   * `DailyPlan` satırlarından türetiliyor. Alan burada olmasaydı, taşınan
+   * her planın haritası — kullanıcı hiçbir şey yapmadan — boşalırdı.
+   *
+   * Sınırlar WGS84: geçersiz bir çift, rotayı okyanusun ortasına taşır.
+   */
+  coordinates: z
+    .object({
+      lat: z.number().finite().min(-90).max(90),
+      lng: z.number().finite().min(-180).max(180),
+    })
+    .optional(),
 });
 
 /** `POST /api/trip/daily-plans` gövdesi. */
@@ -376,3 +467,37 @@ export const transportPricesToolArgsSchema = z.object({
 });
 
 export type TransportPricesToolArgs = z.infer<typeof transportPricesToolArgsSchema>;
+
+/**
+ * `GET /api/transport-options` sorgu parametreleri.
+ *
+ * `web` bir sorgu dizesinden geliyor, yani her zaman METİN. Zod'un
+ * `coerce.boolean()`u burada işe yaramaz: `Boolean("0")` true'dur ve
+ * `?web=0` sessizce arama yapardı. Açıkça çeviriyoruz.
+ */
+export const transportOptionsQuerySchema = z.object({
+  from: z.string().trim().min(1, "Kalkış şehri gereklidir").max(80),
+  to: z.string().trim().min(1, "Varış şehri gereklidir").max(80),
+  web: z
+    .string()
+    .optional()
+    .transform((v) => v !== "0" && v !== "false"),
+});
+
+export type TransportOptionsQuery = z.infer<typeof transportOptionsQuerySchema>;
+
+/**
+ * `GET /api/accommodation-options` sorgu parametreleri.
+ *
+ * Tarihler serbest metin: sorgu şablonuna "Kasım 2026" gibi bir ay/yıl
+ * olarak giriyorlar (bkz. web-search.ts `ayYilMetni`), biçim zorlamanın
+ * bir karşılığı yok.
+ */
+export const accommodationOptionsQuerySchema = z.object({
+  city: z.string().trim().min(1, "Şehir gereklidir").max(80),
+  checkIn: z.string().trim().max(40).optional(),
+  checkOut: z.string().trim().max(40).optional(),
+  budgetLevel: z.string().trim().max(40).optional(),
+});
+
+export type AccommodationOptionsQuery = z.infer<typeof accommodationOptionsQuerySchema>;

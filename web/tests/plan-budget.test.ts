@@ -103,6 +103,23 @@ describe("butceyiCoz", () => {
     expect(butceyiCoz(ham)?.totalCostWithExtras).toBe(1000);
   });
 
+  it("toplam yoksa extraItemsTotal'a DÜŞMEZ", () => {
+    // REGRESYON: plan detay sayfası kendi ayrıştırıcısında
+    // `totalCostWithExtras ?? extraItemsTotal` yazıyordu. `extraItemsTotal`
+    // bir toplam DEĞİL — kategori dışı kalemlerin tutarı. Toplam alanı boş
+    // bir satırda ekranda "Toplam: ₺50" görünüyordu; doğrusu ₺1.000.
+    const ham = JSON.stringify({
+      categories: { yemek: { items: [], total: 300 }, "ulaşım": { items: [], total: 700 } },
+      extraItemsTotal: 50,
+    });
+
+    const butce = butceyiCoz(ham)!;
+    expect(butce.totalCostWithExtras).toBe(1000);
+    // Alan okunuyor ama toplama KATILMIYOR; adına rağmen türetilmiş
+    // alanların hiçbirine girmiyor (bkz. PlanButcesi.extraItemsTotal notu).
+    expect(butce.extraItemsTotal).toBe(50);
+  });
+
   it("bozuk kalemleri eler, sayfayı düşürmez", () => {
     const ham = JSON.stringify({
       categories: { yemek: { items: [null, 5, { description: "Ok", amount: 100 }], total: 100 } },

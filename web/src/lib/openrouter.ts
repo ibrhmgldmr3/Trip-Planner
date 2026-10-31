@@ -1,4 +1,5 @@
 import { env } from "@/env";
+import { logger } from "@/lib/logger";
 
 /**
  * OpenRouter istemcisi ve model seçimi.
@@ -32,6 +33,158 @@ export function openRouterModels(): string[] {
 
   // Aynı model iki kez denenmesin.
   return birincil === yedek ? [birincil] : [birincil, yedek];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Model sağlığı                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Model kimliği ücretsiz katmanı mı gösteriyor?
+ *
+ * OpenRouter ücretsiz varyantları `:free` sonekiyle ayırıyor. Sonek
+ * kaldırılan bir model başka bir kimlik demek, yani "aynı modelin ücretli
+ * hâline geçildi" varsayımı YAPILAMAZ — bu yüzden kod otomatik bir geçiş
+ * denemiyor, yalnızca uyarıyor.
+ */
+export function ucretsizModelMi(model: string): boolean {
+  return model.trim().endsWith(":free");
+}
+
+/**
+ * Üretimde ücretsiz model kullanılıyorsa BİR KEZ uyarır.
+ *
+ * NEDEN VAR: bu hata modu üç kez yaşandı ve üçünde de SESSİZ oldu. Ücretsiz
+ * bir model katalogdan kalktığında OpenRouter 404 dönüyor, plan üretimi
+ * yedeğe düşüyor, yedek de aynı gün ölmüşse zincirin tamamı kırılıyor —
+ * ve bunu ancak bir kullanıcı şikâyet ettiğinde öğreniyoruz.
+ *
+ * Uyarı log'a düşüyor, üretimi DURDURMUYOR: yerel geliştirmede ücretsiz
+ * model tamamen makul, engellemek geliştiriciyi anahtar almaya zorlardı.
+ * Yalnızca `NODE_ENV=production` altında ve modül başına bir kez basılıyor
+ * ki her istekte log'u doldurmasın.
+ */
+let uyariBasildi = false;
+
+export function ucretsizModelUyarisi(): void {
+  if (uyariBasildi) return;
+  if (process.env.NODE_ENV !== "production") return;
+
+  const ucretsizler = openRouterModels().filter(ucretsizModelMi);
+  if (ucretsizler.length === 0) return;
+
+  uyariBasildi = true;
+  logger.warn(
+    "Üretimde ücretsiz OpenRouter modeli kullanılıyor; katalogdan kalkarsa plan üretimi sessizce durur",
+    undefined,
+    { modeller: ucretsizler }
+  );
+}
+
+/** Tek bir modelin katalogdaki durumu. */
+export interface ModelDurumu {
+  model: string;
+  /** Model OpenRouter kataloğunda hâlâ duruyor mu? */
+  bulundu: boolean;
+  ucretsiz: boolean;
+}
+
+export interface ModelYoklamasi {
+  /** Katalog OKUNABİLDİ mi? Modellerin bulunup bulunmadığından bağımsız. */
+  ok: boolean;
+  /** HTTP durum kodu; ağ hatasında 0. */
+  status: number;
+  modeller: ModelDurumu[];
+  /** Yapılandırılmış modellerden katalogda olmayanlar. */
+  eksikler: string[];
+  /** Yalnızca sunucu log'una yazılacak hata ayrıntısı. */
+  detay: string;
+}
+
+/**
+ * Yapılandırılmış modellerin katalogda hâlâ var olduğunu doğrular.
+ *
+ * NEDEN SOHBET ÇAĞRISI DEĞİL: `/api/v1/models` bir GET, ücretsiz ve token
+ * harcamıyor. Sorulan soru zaten "model hâlâ var mı?" — sohbet çağrısı bunu
+ * da doğrular ama her sağlık yoklamasında para harcar. Anahtarın geçerli
+ * olduğunu ayrıca doğrulamak isteyen canlı test gerçek bir çağrı yapıyor
+ * (tests/openrouter.canli.test.ts).
+ *
+ * ASLA FIRLATMAZ: sağlık ucundan çağrılıyor ve orada bir istisna
+ * `/health`in kendisini düşürürdü.
+ */
+export async function modelleriYokla(timeoutMs = 5_000): Promise<ModelYoklamasi> {
+  const modeller = openRouterModels();
+  const bos = modeller.map((model) => ({
+    model,
+    bulundu: false,
+    ucretsiz: ucretsizModelMi(model),
+  }));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}` },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const govde = await response.text().catch(() => "");
+      return {
+        ok: false,
+        status: response.status,
+        modeller: bos,
+        eksikler: [],
+        detay: govde.slice(0, 300),
+      };
+    }
+
+    const govde = (await response.json()) as { data?: Array<{ id?: unknown }> };
+    const kimlikler = new Set(
+      (Array.isArray(govde.data) ? govde.data : [])
+        .map((m) => (typeof m.id === "string" ? m.id : ""))
+        .filter(Boolean)
+    );
+
+    // Katalog boş dönerse "hepsi eksik" demek yanlış olur; sağlayıcı
+    // tarafında beklenmeyen bir yanıt şekli var demektir.
+    if (kimlikler.size === 0) {
+      return {
+        ok: false,
+        status: response.status,
+        modeller: bos,
+        eksikler: [],
+        detay: "Katalog boş ya da beklenmeyen biçimde",
+      };
+    }
+
+    const durumlar = modeller.map((model) => ({
+      model,
+      bulundu: kimlikler.has(model),
+      ucretsiz: ucretsizModelMi(model),
+    }));
+
+    return {
+      ok: true,
+      status: response.status,
+      modeller: durumlar,
+      eksikler: durumlar.filter((d) => !d.bulundu).map((d) => d.model),
+      detay: "",
+    };
+  } catch (error) {
+    const iptal = error instanceof Error && error.name === "AbortError";
+    return {
+      ok: false,
+      status: 0,
+      modeller: bos,
+      eksikler: [],
+      detay: iptal ? `Zaman aşımı (${timeoutMs} ms)` : `Ağ hatası: ${String(error)}`,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface ChatMessage {
@@ -81,6 +234,31 @@ export interface ChatResult {
  * her zaman bir `ChatResult` döner.
  */
 export async function chatCompletion(request: ChatRequest): Promise<ChatResult> {
+  // Üretimde ücretsiz model kullanılıyorsa bir kez uyarır; no-op sonrası.
+  ucretsizModelUyarisi();
+
+  // GÖNDERİLMEYEN PARAMETRELER: `frequency_penalty` ve `presence_penalty`.
+  //
+  // İkisi de 0, yani sağlayıcı varsayılanıyla aynı — davranışa hiçbir
+  // katkıları yoktu. Ama `provider.require_parameters: true` ile
+  // birleştiklerinde OpenRouter'ın yönlendirmesini DARALTIYORLAR: istek
+  // yalnızca istenen TÜM parametreleri destekleyen sağlayıcılara gidebiliyor.
+  //
+  // Ölçüldü (2 Eylül 2026, gerçek çağrı): varsayılan birincil model
+  // `dots-studio/dots-3-note-preview:free` bu iki parametreyi desteklemiyor
+  // (`supported_parameters` listesinde yoklar) ve istek
+  //   404 "No endpoints found that can handle the requested parameters"
+  // dönüyordu. Aynı istek penalty'ler olmadan 200 dönüyor.
+  //
+  // ETKİSİ: `plan-generation.ts`'in BİRİNCİ ve en iyi stratejisi (strict
+  // `json_schema`) her üretimde sessizce başarısız oluyor, zincir
+  // `json_object`e düşüyordu. Plan yine üretiliyordu — bu yüzden hata
+  // görünmüyordu — ama her istekte bir tur boşa gidiyor ve şema garantisi
+  // kayboluyordu.
+  //
+  // KURAL: `require_parameters` ile birlikte YALNIZCA gerçekten ihtiyaç
+  // duyulan parametreler gönderilmeli. Varsayılan değerli bir parametre
+  // eklemek burada bedava değil.
   const body: Record<string, unknown> = {
     model: request.model,
     messages: request.messages,
@@ -88,8 +266,6 @@ export async function chatCompletion(request: ChatRequest): Promise<ChatResult> 
     // Yapılandırılmış çıktı markdown'dan daha uzun sürebiliyor.
     max_tokens: request.maxTokens ?? 16000,
     top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
   };
 
   if (request.responseFormat) {

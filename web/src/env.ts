@@ -43,6 +43,33 @@ export const env = createEnv({
      * OLMAZ (bkz. src/lib/geocoding.ts).
      */
     GOOGLE_MAPS_SERVER_API_KEY: z.string().min(1).optional(),
+    /**
+     * Zamanlanmış görev (cron) paylaşılan sırrı.
+     *
+     * `POST /api/plan-jobs/temizle` bunu bekliyor. Tanımsızsa uç KAPALI
+     * (503) — sırsız bir temizlik ucu, herkesin çağırabildiği bir yazma
+     * ucu demek olurdu.
+     *
+     * En az 32 karakter: bu sır bir insan tarafından hatırlanmıyor,
+     * üretilip gizli yöneticiye konuyor.
+     */
+    CRON_SECRET: z.string().min(32).optional(),
+    /**
+     * İşlemsel e-posta sağlayıcısı (Resend) anahtarı — B9.
+     *
+     * `EPOSTA_GONDEREN` ile BİRLİKTE tanımlanmalı; biri eksikse gönderim
+     * yapılandırılmamış sayılıyor ve şifre sıfırlama ucu 503 dönüyor.
+     * "Gönderdik" deyip hiç göndermemek, kullanıcıyı olmayan bir postayı
+     * beklemeye mahkûm ederdi.
+     */
+    RESEND_API_KEY: z.string().min(1).optional(),
+    /**
+     * Gönderen adresi, örn. `Trip Planner <bilgi@alanadiniz.com>`.
+     *
+     * Alan adı sağlayıcıda DOĞRULANMIŞ olmalı; doğrulanmamış alan adından
+     * gönderim reddedilir ve kullanıcı sıfırlama postasını hiç almaz.
+     */
+    EPOSTA_GONDEREN: z.string().min(1).optional(),
   },
   client: {
     // Maps JS API tarayıcıda yüklendiği için bu anahtar zorunlu olarak public.
@@ -65,6 +92,9 @@ export const env = createEnv({
     TOGETHER_MODEL: process.env.TOGETHER_MODEL,
     TAVILY_API_KEY: process.env.TAVILY_API_KEY,
     GOOGLE_MAPS_SERVER_API_KEY: process.env.GOOGLE_MAPS_SERVER_API_KEY,
+    CRON_SECRET: process.env.CRON_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EPOSTA_GONDEREN: process.env.EPOSTA_GONDEREN,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:
       process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
   },

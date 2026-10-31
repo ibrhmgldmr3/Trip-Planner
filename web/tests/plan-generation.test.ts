@@ -200,10 +200,22 @@ beforeEach(() => {
   openRouterMock.chatCompletion.mockResolvedValue(openRouterBasarili());
 });
 
-async function planUretCagir(girdi: Partial<{ city: string; country: string }> = {}) {
+async function planUretCagir(
+  girdi: Partial<{
+    city: string;
+    country: string;
+    originCity: string;
+    transportation: string[];
+  }> = {}
+) {
   const { planUret } = await import("@/lib/plan-generation");
   return planUret(
-    { city: girdi.city ?? "Roma", country: girdi.country },
+    {
+      city: girdi.city ?? "Roma",
+      country: girdi.country,
+      originCity: girdi.originCity,
+      transportation: girdi.transportation,
+    },
     { userId: "u1" }
   );
 }
@@ -775,5 +787,90 @@ describe("araç sonucu zararsızlaştırma", () => {
     expect(aracMesaji.content).not.toContain("<|im_start|>");
     expect(aracMesaji.content).not.toContain("<|im_end|>");
     expect(aracMesaji.content).toContain("fiyat 3000 TL");
+  });
+});
+
+/* ========================================================================== */
+/* Kalkış şehri uçtan uca (B6)                                                */
+/* ========================================================================== */
+
+describe("kalkış şehri", () => {
+  /**
+   * SORUN NEYDİ: AI planlayıcı kalkış şehrini hiç sormuyordu; sütun her
+   * planda null kalıyor ve ŞEHİRLERARASI ULAŞIM bütçeye hiç girmiyordu.
+   * Kullanıcı "İstanbul'dan Kars'a" plan istiyor, bütçede uçak bileti
+   * görünmüyor, toplam gerçeğin belirgin altında çıkıyordu.
+   */
+
+  /** Kaydedilen `TripPlan` satırı. */
+  function kaydedilenPlan() {
+    return kayitOkuyucu("tripPlan")[0];
+  }
+
+  it("originCity sütununa yazılıyor", async () => {
+    await planUretCagir({ city: "Ankara", originCity: "İstanbul" });
+
+    expect(kaydedilenPlan().originCity).toBe("İstanbul");
+  });
+
+  it("kalkış verilmezse sütun NULL kalıyor", async () => {
+    await planUretCagir({ city: "Ankara" });
+
+    expect(kaydedilenPlan().originCity).toBeNull();
+  });
+
+  it("bütçeye şehirlerarası ulaşım kalemi ekleniyor", async () => {
+    await planUretCagir({ city: "Ankara", originCity: "İstanbul" });
+
+    const butce = JSON.parse(String(kaydedilenPlan().butce_tahmini));
+    const kalemler = butce.categories["ulaşım"].items as Array<{
+      description: string;
+      amount: number;
+    }>;
+
+    const sehirlerarasi = kalemler.find((k) => k.description.includes("İstanbul → Ankara"));
+    expect(sehirlerarasi).toBeDefined();
+    expect(sehirlerarasi!.amount).toBeGreaterThan(0);
+    // Toplam da tazeleniyor: kalem eklenip toplam eski değerde kalsaydı
+    // planlar listesi ve profil yanlış rakam gösterirdi.
+    expect(kaydedilenPlan().total_cost).toBe(butce.totalCostWithExtras);
+  });
+
+  it("kullanıcının ULAŞIM TERCİHİ kalemde görünüyor", async () => {
+    await planUretCagir({
+      city: "Ankara",
+      originCity: "İstanbul",
+      transportation: ["Tren"],
+    });
+
+    const butce = JSON.parse(String(kaydedilenPlan().butce_tahmini));
+    const kalemler = butce.categories["ulaşım"].items as Array<{ description: string }>;
+
+    expect(kalemler.some((k) => k.description.includes("Tren"))).toBe(true);
+  });
+
+  it("TANINMAYAN şehirde plan yine üretiliyor", async () => {
+    // Yurt dışı planları: mesafe hesabı yalnızca 81 ili biliyor. Ulaşımın
+    // eksik kalması, 4 dakikalık bir zincirin sonunda planı kaybetmekten
+    // iyidir.
+    const sonuc = await planUretCagir({ city: "Roma", originCity: "İstanbul" });
+
+    expect(sonuc.tripPlanId).toBeTruthy();
+    expect(kaydedilenPlan().originCity).toBe("İstanbul");
+  });
+
+  it("prompt'a güzergâh bilgisi giriyor", async () => {
+    // Model, ilk ve son günü varış/dönüş saatlerine göre kurabilmeli;
+    // eskiden her planı "şehirdesiniz" varsayımıyla yazıyordu.
+    togetherMock.yapilandirilmis = false;
+
+    await planUretCagir({ city: "Ankara", originCity: "İstanbul" });
+
+    const mesajlar = openRouterMock.chatCompletion.mock.calls[0][0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const kullanici = mesajlar.messages.find((m) => m.role === "user");
+
+    expect(kullanici?.content).toContain("İstanbul çıkışlı");
   });
 });

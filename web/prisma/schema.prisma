@@ -215,6 +215,18 @@ model BudgetItem {
 model TripPlan {
   id               String      @id @default(cuid())
   tripId           String?
+  /// Kalkış şehri.
+  ///
+  /// UÇTAN UCA BAĞLI (B6): manuel planlayıcı ve AI planlayıcı dolduruyor;
+  /// plan üretimi bu şehirden hareketle bütçeye şehirlerarası ulaşım
+  /// kalemi ekliyor (src/lib/ulasim-butce.ts), ulaşım sayfası güzergâhı
+  /// buradan ön dolduruyor ve plan detayı başlıkta "İstanbul → Kars"
+  /// güzergâhını gösteriyor.
+  ///
+  /// OPSİYONEL KALIYOR: yurt dışı planlarında ve "zaten oradayım"
+  /// senaryosunda karşılığı yok. Eski satırlarda da null — alan sonradan
+  /// eklendi ve geçmiş planlarda kalkış bilgisi hiç toplanmamıştı.
+  originCity       String?     @map("origin_city")
   city             String
   country          String?
   startDate        DateTime?
@@ -253,10 +265,17 @@ model TripPlan {
   /// null = plan hâlâ yalnızca JSON sütunlarında yaşıyor.
   migratedAt       DateTime?
 
-  trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  // SetNull, Cascade DEĞİL. `TripPlan` asıl kayıt, `Trip` ondan TÜRETİLMİŞ
+  // (plan DONE olunca plan-status-service açıyor, taşıma çalıştırıcısı da
+  // öyle). Cascade olduğu sürece `DELETE /api/trip?id=...` türetilmiş kaydı
+  // silerken planın kendisini de yok ediyordu — kullanıcı "gezi kaydımı
+  // sil" derken planını kaybediyordu. Artık yalnızca bağ kopuyor.
+  trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: SetNull)
   user             User?       @relation("UserToTripPlan", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([city, country])
+  /// Güzergâh sorguları: "İstanbul çıkışlı planlarım" gibi.
+  @@index([originCity, city])
   @@index([generated_at])
   @@index([userId])
   @@index([userId, status])

@@ -3,750 +3,694 @@
 /* Tailwind v4'te 'dark' varyantı varsayılan olarak
    @media (prefers-color-scheme: dark) üretir ve tailwind.config.js okunmaz.
    Kullanıcının tema seçimine göre geçiş yapabilmek için varyantı .dark
-   sınıfına bağlıyoruz. :where() kullandığımız için özgüllük artmaz,
-   yani mevcut dark: sınıflarının sırası bozulmaz. */
+   sınıfına bağlıyoruz. :where() kullandığımız için özgüllük artmaz. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
-   TASARIM TOKEN'LARI
+   KARTOGRAFİ — TASARIM TOKEN'LARI (Deniz Haritası paleti)
    --------------------------------------------------------------------------
-   Tek aksan rengi, düz yüzeyler, neredeyse gölgesiz. Gerekçe: bu uygulama
-   para ve zaman kararı verdiriyor (bütçe, rota, rezervasyon tahmini). Sakin
-   ve okunaklı bir yüzey güvenilir okunuyor; birbiriyle yarışan altı aksan
-   rengi ve gradient katmanları okunurluğu düşürüyordu.
+   Bu uygulama bir seyahat BELGESİ üretiyor: rota, günlük program, kalem
+   kalem bütçe. Arayüz de o belgenin diliyle konuşuyor — deniz haritası kâğıdı,
+   koordinat ızgarası, eşyükselti çizgileri, bilet koçanı, damga.
 
-   KURAL: sayfalar bundan sonra ham Tailwind rengi (bg-blue-600) yerine
-   buradaki token'lara bağlı yardımcı sınıfları/bileşenleri kullanmalı.
+   RENK ROLLERİ (dekor değil, iş bölümü):
+     accent  prusya mavisi → birincil eylem, aktif durum, mürekkep
+     route   macenta       → rota, sıra, hareket; "buradan oraya" olan her şey
+     stamp   pirinç        → onay ve durum damgası; ASLA metin rengi değil
+     ok/warn/danger/info → yalnızca ANLAM taşıdığında
+
+   KURAL: sayfalar ham Tailwind rengi (bg-blue-600) değil, bu token'ları
+   kullanır. Tema tek yerden döner, açık/koyu kendiliğinden tutar.
+
+   KONTRAST: gövde metni ≥4.5:1, büyük metin ≥3:1. Her metin token'ının
+   ölçülen değeri yanında yazıyor.
    ========================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* --- Aksan: tek aile, derin mavi-yeşil --- */
-  --accent:          #14564f;
-  --accent-hover:    #0e423c;
-  --accent-active:   #0a322e;
-  --accent-soft:     #e4efec;   /* zemin dolgusu */
-  --accent-border:   #b9d4ce;
-  --accent-contrast: #ffffff;   /* aksan üstündeki metin */
+  /* --- Aksan: prusya mavisi. Haritanın mürekkep rengi. --- */
+  --accent:          #14456b;   /* kâğıt 8.99 · yüzey 9.77 */
+  --accent-hover:    #0f3550;
+  --accent-active:   #0a2739;
+  --accent-soft:     #e0e9f0;
+  --accent-border:   #b0c4d5;
+  --accent-contrast: #fbfcfd;
 
-  /* --- Yüzeyler --- */
-  --bg:            #f7f8f7;     /* sayfa zemini */
-  --surface:       #ffffff;     /* kart */
-  --surface-2:     #f1f3f2;     /* ikincil dolgu, girdi zemini */
-  --surface-3:     #e8ebe9;     /* hover */
+  /* --- Rota: macenta. Denizcilik haritalarında özel işaretlerin rengi;
+         burada hareketin ve sıranın rengi. --- */
+  --route:        #9c3f6a;      /* kâğıt 5.64 · surface-2 5.14 · route-soft 5.31 */
+  --route-vivid:  #b84e80;      /* YALNIZCA çizgi/dolgu; metinde 4.24 */
+  --route-soft:   #f6e8ef;
+  --route-border: #e3bed1;
 
-  /* --- Metin --- */
-  --fg:            #14201f;     /* birincil */
-  --fg-muted:      #5c6b69;     /* ikincil */
-  /* 4.5:1 ESIGI: onceki #8a9895 zemine karsi 2.82 veriyordu ve bu renk
-     placeholder ile kucuk etiketlerde kullaniliyor — okunabilirlik esiginin
-     altindaydi. #647370 zeminde 4.67, kart yuzeyinde 4.97 veriyor. */
-  --fg-subtle:     #647370;     /* üçüncül, etiketler */
+  /* --- Damga: pirinç. Pusula gülünün rengi; halka, dolgu ve vurgu. --- */
+  --stamp:        #b8892c;      /* metin olarak KULLANILMAZ (2.83:1) */
+  --stamp-ink:    #7a5a12;      /* damga metni gerekiyorsa bu — kâğıt 5.70 */
+  --stamp-soft:   #f7efdc;
+
+  /* --- Yüzeyler: soğuk mavi-gri harita kâğıdı --- */
+  --bg:            #eff3f5;
+  --surface:       #fbfcfd;
+  --surface-2:     #e3e9ed;
+  --surface-3:     #d6dee4;
+
+  /* --- Metin ---
+     Tonlar sayfa zeminine göre DEĞİL, en koyu basıldıkları yüzeye göre
+     seçildi. --fg-subtle küçük etiketlerde --surface-2 üzerinde de
+     4.5 eşiğini geçmeli. */
+  --fg:            #131c24;     /* kâğıt 15.43 */
+  --fg-muted:      #4a5763;     /* kâğıt 6.64 · surface-2 6.05 · surface-3 5.44 */
+  --fg-subtle:     #58656f;     /* kâğıt 5.36 · surface-2 4.89 */
 
   /* --- Çizgiler --- */
-  --line:          #dfe4e2;
-  --line-strong:   #c6cecb;
+  --line:          #dde4e9;
+  --line-strong:   #bcc7d0;
 
-  /* --- Durum renkleri: yalnızca ANLAM taşıdığında kullanılır --- */
-  --ok:            #2d6b3f;
-  --ok-soft:       #e6f1e9;
-  --warn:          #8a5f10;
-  --warn-soft:     #f8f0dd;
-  --danger:        #a8321f;
-  --danger-hover:  #872718;
-  --danger-soft:   #f8e8e5;
-  --info:          #285a8a;
-  --info-soft:     #e5eef6;
+  /* --- Durum renkleri: yalnızca ANLAM taşıdığında --- */
+  --ok:            #1f6b4a;     /* kâğıt 5.77 */
+  --ok-soft:       #e0efe7;
+  --warn:          #7a5a12;     /* pirinçle aynı aile */
+  --warn-soft:     #f7efdc;
+  --danger:        #a32f30;     /* kâğıt 6.26 */
+  --danger-hover:  #862527;
+  --danger-soft:   #f8e6e6;
+  --info:          #1f5f86;     /* kâğıt 6.19 */
+  --info-soft:     #e2edf4;
 
   /* --- Ölçek --- */
-  --radius-sm: 6px;
-  --radius:    10px;
-  --radius-lg: 14px;
+  --radius-sm: 4px;
+  --radius:    8px;
+  --radius-lg: 12px;
 
-  /* Gölge yerine kenarlık; gölge yalnızca gerçekten yüzen katmanlarda
-     (menü, modal) kullanılıyor. */
-  --shadow-pop: 0 8px 24px -8px rgba(20, 32, 31, 0.18);
+  /* Gölge: gerçek bir kaynaktan düşüyor — ofset + yumuşak bulanıklık.
+     Sıfır ofsetli renkli hâle bir gölge değil, dekordur. */
+  --shadow-pop: 0 12px 28px -12px rgba(19, 28, 36, 0.28), 0 2px 6px -2px rgba(19, 28, 36, 0.12);
+  --shadow-kart: 0 1px 2px rgba(19, 28, 36, 0.05);
 
-  /* Geriye dönük uyumluluk: henüz elden geçmemiş sayfalar bu adları
-     kullanıyor. Yeni palete eşleniyorlar ki o sayfalar da tutarlı görünsün. */
-  --primary: var(--accent);
-  --primary-dark: var(--accent-hover);
-  --secondary: var(--ok);
-  --secondary-dark: var(--ok);
-  --danger-dark: var(--danger-hover);
-  --background: var(--bg);
-  --foreground: var(--fg);
-  --card: var(--surface);
-  --card-foreground: var(--fg);
-  --border: var(--line);
-  --input: var(--surface-2);
-  --radius: 10px;
-  --gradient-from: var(--accent-soft);
-  --gradient-to: var(--surface-2);
-  --scrollbar-track: var(--surface-2);
+  /* --- Harita ızgarası (graticule): sayfanın altındaki koordinat ağı --- */
+  --izgara:       rgba(20, 69, 107, 0.055);
+  --izgara-ana:   rgba(20, 69, 107, 0.085);
+  /* Eşyükselti çizgisi rengi — KonturDoku bileşeni bunu okur. */
+  --kontur:       rgba(20, 69, 107, 0.16);
+
+  /* Seçim ve imleç: tarayıcı varsayılanı hiçbir tasarım sistemine ait
+     değil. Bunlar da paletten geliyor. */
+  --secim-zemin: #cbdcea;
+  --secim-metin: #0d2f47;
 }
 
 .dark {
   color-scheme: dark;
 
-  --accent:          #5cbcae;
-  --accent-hover:    #7ccdc0;
-  --accent-active:   #8fd8cc;
-  --accent-soft:     #16302d;
-  --accent-border:   #21514b;
-  --accent-contrast: #0b1413;
+  /* Gece haritası: aynı roller, kaldırılmış parlaklık. */
+  --accent:          #5aa9d6;   /* zemin 7.13 */
+  --accent-hover:    #7cc0e4;
+  --accent-active:   #9bd2ee;
+  --accent-soft:     #0e2739;
+  --accent-border:   #1d4462;
+  --accent-contrast: #06101a;
 
-  --bg:            #0e1413;
-  --surface:       #151d1c;
-  --surface-2:     #1b2524;
-  --surface-3:     #222e2c;
+  --route:        #d97aa8;      /* zemin 6.44 */
+  --route-vivid:  #e88fb8;
+  --route-soft:   #2b1622;
+  --route-border: #4d2a3c;
 
-  --fg:            #e2e8e6;
-  --fg-muted:      #9aa8a5;
-  --fg-subtle:     #7e8c89;   /* koyu temada 5.32 / 4.90 */
+  --stamp:        #d9ad5c;
+  --stamp-ink:    #d9ad5c;      /* koyu zeminde pirinç okunuyor */
+  --stamp-soft:   #2b2313;
 
-  --line:          #26312f;
-  --line-strong:   #35423f;
+  --bg:            #0a1420;
+  --surface:       #101d2b;
+  --surface-2:     #16283a;
+  --surface-3:     #1e3448;
 
-  --ok:            #6cc08a;
-  --ok-soft:       #16281d;
-  --warn:          #d9a641;
-  --warn-soft:     #2b2312;
-  --danger:        #e2705c;
-  --danger-hover:  #ec8875;
-  --danger-soft:   #2c1a17;
-  --info:          #7ab0e0;
-  --info-soft:     #14212c;
+  --fg:            #e4ebf2;     /* zemin 15.41 */
+  --fg-muted:      #9aabbc;     /* zemin 7.87 */
+  --fg-subtle:     #90a2b3;     /* zemin 7.06 · surface-3 4.88 */
 
-  --shadow-pop: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --line:          #223447;
+  --line-strong:   #32475d;
 
-  --primary: var(--accent);
-  --primary-dark: var(--accent-hover);
-  --secondary: var(--ok);
-  --secondary-dark: var(--ok);
-  --danger-dark: var(--danger-hover);
-  --background: var(--bg);
-  --foreground: var(--fg);
-  --card: var(--surface);
-  --card-foreground: var(--fg);
-  --border: var(--line);
-  --input: var(--surface-2);
-  --gradient-from: var(--accent-soft);
-  --gradient-to: var(--surface-2);
-  --scrollbar-track: var(--surface-2);
+  --ok:            #5fbe8c;
+  --ok-soft:       #12251c;
+  --warn:          #d4a94d;
+  --warn-soft:     #2a2413;
+  --danger:        #e0706e;
+  --danger-hover:  #ea8886;
+  --danger-soft:   #2b1718;
+  --info:          #6fb0dd;
+  --info-soft:     #12222e;
+
+  --shadow-pop: 0 12px 28px -12px rgba(0, 0, 0, 0.7), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+  --shadow-kart: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  --izgara:       rgba(120, 180, 230, 0.05);
+  --izgara-ana:   rgba(120, 180, 230, 0.08);
+  --kontur:       rgba(120, 180, 230, 0.14);
+
+  --secim-zemin: #17405e;
+  --secim-metin: #d9ecf7;
 }
+
+/* ==========================================================================
+   ZEMİN
+   ========================================================================== */
 
 body {
-  /* Kısayol (background) yerine background-color: aksi halde katmansız olan
-     bu kural, @layer utilities içindeki Tailwind gradient sınıflarını eziyor. */
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), var(--font-roboto), Arial, sans-serif;
-  scroll-behavior: smooth;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Kısayol (background) yerine background-color: aksi hâlde katmansız olan
+     bu kural, @layer utilities içindeki Tailwind sınıflarını eziyor. */
+  background-color: var(--bg);
+  color: var(--fg);
+  /* --font-roboto yedek listeden çıkarıldı: o font artık yüklenmiyor,
+     dolayısıyla tanımsız bir değişkendi. */
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  /* Kâğıt hissi için hafif optik düzeltme. */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
-/* Custom Scrollbar */
+html {
+  scroll-behavior: smooth;
+}
+
+/* --------------------------------------------------------------------------
+   HARİTA IZGARASI
+   Sayfa zemininde duran koordinat ağı. Her 34px'te ince çizgi, her 5.
+   çizgide (170px) biraz daha koyu — gerçek bir harita graticule'ü böyle
+   davranır. Alfa değerleri okunurluğu bozmayacak kadar düşük; metin ve
+   kartlar bu ağın ÜSTÜNDE, kendi opak zeminlerinde duruyor.
+   -------------------------------------------------------------------------- */
+.harita-zemin {
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(to right, var(--izgara-ana) 0 1px, transparent 1px 170px),
+    repeating-linear-gradient(to bottom, var(--izgara-ana) 0 1px, transparent 1px 170px),
+    repeating-linear-gradient(to right, var(--izgara) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(to bottom, var(--izgara) 0 1px, transparent 1px 34px);
+}
+
+/* Izgaranın kenarda sertçe kesilmemesi için üstten aşağı sönümlenen sürüm. */
+.harita-zemin-sonen {
+  position: relative;
+}
+.harita-zemin-sonen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(to right, var(--izgara-ana) 0 1px, transparent 1px 170px),
+    repeating-linear-gradient(to bottom, var(--izgara-ana) 0 1px, transparent 1px 170px),
+    repeating-linear-gradient(to right, var(--izgara) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(to bottom, var(--izgara) 0 1px, transparent 1px 34px);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 88%);
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+/* --------------------------------------------------------------------------
+   BİLET KOÇANI
+   İki ucu delikli, ortası kesik çizgi. Ayraç olarak kullanılıyor: bir plan
+   kartında "üst bilgi" ile "program" arasını ayırır. Yarım daireler kartın
+   dışına taşan gerçek boşluklar gibi görünsün diye zemin rengiyle boyanıyor.
+   -------------------------------------------------------------------------- */
+.kocan {
+  position: relative;
+  height: 0;
+  border-top: 1px dashed var(--line-strong);
+}
+.kocan::before,
+.kocan::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--bg);
+  border: 1px solid var(--line);
+  transform: translateY(-50%);
+}
+.kocan::before {
+  left: -9px;
+  clip-path: inset(0 0 0 50%);
+}
+.kocan::after {
+  right: -9px;
+  clip-path: inset(0 50% 0 0);
+}
+
+/* --------------------------------------------------------------------------
+   ROTA ÇİZGİSİ
+   Günlük programda durakları birbirine bağlayan dikey macenta çizgi.
+   Liste öğesinin solunda, noktalarla birlikte.
+   -------------------------------------------------------------------------- */
+.rota-hat {
+  position: relative;
+}
+.rota-hat::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1.35rem;
+  bottom: -0.25rem;
+  width: 1px;
+  background-image: linear-gradient(
+    to bottom,
+    var(--route-border) 0 6px,
+    transparent 6px 11px
+  );
+  background-size: 1px 11px;
+}
+.rota-hat:last-child::before {
+  display: none;
+}
+
+/* ==========================================================================
+   HAREKET
+   --------------------------------------------------------------------------
+   Sayfada TEK koreografi var: ana sayfada örnek planın rota çizgisi
+   çiziliyor ve "HAZIR" damgası oturuyor. Her bölüme aynı giriş animasyonunu
+   dağıtmak hareketi anlamsızlaştırır.
+   ========================================================================== */
+
+@keyframes rota-ciz {
+  from { stroke-dashoffset: var(--rota-uzunluk, 400); }
+  to   { stroke-dashoffset: 0; }
+}
+
+.rota-ciz {
+  stroke-dasharray: var(--rota-uzunluk, 400);
+  /* Üstel yavaşlama, halihazırda görünür bir başlangıçtan. */
+  animation: rota-ciz 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes damga-bas {
+  0%   { opacity: 0; transform: rotate(-14deg) scale(1.5); }
+  60%  { opacity: 1; transform: rotate(-4deg) scale(0.94); }
+  100% { opacity: 1; transform: rotate(-6deg) scale(1); }
+}
+
+.damga-bas {
+  animation: damga-bas 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.9s backwards;
+}
+
+@keyframes belir {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.belir {
+  animation: belir 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes don {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   TARAYICI YÜZEYLERİ
+   --------------------------------------------------------------------------
+   Çizmediğimiz parçalar da tasarımı taşıyor: seçim, imleç, kaydırma çubuğu,
+   odak halkası. Bunlar varsayılan bırakılırsa sayfa "kurulmuş" değil
+   "birleştirilmiş" görünür.
+   ========================================================================== */
+
+::selection {
+  background-color: var(--secim-zemin);
+  color: var(--secim-metin);
+}
+
+:root {
+  caret-color: var(--accent);
+  accent-color: var(--accent);
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 11px;
+  height: 11px;
 }
 
 ::-webkit-scrollbar-track {
-  /* Medya sorgusu yerine değişken: tema kullanıcı seçimiyle değişiyor */
-  background: var(--scrollbar-track);
+  background-color: var(--surface-2);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
-  border-radius: 10px;
+  background-color: var(--line-strong);
+  border-radius: 999px;
+  /* Zemin renginde kenarlık: tutamak rayın içinde ince görünüyor. */
+  border: 3px solid var(--surface-2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--fg-subtle);
+  background-color: var(--fg-subtle);
 }
 
-/* Animated Route */
-.pulse-animation {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 0 0 rgba(239, 68, 68, 0.4);
-  animation: pulse 1.5s infinite;
+::-webkit-scrollbar-corner {
+  background-color: var(--surface-2);
 }
 
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
+/* Firefox */
+* {
+  scrollbar-color: var(--line-strong) var(--surface-2);
+  scrollbar-width: thin;
 }
 
-.route-dash-animation {
-  stroke-dasharray: 15, 15;
-  animation: dash 30s linear infinite;
+/* Rakamlar: para, saat ve mesafe her satırda aynı genişlikte hizalanmalı. */
+.sayisal {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
-@keyframes dash {
-  to {
-    stroke-dashoffset: 1000;
-  }
+/* Küçük büyük harfli etiket — harita lejantı dili. */
+.lejant {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-/* Özel Animasyonlar */
-.hover-scale {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hover-scale:hover {
-  transform: scale(1.05);
-}
-
-.hover-lift {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
-}
-
-.hover-lift:hover {
-  /* -6px ve 35px'lik gölge yerine ölçülü bir kalkış: sayfada aynı anda
-     8-10 kart varken büyük hareket arayüzü huzursuz gösteriyordu. */
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-pop);
-}
-
-.hover-glow {
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-}
-
-.hover-glow:hover {
-  /* Parlama yerine ince bir aksan halkası. */
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-/* Modern Button Animations */
-.btn-modern {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Parıltı süpürmesi kaldırıldı: her düğmede dönen bir ışık huzmesi
-   dikkati eylemden çalıyordu. Sınıf adı korunuyor — henüz elden geçmemiş
-   sayfalar onu kullanıyor. */
-.btn-modern::before {
-  content: none;
-}
-
-/* Card Hover Effects */
-.card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
-
-/* Mavi-mor katman kaldırıldı: kartın kendi rengini bozuyordu. */
-.card-hover::before {
-  content: none;
-}
-
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-pop);
-}
-
-/* Glowing Border Animation */
-.glow-border {
-  position: relative;
-  background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
-  background-size: 400% 400%;
-  animation: gradient-border 4s ease infinite;
-  border-radius: inherit;
-  padding: 2px;
-}
-
-.glow-border::before {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  background: inherit;
-  border-radius: inherit;
-  background: white;
-}
-
-@keyframes gradient-border {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-/* Floating Animation */
-/* Sürekli süzülen kart yok: bitmeyen hareket okumayı zorlaştırıyor.
-   Sınıf adı korunuyor (henüz elden geçmemiş sayfalar kullanıyor). */
-.float {
-  animation: none;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-/* Shimmer Loading Effect */
-.shimmer {
-  background: linear-gradient(110deg, #f0f0f0 8%, #e0e0e0 18%, #f0f0f0 33%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-/* Pulse Glow Effect */
-.pulse-glow {
-  animation: none;
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
-  }
-}
-
-/* Typewriter Effect */
-.typewriter {
-  overflow: hidden;
-  border-right: 0.15em solid #3b82f6;
-  white-space: nowrap;
-  animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
-}
-
-@keyframes typing {
-  from { width: 0; }
-  to { width: 100%; }
-}
-
-@keyframes blink-caret {
-  from, to { border-color: transparent; }
-  50% { border-color: #3b82f6; }
-}
-
-/* Modern Loading Spinner */
-.spinner-modern {
-  width: 40px;
-  height: 40px;
-  /* Tek renkli, ince halka: iki farkli renkli kalin kenar hem paletin
-     disinda kaliyordu hem de yuvarlak kosede kirik gorunuyordu. */
-  border: 2px solid var(--line);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin-modern 1s linear infinite;
-}
-
-@keyframes spin-modern {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Advanced Gradient Animations */
-.gradient-animate {
-  background: var(--accent-soft);
-}
-
-@keyframes gradient-flow {
-  0% { background-position: 0% 50%; }
-  25% { background-position: 100% 50%; }
-  50% { background-position: 100% 100%; }
-  75% { background-position: 0% 100%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* Interactive Button Ripple Effect */
-.ripple {
-  position: relative;
-  overflow: hidden;
-}
-
-.ripple::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  transform: translate(-50%, -50%);
-  /* width/height animasyonu layout thrash yaratiyor; olcek donusumu
-     ayni etkiyi compositor uzerinde veriyor. */
-  transition: transform 0.6s, opacity 0.6s;
-}
-
-.ripple:active::after {
-  width: 300px;
-  height: 300px;
-}
-
-/* Modern Toast Animations */
-.toast-enter {
-  transform: translateX(100%);
-  opacity: 0;
-  animation: toast-slide-in 0.3s ease forwards;
-}
-
-.toast-exit {
-  animation: toast-slide-out 0.3s ease forwards;
-}
-
-@keyframes toast-slide-in {
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes toast-slide-out {
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
-
-/* Gradient Animasyonu */
-@keyframes gradient-shift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-/* Dönen üç renkli gradient metin yerine sabit aksan rengi: başlık artık
-   okunuyor ve kontrast tahmin edilebilir (gradient'te bazı karelerde
-   metin zemine karışıyordu). */
-.animated-gradient {
-  color: var(--accent);
-  display: inline-block;
-}
-
-/* Fade In Animasyonu */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.5s ease forwards;
-}
-
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
-.delay-500 { animation-delay: 0.5s; }
-
-/* Pop In Animasyonu */
-@keyframes popIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  70% {
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.pop-in {
-  animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Bounce Animasyonu */
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-20px);
-  }
-  60% {
-    transform: translateY(-10px);
-  }
-}
-
-.bounce {
-  /* Zipiplama easing'i tarihli duruyor ve sonsuz tekrar dikkat caliyor. */
-  animation: none;
-}
-
-.custom-route-marker .start-marker div {
-  background-color: var(--secondary);
-  animation: pulse-green 2s infinite;
-}
-
-.custom-route-marker .end-marker div {
-  background-color: var(--danger);
-  animation: pulse-red 2s infinite;
-}
-
-@keyframes pulse-green {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
-}
-
-@keyframes pulse-red {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
-
-/* Google Maps CSS Fixes */
+/* Google Maps kendi sınıfını enjekte ediyor; tipografisi sayfayla uyuşsun. */
 .gm-style {
-  font-family: var(--font-roboto), Arial, sans-serif !important;
+  font-family: var(--font-geist-sans), system-ui, sans-serif !important;
 }
 
 .gm-style img {
   max-width: none !important;
 }
 
-/* Route Stats */
-.route-stats-card {
-  background-color: var(--card);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  padding: 1rem;
-  margin-top: 1rem;
-  border: 1px solid var(--border);
-  transition: all 0.3s ease;
+/* ==========================================================================
+   PLAN GÖVDESİ
+   --------------------------------------------------------------------------
+   Yapay zekâ planının markdown'dan gelen HTML'i. İKİ sayfa kullanıyor:
+   /ai-planner (yeni üretilen plan) ve /plan-detail/[id] (kayıtlı plan).
+   Daha önce yalnızca ai-planner içinde `<style jsx global>` olarak duruyordu;
+   plan-detail aynı içeriği stilsiz basıyordu. Sistem düzeyinde bir tipografi
+   olduğu için buraya taşındı.
+
+   Bu içerik uygulama kabuğundan bağımsız bir BELGE: kendi başlık ramp'i,
+   kendi okuma ölçüsü ve kendi tablo dili var.
+   ========================================================================== */
+
+.plan-govde {
+  color: var(--fg);
+  line-height: 1.7;
+  /* Okuma ölçüsü: sınırsız genişlikte satırlar takip
+     edilemiyor. */
+  max-width: 74ch;
+}
+.plan-govde > *:first-child {
+  margin-top: 0;
 }
 
-.route-stats-card:hover {
-  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
-  transform: translateY(-2px);
-}
-
-.route-stats-title {
-  font-size: 1rem;
+.plan-govde h1,
+.plan-govde h2,
+.plan-govde h3,
+.plan-govde h4 {
+  font-family: var(--font-serif), Georgia, serif;
+  color: var(--fg);
   font-weight: 600;
-  color: var(--foreground);
-  margin-bottom: 0.75rem;
+  text-wrap: balance;
+}
+/* Akışkan: mobil için ayrı bir @media adımı yerine tek
+   token. İki sabit boyut (1.875 / 1.6) yerine bir aralık. */
+.plan-govde h1 {
+  font-size: clamp(1.6rem, 1.2rem + 1.7vw, 1.875rem);
+  letter-spacing: -0.015em;
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--accent);
+}
+/* Başlığın ÜSTÜNDE altından daha çok boşluk: başlık
+   kendinden sonrakine bağlı. */
+.plan-govde h2 {
+  font-size: clamp(1.3rem, 1.05rem + 1.05vw, 1.5rem);
+  margin: 2.75rem 0 0.875rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.plan-govde h3 {
+  font-size: 1.185rem;
+  color: var(--accent);
+  margin: 2rem 0 0.625rem;
+}
+.plan-govde h4 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.plan-govde p {
+  margin: 1rem 0;
+}
+
+/* Listeler kutu içinde değil: her listeyi gri bir kutuya
+   koymak metni parçalıyordu. Asılı işaretler yeterli. */
+.plan-govde ul,
+.plan-govde ol {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+.plan-govde ul {
+  list-style: none;
+}
+.plan-govde ul > li {
+  position: relative;
+}
+.plan-govde ul > li::before {
+  content: "";
+  position: absolute;
+  left: -1.15rem;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--route);
+}
+.plan-govde ol {
+  list-style: decimal;
+}
+.plan-govde ol > li::marker {
+  color: var(--route);
+  font-variant-numeric: tabular-nums;
+}
+.plan-govde li {
+  margin: 0.4rem 0;
+}
+.plan-govde li > ul,
+.plan-govde li > ol {
+  margin: 0.4rem 0;
+}
+
+.plan-govde strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.plan-govde em {
+  color: var(--accent);
+  font-style: italic;
+}
+.plan-govde a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent-border);
+}
+.plan-govde a:hover {
+  text-decoration-color: var(--accent);
+}
+
+.plan-govde hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2.5rem 0;
+}
+
+.plan-govde blockquote {
+  background: var(--surface-2);
+  /* 1px: bundan kalın renkli bir yan çizgi bir kalıp, derinlik değil.
+     Alıntıyı zaten yüzey rengi ayırıyor. */
+  border-left: 1px solid var(--accent);
+  padding: 0.875rem 1.25rem;
+  margin: 1.5rem 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--fg-muted);
+}
+.plan-govde blockquote p {
+  margin: 0;
+}
+
+.plan-govde code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+}
+
+/* --- Tablolar ---
+   Bütçe ve program tabloları bu sayfanın en yoğun verisi.
+   Dar ekranda taşmak yerine KENDİ İÇİNDE kayıyor; sayfa
+   gövdesi yatayda asla kaymıyor. */
+.plan-govde table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+  background: var(--surface);
+  margin: 1.75rem 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-variant-numeric: tabular-nums;
+}
+.plan-govde thead {
+  background: var(--surface-2);
+}
+.plan-govde th {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+.plan-govde td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  vertical-align: top;
+}
+.plan-govde tbody tr:last-child td {
+  border-bottom: 0;
+}
+.plan-govde tbody tr:hover {
+  background: var(--surface-2);
+}
+.plan-govde td:first-child {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.plan-govde table ul,
+.plan-govde table ol {
+  margin: 0.25rem 0;
+  padding-left: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   BÜTÇE DÖKÜMÜ
+   plan-detail sayfasındaki `ButceDokumu` bileşeni bu sınıfları kullanıyor.
+   (Blok eskiden HTML STRING olarak üretiliyordu; artık React bileşeni ama
+   sınıflar burada kalıyor — satır içi Tailwind ile yazıldığında bir kısmı
+   paletin dışına çıkmıştı.)
+   -------------------------------------------------------------------------- */
+.plan-govde .butce-ozet {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 0 0 1.5rem;
+}
+.plan-govde .butce-kutu {
+  background: var(--surface-2);
+  padding: 1rem 1.25rem;
+}
+.plan-govde .butce-etiket {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.plan-govde .butce-deger {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-top: 0.4rem;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.plan-govde .butce-deger-aksan { color: var(--accent); }
+
+.plan-govde .butce-kategori {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin: 0 0 0.75rem;
+  overflow: hidden;
+}
+.plan-govde .butce-kategori-basi {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.route-complete-badge {
-  font-size: 0.7rem;
-  background-color: var(--secondary);
-  color: white;
-  padding: 0.2rem 0.5rem;
-  border-radius: 1rem;
-  display: flex;
-  align-items: center;
-}
-
-.route-stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-2);
 }
-
-.route-stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  background-color: rgba(0,0,0,0.02);
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.route-stat-item:hover {
-  background-color: rgba(59, 130, 246, 0.05);
-}
-
-.route-stat-icon {
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  background-color: rgba(59, 130, 246, 0.1);
-  border-radius: 9999px;
-  transition: all 0.2s ease;
-}
-
-.route-stat-item:hover .route-stat-icon {
-  transform: scale(1.1);
-  background-color: rgba(59, 130, 246, 0.2);
-}
-
-.route-stat-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--foreground);
-  margin-bottom: 0.25rem;
-  transition: all 0.2s ease;
-}
-
-.route-stat-item:hover .route-stat-value {
-  color: var(--primary);
-}
-
-.route-stat-label {
-  font-size: 0.75rem;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Custom Components */
-.trip-card {
-  background-color: var(--card);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  padding: 1.25rem;
-  margin-bottom: 1rem;
-}
-
-.trip-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.375rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+.plan-govde .butce-kategori-ad {
   font-weight: 500;
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  color: var(--fg);
+  text-transform: capitalize;
+}
+.plan-govde .butce-kategori-toplam {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.925rem;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.plan-govde .butce-kalem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--line);
+}
+.plan-govde .butce-kalem-ad {
+  font-size: 0.925rem;
+  color: var(--fg-muted);
+}
+.plan-govde .butce-kalem-tutar {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.925rem;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.trip-button-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.trip-button-primary:hover {
-  background-color: var(--primary-dark);
-}
-
-.trip-button-secondary {
-  background-color: var(--secondary);
-  color: white;
-}
-
-.trip-button-secondary:hover {
-  background-color: var(--secondary-dark);
-}
-
-.trip-button-danger {
-  background-color: var(--danger);
-  color: white;
-}
-
-.trip-button-danger:hover {
-  background-color: var(--danger-dark);
-}
-
-.trip-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.trip-select {
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.75rem;
-  font-size: 0.875rem;
-  background-color: var(--background);
-  color: var(--foreground);
-}
-
-.trip-info {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.trip-error {
-  background-color: #fef2f2;
-  border: 1px solid #fee2e2;
-  border-radius: 0.375rem;
-  padding: 0.75rem;
-  color: #b91c1c;
-  font-size: 0.875rem;
-}
-
-.loading-spinner {
+/* Kalem tutarı bir arama sonucuna dayanıyorsa gösterilen kaynak bağlantısı.
+   Tutarın modelin kendi tahmini mi yoksa harici bir kaynağa mı dayandığı
+   kullanıcı için anlamlı bir fark; rozet ikincil bilgi olduğu için sessiz. */
+.plan-govde .butce-kalem-kaynak {
   display: inline-block;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 2px solid rgba(156, 163, 175, 0.3);
-  border-radius: 50%;
-  border-top-color: var(--primary);
-  animation: spin 1s linear infinite;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+  text-decoration: none;
+  vertical-align: middle;
 }
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.plan-govde .butce-kalem-kaynak:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 /* ==========================================================================
    HAREKET AZALTMA
    --------------------------------------------------------------------------
-   Bu dosyada onlarca sonsuz animasyon var (pulse, ping, bounce, shimmer).
-   İşletim sisteminde "hareketi azalt" seçen kullanıcı için hepsi tek yerden
-   durduruluyor — vestibüler rahatsızlığı olanlar için bu bir tercih değil,
-   erişilebilirlik gereği.
+   Vestibüler rahatsızlığı olan kullanıcı için hareket bir tercih değil,
+   erişilebilirlik gereği. Rota çizimi ve damga dahil her şey duruyor.
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -756,5 +700,11 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Rota çizgisi animasyonsuz da TAM görünmeli, yarım kalmamalı. */
+  .rota-ciz {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
   }
 }

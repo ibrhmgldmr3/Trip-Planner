@@ -21,8 +21,11 @@ import {
   Dugme,
   GirisGerekli,
   Kart,
+  Kocan,
+  Olcum,
   Rozet,
   SayfaBasi,
+  SayfaKabugu,
   Yukleniyor,
 } from "@/components/ui";
 
@@ -219,13 +222,11 @@ export default function MyPlansPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg)]">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
-          <Yukleniyor
-            metin={status === 'loading' ? 'Oturum kontrol ediliyor…' : 'Planlarınız yükleniyor…'}
-          />
-        </div>
-      </div>
+      <SayfaKabugu>
+        <Yukleniyor
+          metin={status === 'loading' ? 'Oturum kontrol ediliyor…' : 'Planlarınız yükleniyor…'}
+        />
+      </SayfaKabugu>
     );
   }
 
@@ -235,155 +236,170 @@ export default function MyPlansPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[var(--bg)]">
-        <div className="max-w-2xl mx-auto px-4 md:px-8 py-16">
-          <BosDurum
-            baslik="Planlar yüklenemedi"
-            aciklama={error}
-            eylem={<Dugme onClick={() => window.location.reload()}>Tekrar dene</Dugme>}
-          />
-        </div>
-      </div>
+      <SayfaKabugu genislik="dar">
+        <BosDurum
+          baslik="Planlar yüklenemedi"
+          aciklama={error}
+          eylem={<Dugme onClick={() => window.location.reload()}>Tekrar dene</Dugme>}
+        />
+      </SayfaKabugu>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
-        <SayfaBasi
-          baslik="Seyahat planlarım"
-          aciklama={
-            plans.length > 0
-              ? `${plans.length} kayıtlı plan`
-              : 'Kaydettiğiniz planlar burada listelenir.'
-          }
-          yan={<BagDugme href="/travel-mode">Yeni plan</BagDugme>}
+    <SayfaKabugu>
+      <SayfaBasi
+        baslik="Seyahat planlarım"
+        aciklama={
+          plans.length > 0
+            ? `${plans.length} kayıtlı plan`
+            : 'Kaydettiğiniz planlar burada listelenir.'
+        }
+        yan={<BagDugme href="/travel-mode">Yeni plan</BagDugme>}
+      />
+
+      {plans.length === 0 ? (
+        <BosDurum
+          baslik="Henüz bir planınız yok"
+          aciklama="İlk planınızı oluşturun; şehir ve tarihleri girmeniz yeterli, gerisini biz hazırlayalım."
+          eylem={<BagDugme href="/travel-mode">Plan oluştur</BagDugme>}
         />
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {plans.map((plan) => {
+            // Tarihsiz planlarda `new Date(null)` 1970 üretiyor ve plan
+            // "Tamamlandı" görünüyordu; artık tarih çözülemezse kayıtlı
+            // durum olduğu gibi gösteriliyor.
+            const currentStatus = getTripStatus(
+              tarihCoz(plan.startDate),
+              tarihCoz(plan.endDate),
+              plan.status
+            );
 
-        {plans.length === 0 ? (
-          <BosDurum
-            baslik="Henüz bir planınız yok"
-            aciklama="İlk planınızı oluşturun; şehir ve tarihleri girmeniz yeterli, gerisini biz hazırlayalım."
-            eylem={<BagDugme href="/travel-mode">Plan oluştur</BagDugme>}
-          />
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {plans.map((plan) => {
-              // Tarihsiz planlarda `new Date(null)` 1970 üretiyor ve plan
-              // "Tamamlandı" görünüyordu; artık tarih çözülemezse kayıtlı
-              // durum olduğu gibi gösteriliyor.
-              const currentStatus = getTripStatus(
-                tarihCoz(plan.startDate),
-                tarihCoz(plan.endDate),
-                plan.status
-              );
-
-              return (
-                <Kart key={plan.id} etkilesimli className="flex flex-col">
-                  <div className="p-5 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] leading-snug">
-                          {plan.city}
-                          {plan.country && (
-                            <span className="text-[var(--fg-muted)]">, {plan.country}</span>
-                          )}
-                        </h2>
-                        <p className="text-sm text-[var(--fg-muted)] mt-0.5">
-                          {tarihAraligi(plan.startDate, plan.endDate)}
-                        </p>
-                      </div>
-                      <Rozet ton={getStatusTone(currentStatus)}>
-                        {getStatusLabel(currentStatus)}
-                      </Rozet>
-                    </div>
-
-                    {/* Maliyet kartın en önemli sayısı: ayrı ve büyük. */}
-                    {plan.total_cost ? (
-                      <p className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] tabular-nums mt-4">
-                        ₺{plan.total_cost.toLocaleString('tr-TR')}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-[var(--fg-subtle)] mt-4">Bütçe hesaplanmamış</p>
-                    )}
-
-                    <dl className="mt-4 space-y-1.5 text-sm">
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-[var(--fg-muted)]">Süre</dt>
-                        <dd className="text-[var(--fg)]">{plan.duration || 'Belirtilmemiş'}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-[var(--fg-muted)]">Tarz</dt>
-                        <dd className="text-[var(--fg)] capitalize">
-                          {plan.travel_style || 'Standart'}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-[var(--fg-muted)]">Oluşturulma</dt>
-                        <dd className="text-[var(--fg)]">
-                          {new Date(plan.createdAt).toLocaleDateString('tr-TR')}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-[var(--fg-muted)]">Kaynak</dt>
-                        <dd className="text-[var(--fg)]">
-                          {plan.ai_model === 'manual_planning' ? 'Manuel' : 'Yapay zekâ'}
-                        </dd>
-                      </div>
-                    </dl>
+            /* Her kart bir BELGE: üst bilgi, koçan ayracı, ölçüm, künye.
+               Listede damga değil rozet kullanılıyor — on iki kartın her
+               birinde eğik bir damga arayüzü huzursuz gösterirdi. */
+            return (
+              <Kart key={plan.id} etkilesimli className="flex flex-col">
+                <div className="flex items-start justify-between gap-3 p-5 pb-4">
+                  <div className="min-w-0">
+                    <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] leading-snug truncate">
+                      {plan.city}
+                      {plan.country && (
+                        <span className="text-[var(--fg-muted)]">, {plan.country}</span>
+                      )}
+                    </h2>
+                    <p className="text-sm text-[var(--fg-muted)] mt-1 sayisal">
+                      {tarihAraligi(plan.startDate, plan.endDate)}
+                    </p>
                   </div>
+                  <Rozet ton={getStatusTone(currentStatus)}>
+                    {getStatusLabel(currentStatus)}
+                  </Rozet>
+                </div>
 
-                  <div className="px-5 pb-5 pt-1 flex flex-wrap items-center gap-2">
-                    <Dugme boy="sm" onClick={() => viewPlan(plan.id)}>
-                      Görüntüle
-                    </Dugme>
+                <div className="px-5">
+                  <Kocan />
+                </div>
 
-                    {canCancel(currentStatus) && (
-                      <Dugme
-                        boy="sm"
-                        tur="ikincil"
-                        onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
-                      >
-                        İptal et
-                      </Dugme>
-                    )}
-                    {canMarkAsDone(currentStatus) && (
-                      <Dugme
-                        boy="sm"
-                        tur="ikincil"
-                        onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
-                      >
-                        Tamamlandı
-                      </Dugme>
-                    )}
-                    {currentStatus === TripStatus.COMPLETED && (
-                      <Dugme
-                        boy="sm"
-                        tur="ikincil"
-                        onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
-                      >
-                        Uygulandı
-                      </Dugme>
-                    )}
+                <div className="p-5 flex-1">
+                  {/* Maliyet kartın en önemli sayısı: ölçüm olarak duruyor.
+                      `total_cost` 0 olabilir; truthy kontrolü sıfır bütçeli
+                      planı "hesaplanmamış" gösteriyordu. */}
+                  {plan.total_cost != null ? (
+                    <Olcum
+                      etiket="Toplam bütçe"
+                      deger={`₺${plan.total_cost.toLocaleString('tr-TR')}`}
+                      ton="aksan"
+                    />
+                  ) : (
+                    <div>
+                      <p className="lejant text-[var(--fg-subtle)]">Toplam bütçe</p>
+                      <p className="text-sm text-[var(--fg-subtle)] mt-1.5">Hesaplanmamış</p>
+                    </div>
+                  )}
 
-                    {/* Yıkıcı eylem en sona ve en sessiz biçime: yanlışlıkla
-                        tıklanması en pahalı olan düğme, en çok dikkat çeken
-                        kırmızı dolgu olmamalı. */}
+                  {/* Künye: etiketler lejant dilinde, değerler sağda hizalı.
+                      Göz etiketleri atlayıp değerleri tarayabiliyor. */}
+                  <dl className="mt-5 space-y-2 text-sm">
+                    {[
+                      { etiket: 'Süre', deger: plan.duration || 'Belirtilmemiş' },
+                      { etiket: 'Tarz', deger: plan.travel_style || 'Standart', buyukHarf: true },
+                      {
+                        etiket: 'Oluşturulma',
+                        deger: new Date(plan.createdAt).toLocaleDateString('tr-TR'),
+                      },
+                      {
+                        etiket: 'Kaynak',
+                        deger: plan.ai_model === 'manual_planning' ? 'Manuel' : 'Yapay zekâ',
+                      },
+                    ].map((satir) => (
+                      <div key={satir.etiket} className="flex items-baseline justify-between gap-3">
+                        <dt className="lejant text-[var(--fg-subtle)] shrink-0">{satir.etiket}</dt>
+                        <dd
+                          className={
+                            satir.buyukHarf
+                              ? 'text-[var(--fg)] capitalize text-right truncate'
+                              : 'text-[var(--fg)] text-right truncate sayisal'
+                          }
+                        >
+                          {satir.deger}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
+                <div className="px-5 pb-5 flex flex-wrap items-center gap-2">
+                  <Dugme boy="sm" onClick={() => viewPlan(plan.id)}>
+                    Görüntüle
+                  </Dugme>
+
+                  {canCancel(currentStatus) && (
                     <Dugme
                       boy="sm"
-                      tur="tehlike"
-                      className="ml-auto"
-                      onClick={() => deletePlan(plan.id)}
+                      tur="ikincil"
+                      onClick={() => updatePlanStatus(plan.id, TripStatus.CANCELLED)}
                     >
-                      Sil
+                      İptal et
                     </Dugme>
-                  </div>
-                </Kart>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                  )}
+                  {canMarkAsDone(currentStatus) && (
+                    <Dugme
+                      boy="sm"
+                      tur="ikincil"
+                      onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
+                    >
+                      Tamamlandı
+                    </Dugme>
+                  )}
+                  {currentStatus === TripStatus.COMPLETED && (
+                    <Dugme
+                      boy="sm"
+                      tur="ikincil"
+                      onClick={() => updatePlanStatus(plan.id, TripStatus.DONE)}
+                    >
+                      Uygulandı
+                    </Dugme>
+                  )}
+
+                  {/* Yıkıcı eylem en sona ve en sessiz biçime: yanlışlıkla
+                      tıklanması en pahalı olan düğme, en çok dikkat çeken
+                      kırmızı dolgu olmamalı. */}
+                  <Dugme
+                    boy="sm"
+                    tur="tehlike"
+                    className="ml-auto"
+                    onClick={() => deletePlan(plan.id)}
+                  >
+                    Sil
+                  </Dugme>
+                </div>
+              </Kart>
+            );
+          })}
+        </div>
+      )}
+    </SayfaKabugu>
   );
 }

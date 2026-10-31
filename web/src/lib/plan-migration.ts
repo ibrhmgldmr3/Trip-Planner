@@ -52,6 +52,8 @@ export interface IliskiselPlanTaslagi {
       location?: string;
       cost?: number;
       category?: string;
+      /** Çözülmüş konum; harita rotası bunu okuyor (B4 · Adım 5). */
+      coordinates?: { lat: number; lng: number };
     }>;
   }>;
 }
@@ -102,6 +104,10 @@ function aktiviteleriCevir(gun: PlanGunu): IliskiselPlanTaslagi["dailyPlans"][nu
     if (aktivite.location.trim()) kayit.location = aktivite.location.trim();
     if (aktivite.cost > 0) kayit.cost = aktivite.cost;
     if (aktivite.category.trim()) kayit.category = aktivite.category.trim();
+    // Koordinat taşınmasaydı, taşınan planın haritası boşalırdı: harita
+    // rotayı `gun_plani`den okuyor ve o sütun artık taşınmış planlarda
+    // `DailyPlan` satırlarından türetiliyor.
+    if (aktivite.coordinates) kayit.coordinates = aktivite.coordinates;
 
     return kayit;
   });

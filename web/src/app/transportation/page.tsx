@@ -1,589 +1,620 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { toast } from "react-hot-toast";
+import { logger } from "@/lib/logger";
+import { SEHIRLER } from "@/lib/seyahat-mesafe";
+import {
+  Alan,
+  BagDugme,
+  Dugme,
+  GIRDI_SINIFI,
+  GirisGerekli,
+  Olcum,
+  Rozet,
+  SayfaBasi,
+  SayfaKabugu,
+  Serit,
+  Yukleniyor,
+  cx,
+} from "@/components/ui";
 
-// Örnek veriler - Çeşitli tarihlerde ulaşım seçenekleri
-const sampleTransportations = [
-  // 26 Ağustos 2025 - Ankara > İstanbul
-  {
-    id: 1,
-    type: "Uçak",
-    company: "THY",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "08:45",
-    arrivalDate: "2025-08-26",
-    arrivalTime: "09:50",
-    price: 1250,
-    duration: "1s 5dk",
-    seats: 12
-  },
-  {
-    id: 2,
-    type: "Uçak",
-    company: "Pegasus",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "10:30",
-    arrivalDate: "2025-08-26", 
-    arrivalTime: "11:40",
-    price: 950,
-    duration: "1s 10dk",
-    seats: 8
-  },
-  {
-    id: 3,
-    type: "Uçak",
-    company: "AnadoluJet",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "16:20",
-    arrivalDate: "2025-08-26",
-    arrivalTime: "17:30",
-    price: 1100,
-    duration: "1s 10dk",
-    seats: 25
-  },
-  {
-    id: 4,
-    type: "Otobüs",
-    company: "Metro Turizm",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "21:00",
-    arrivalDate: "2025-08-27",
-    arrivalTime: "05:00",
-    price: 550,
-    duration: "8s",
-    seats: 24
-  },
-  {
-    id: 5,
-    type: "Otobüs",
-    company: "Kamil Koç",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "22:30",
-    arrivalDate: "2025-08-27",
-    arrivalTime: "06:30",
-    price: 600,
-    duration: "8s",
-    seats: 16
-  },
-  {
-    id: 6,
-    type: "Otobüs",
-    company: "Pamukkale Turizm",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "23:15",
-    arrivalDate: "2025-08-27",
-    arrivalTime: "07:15",
-    price: 580,
-    duration: "8s",
-    seats: 32
-  },
-  {
-    id: 7,
-    type: "Tren",
-    company: "TCDD YHT",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "18:00",
-    arrivalDate: "2025-08-26",
-    arrivalTime: "22:45", 
-    price: 850,
-    duration: "4s 45dk",
-    seats: 45
-  },
-  {
-    id: 8,
-    type: "Tren",
-    company: "TCDD",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-26",
-    departureTime: "06:30",
-    arrivalDate: "2025-08-26",
-    arrivalTime: "11:15", 
-    price: 650,
-    duration: "4s 45dk",
-    seats: 30
-  },
+/**
+ * Ulaşım seçenekleri.
+ *
+ * BU SAYFA ARTIK DEMO DEĞİL (B4 · Adım 4).
+ *
+ * Eskiden ~350 satırlık sabit bir `SEFERLER` dizisi vardı: dört şehir, yedi
+ * günlük uydurma sefer tablosu, sahte koltuk sayıları. Sayfa gerçek bir
+ * arama yapıyormuş gibi görünüyordu ve tek dürüstlüğü listenin üstündeki
+ * "Demo veri" şeridiydi.
+ *
+ * Şimdi `GET /api/transport-options` çağrılıyor. O uç iki katman döndürüyor
+ * ve ikisi de gerçek:
+ *
+ *  1. **Tahmin** — 81 ilin koordinatından hesaplanan mesafe, moda göre süre
+ *     ve maliyet (`src/lib/seyahat-mesafe.ts`). Çevrimdışı ve her zaman var.
+ *  2. **Kaynak** — Tavily aramasından gelen gerçek satış siteleri
+ *     (`src/lib/ulasim-arama.ts`). Anahtar yoksa sessizce boş kalıyor.
+ *
+ * NEDEN SEFER SAATİ / KOLTUK YOK: bu bir sefer tarifesi değil. Gerçek
+ * kalkış saatini ve boş koltuğu ancak bir rezervasyon sağlayıcısı bilir.
+ * Uydurma bir saat göstermek, kaldırdığımız demo verinin aynısı olurdu.
+ * Kullanıcı kalkış saatini KENDİSİ giriyor; varış, tahmini süreden
+ * hesaplanıyor.
+ *
+ * KAYDETME (B4): seçilen seçenek `POST /api/trip/transportations` ile
+ * ilişkisel modele yazılıyor. Yalnızca taşınmış planlarda mümkün —
+ * `Transportation` satırı bir `Trip`e bağlı ve o `Trip` taşımayla oluşuyor.
+ */
 
-  // 27 Ağustos 2025 - Ankara > İstanbul
-  {
-    id: 9,
-    type: "Uçak",
-    company: "THY",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-27",
-    departureTime: "07:30",
-    arrivalDate: "2025-08-27",
-    arrivalTime: "08:35",
-    price: 1350,
-    duration: "1s 5dk",
-    seats: 18
-  },
-  {
-    id: 10,
-    type: "Uçak",
-    company: "Pegasus",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-27",
-    departureTime: "14:15",
-    arrivalDate: "2025-08-27", 
-    arrivalTime: "15:25",
-    price: 980,
-    duration: "1s 10dk",
-    seats: 12
-  },
-  {
-    id: 11,
-    type: "Otobüs",
-    company: "Metro Turizm",
-    from: "Ankara",
-    to: "İstanbul",
-    departureDate: "2025-08-27",
-    departureTime: "20:30",
-    arrivalDate: "2025-08-28",
-    arrivalTime: "04:30",
-    price: 570,
-    duration: "8s",
-    seats: 28
-  },
+/* -------------------------------------------------------------------------- */
+/* Tipler                                                                     */
+/* -------------------------------------------------------------------------- */
 
-  // 28 Ağustos 2025 - İstanbul > İzmir
-  {
-    id: 12,
-    type: "Uçak",
-    company: "THY",
-    from: "İstanbul",
-    to: "İzmir",
-    departureDate: "2025-08-28",
-    departureTime: "09:20",
-    arrivalDate: "2025-08-28",
-    arrivalTime: "10:35",
-    price: 1180,
-    duration: "1s 15dk",
-    seats: 22
-  },
-  {
-    id: 13,
-    type: "Uçak",
-    company: "Pegasus",
-    from: "İstanbul",
-    to: "İzmir",
-    departureDate: "2025-08-28",
-    departureTime: "13:45",
-    arrivalDate: "2025-08-28", 
-    arrivalTime: "15:00",
-    price: 890,
-    duration: "1s 15dk",
-    seats: 15
-  },
-  {
-    id: 14,
-    type: "Otobüs",
-    company: "Pamukkale Turizm",
-    from: "İstanbul",
-    to: "İzmir",
-    departureDate: "2025-08-28",
-    departureTime: "22:00",
-    arrivalDate: "2025-08-29",
-    arrivalTime: "06:00",
-    price: 420,
-    duration: "8s",
-    seats: 35
-  },
-  {
-    id: 15,
-    type: "Otobüs",
-    company: "Kamil Koç",
-    from: "İstanbul",
-    to: "İzmir",
-    departureDate: "2025-08-28",
-    departureTime: "23:30",
-    arrivalDate: "2025-08-29",
-    arrivalTime: "07:30",
-    price: 450,
-    duration: "8s",
-    seats: 18
-  },
+interface UlasimKaynagi {
+  baslik: string;
+  url: string;
+  ozet: string;
+}
 
-  // 29 Ağustos 2025 - İzmir > Antalya
-  {
-    id: 16,
-    type: "Uçak",
-    company: "THY",
-    from: "İzmir",
-    to: "Antalya",
-    departureDate: "2025-08-29",
-    departureTime: "11:30",
-    arrivalDate: "2025-08-29",
-    arrivalTime: "12:45",
-    price: 1320,
-    duration: "1s 15dk",
-    seats: 8
-  },
-  {
-    id: 17,
-    type: "Uçak",
-    company: "AnadoluJet",
-    from: "İzmir",
-    to: "Antalya",
-    departureDate: "2025-08-29",
-    departureTime: "17:20",
-    arrivalDate: "2025-08-29", 
-    arrivalTime: "18:35",
-    price: 1050,
-    duration: "1s 15dk",
-    seats: 20
-  },
-  {
-    id: 18,
-    type: "Otobüs",
-    company: "Metro Turizm",
-    from: "İzmir",
-    to: "Antalya",
-    departureDate: "2025-08-29",
-    departureTime: "21:45",
-    arrivalDate: "2025-08-30",
-    arrivalTime: "05:45",
-    price: 380,
-    duration: "8s",
-    seats: 40
-  },
+interface UlasimSecenegi {
+  tur: string;
+  saglayici: string;
+  sureDk: number;
+  sureMetni: string;
+  tahminiTl: number;
+  mesafeKm: number;
+  maliyetBirimi: "kisi" | "arac";
+  kaynaklar: UlasimKaynagi[];
+}
 
-  // 30 Ağustos 2025 - Antalya > Ankara
-  {
-    id: 19,
-    type: "Uçak",
-    company: "THY",
-    from: "Antalya",
-    to: "Ankara",
-    departureDate: "2025-08-30",
-    departureTime: "08:15",
-    arrivalDate: "2025-08-30",
-    arrivalTime: "09:45",
-    price: 1450,
-    duration: "1s 30dk",
-    seats: 14
-  },
-  {
-    id: 20,
-    type: "Uçak",
-    company: "Pegasus",
-    from: "Antalya",
-    to: "Ankara",
-    departureDate: "2025-08-30",
-    departureTime: "15:50",
-    arrivalDate: "2025-08-30", 
-    arrivalTime: "17:20",
-    price: 1150,
-    duration: "1s 30dk",
-    seats: 9
-  },
-  {
-    id: 21,
-    type: "Otobüs",
-    company: "Pamukkale Turizm",
-    from: "Antalya",
-    to: "Ankara",
-    departureDate: "2025-08-30",
-    departureTime: "20:00",
-    arrivalDate: "2025-08-31",
-    arrivalTime: "06:00",
-    price: 520,
-    duration: "10s",
-    seats: 26
-  },
+interface Rota {
+  nereden: string;
+  nereye: string;
+  kusUcusuKm: number;
+  karayoluKm: number;
+  secenekler: UlasimSecenegi[];
+  webAramasiYapildi: boolean;
+}
 
-  // 31 Ağustos 2025 - Ankara > İzmir
-  {
-    id: 22,
-    type: "Uçak",
-    company: "AnadoluJet",
-    from: "Ankara",
-    to: "İzmir",
-    departureDate: "2025-08-31",
-    departureTime: "12:40",
-    arrivalDate: "2025-08-31",
-    arrivalTime: "14:10",
-    price: 1280,
-    duration: "1s 30dk",
-    seats: 11
-  },
-  {
-    id: 23,
-    type: "Tren",
-    company: "TCDD",
-    from: "Ankara",
-    to: "İzmir",
-    departureDate: "2025-08-31",
-    departureTime: "07:45",
-    arrivalDate: "2025-08-31",
-    arrivalTime: "17:30", 
-    price: 780,
-    duration: "9s 45dk",
-    seats: 38
-  },
-  {
-    id: 24,
-    type: "Otobüs",
-    company: "Metro Turizm",
-    from: "Ankara",
-    to: "İzmir",
-    departureDate: "2025-08-31",
-    departureTime: "22:15",
-    arrivalDate: "2025-09-01",
-    arrivalTime: "07:15",
-    price: 480,
-    duration: "9s",
-    seats: 31
+interface Plan {
+  id: string;
+  city: string;
+  country: string | null;
+  originCity?: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  migratedAt?: string | null;
+  tripId?: string | null;
+}
+
+/** Plan ilişkisel modelde mi yaşıyor? Kaydetmenin ön koşulu. */
+function iliskiselMi(plan: Plan | null): plan is Plan & { tripId: string } {
+  return Boolean(plan?.migratedAt && plan?.tripId);
+}
+
+const SEHIR_ADLARI = SEHIRLER.map((s) => s.ad);
+
+/** Bugüne `gun` ekleyip `YYYY-MM-DD` döndürür. */
+function gunEkle(gun: number): string {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  t.setDate(t.getDate() + gun);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(
+    t.getDate()
+  ).padStart(2, "0")}`;
+}
+
+/** "2026-11-04" + "09:00" + 320 dk → varış ISO damgası. */
+function varisZamani(tarih: string, saat: string, sureDk: number): string {
+  const [yil, ay, gun] = tarih.split("-").map(Number);
+  const [ss, dd] = saat.split(":").map(Number);
+  const kalkis = new Date(yil, (ay ?? 1) - 1, gun ?? 1, ss ?? 0, dd ?? 0);
+  return new Date(kalkis.getTime() + sureDk * 60_000).toISOString();
+}
+
+function kalkisZamani(tarih: string, saat: string): string {
+  const [yil, ay, gun] = tarih.split("-").map(Number);
+  const [ss, dd] = saat.split(":").map(Number);
+  return new Date(yil, (ay ?? 1) - 1, gun ?? 1, ss ?? 0, dd ?? 0).toISOString();
+}
+
+const ikonOrtak = {
+  fill: "none" as const,
+  viewBox: "0 0 24 24",
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+/**
+ * Tip ikonu.
+ *
+ * Ulaşım tipi eskiden RENKLE ayrılıyordu (uçak mavi, otobüs yeşil, tren
+ * gri). Üçü de aynı türde şey — bir seyahat seçeneği. Renk anlam taşımadığı
+ * yerde gürültüdür; ayrım ikonda.
+ */
+function TipIkonu({ tip }: { tip: string }) {
+  if (tip === "Uçak") {
+    return (
+      <svg {...ikonOrtak} className="h-5 w-5">
+        <path d="M10.2 20.3l1.6-5.1 3.4-1.1 4.7 3.1a1.2 1.2 0 001.8-1.4l-2.4-5.2 1.6-.5a2 2 0 10-1.2-3.8l-1.6.5-3.9-4.2a1.2 1.2 0 00-2 1l.4 5.6-3.4 1.1-3.5-3.1-1.4.5 2.3 4.4-1.6 2.2z" />
+      </svg>
+    );
   }
-];
-
-export default function TransportationPage() {
-  const [from, setFrom] = useState("Ankara");
-  const [to, setTo] = useState("İstanbul");
-  const [date, setDate] = useState("2025-08-26");
-  const [type, setType] = useState("all");
-  const [sortBy, setSortBy] = useState("price");
-  
-  const filteredTransportations = sampleTransportations
-    .filter(t => 
-      t.from === from && 
-      t.to === to && 
-      t.departureDate === date &&
-      (type === "all" || t.type === type)
-    )
-    .sort((a, b) => {
-      if (sortBy === "price") return a.price - b.price;
-      if (sortBy === "duration") return a.duration.localeCompare(b.duration);
-      if (sortBy === "departureTime") return a.departureTime.localeCompare(b.departureTime);
-      return 0;
-    });
-
+  if (tip === "Otobüs") {
+    return (
+      <svg {...ikonOrtak} className="h-5 w-5">
+        <path d="M6 19a2 2 0 002 2h8a2 2 0 002-2m-12 0V7a2 2 0 012-2h8a2 2 0 012 2v12m-12 0h12M9 21v-2m6 2v-2M8 9h8M7.5 15h.01M16.5 15h.01" />
+      </svg>
+    );
+  }
+  if (tip === "Kendi aracı") {
+    return (
+      <svg {...ikonOrtak} className="h-5 w-5">
+        <path d="M5 13l1.5-4.5A2 2 0 018.4 7h7.2a2 2 0 011.9 1.5L19 13m-14 0h14m-14 0v4a1 1 0 001 1h1a1 1 0 001-1v-1h8v1a1 1 0 001 1h1a1 1 0 001-1v-4M7.5 16h.01M16.5 16h.01" />
+      </svg>
+    );
+  }
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-[var(--surface-2)]">
-      <div className="max-w-6xl mx-auto text-[var(--fg-muted)]">
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--accent)] dark:text-[var(--accent)]">
-              Ulaşım Seçenekleri
-            </h1>
-            <p className="text-[var(--fg-muted)] mt-2 max-w-2xl">
-              Seyahatiniz için en uygun ulaşım seçeneklerini bulun ve karşılaştırın.
-            </p>
-          </div>
-          <Link 
-            href="/"
-            className="mt-4 md:mt-0 px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors self-start"
-          >
-            Ana Sayfaya Dön
-          </Link>
-        </div>
-
-        {/* Search Form */}
-        <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)] mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-[var(--accent)] dark:text-[var(--accent)]">Ulaşım Ara</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label htmlFor="from" className="block text-sm font-medium text-[var(--accent)] mb-1">Nereden</label>
-              <select 
-                id="from" 
-                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              >
-                <option value="Ankara">Ankara</option>
-                <option value="İstanbul">İstanbul</option>
-                <option value="İzmir">İzmir</option>
-                <option value="Antalya">Antalya</option>
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="to" className="block text-sm font-medium text-[var(--accent)] mb-1">Nereye</label>
-              <select 
-                id="to" 
-                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              >
-                <option value="İstanbul">İstanbul</option>
-                <option value="Ankara">Ankara</option>
-                <option value="İzmir">İzmir</option>
-                <option value="Antalya">Antalya</option>
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="date" className="block text-sm font-medium text-[var(--accent)] mb-1">Tarih</label>
-              <input 
-                type="date" 
-                id="date" 
-                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                min="2025-08-26"
-                max="2025-09-30"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="type" className="block text-sm font-medium text-[var(--accent)] mb-1">Ulaşım Tipi</label>
-              <select 
-                id="type" 
-                className="w-full px-3 py-2 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="all">Tümü</option>
-                <option value="Uçak">Uçak</option>
-                <option value="Otobüs">Otobüs</option>
-                <option value="Tren">Tren</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="mt-4 flex justify-end">
-            <button 
-              type="button"
-              className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg font-medium hover:bg-[var(--accent-hover)] transition-colors"
-            >
-              Ara
-            </button>
-          </div>
-        </div>
-
-        {/* Results */}
-        <div className="bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)]">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-[var(--accent)] dark:text-[var(--accent)]">Sonuçlar ({filteredTransportations.length})</h2>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-[var(--fg-muted)] font-medium">Sırala:</span>
-              <select 
-                className="px-2 py-1 border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--fg)] rounded-md text-sm"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="price">Fiyat</option>
-                <option value="duration">Süre</option>
-                <option value="departureTime">Kalkış Zamanı</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            {filteredTransportations.length === 0 ? (
-              <div className="text-center py-12">
-                <h3 className="text-xl font-semibold text-[var(--fg-muted)] mb-2">Sonuç Bulunamadı</h3>
-                <p className="text-[var(--fg-muted)] mb-4">
-                  Seçtiğiniz tarih ve güzergah için ulaşım seçeneği bulunmuyor.
-                </p>
-                <p className="text-sm text-[var(--fg-subtle)]">
-                  Farklı bir tarih veya güzergah deneyebilirsiniz.
-                </p>
-              </div>
-            ) : (
-              filteredTransportations.map(transport => (
-                <div 
-                  key={transport.id} 
-                  className="border border-[var(--line)] bg-[var(--surface-2)] rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-                    <div className="flex items-center mb-4 md:mb-0">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-3 ${
-                        transport.type === "Uçak" ? "bg-[var(--info-soft)] text-[var(--accent)]" : 
-                        transport.type === "Otobüs" ? "bg-[var(--ok-soft)] text-[var(--ok)]" : 
-                        "bg-[var(--surface-2)] text-[var(--fg)] dark:text-[var(--fg)]"
-                      }`}>
-                        {transport.type === "Uçak" ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                        ) : transport.type === "Otobüs" ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 5h8m-4 5v-1m4-1v1m-8-1v1m-1-8h10a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2z" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-medium text-[var(--accent)]">{transport.company}</div>
-                        <div className="text-sm text-[var(--fg-muted)] font-medium">{transport.type}</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
-                      <div className="text-center">
-                        <div className="font-bold text-[var(--accent)]">{transport.departureTime}</div>
-                        <div className="text-sm text-[var(--fg-muted)] font-medium">{transport.from}</div>
-                        <div className="text-xs text-[var(--fg-muted)]">{new Date(transport.departureDate).toLocaleDateString('tr-TR')}</div>
-                      </div>
-                      
-                      <div className="hidden md:block">
-                        <div className="w-24 h-[2px] bg-[var(--surface-3)] dark:bg-[var(--surface-3)] relative">
-                          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 text-xs text-[var(--fg-muted)] font-medium">
-                            {transport.duration}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className="font-bold text-[var(--accent)]">{transport.arrivalTime}</div>
-                        <div className="text-sm text-[var(--fg-muted)] font-medium">{transport.to}</div>
-                        <div className="text-xs text-[var(--fg-muted)]">{new Date(transport.arrivalDate).toLocaleDateString('tr-TR')}</div>
-                      </div>
-                      
-                      <div className="md:ml-4">
-                        <div className="font-bold text-[var(--accent)]">{transport.price} TL</div>
-                        <div className="text-xs text-[var(--fg-muted)] font-medium">{transport.seats} koltuk kaldı</div>
-                      </div>
-                      
-                      <button 
-                        className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg text-sm hover:bg-[var(--accent-hover)] transition-colors"
-                      >
-                        Seç
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        
-        {/* Coming Soon Message */}
-        <div className="mt-8 bg-[var(--surface)] border border-[var(--line)] p-4 rounded-lg text-center">
-          <p className="text-[var(--warn)] dark:text-[var(--warn)]">
-            <strong>Bilgilendirme:</strong> Bu özellik şu an demo amaçlıdır. Gerçek rezervasyon yakında aktif olacaktır.
-          </p>
-        </div>
-        
-        <div className="mt-8 text-sm text-[var(--fg-muted)] font-medium text-center">
-          &copy; {new Date().getFullYear()} Trip Planner - Tüm hakları saklıdır.
-        </div>
-      </div>
-    </main>
+    <svg {...ikonOrtak} className="h-5 w-5">
+      <path d="M8 20l-2 2m10-2l2 2M5 16V6a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2zM5 10h14M8.5 14h.01M15.5 14h.01" />
+    </svg>
   );
 }
 
+/** Rota segmenti: kalkış ● ——— ● varış, ortada süre. */
+function RotaHatti({ sure }: { sure: string }) {
+  return (
+    <div className="flex items-center gap-2 min-w-[7rem] flex-1" aria-hidden="true">
+      <span className="h-2 w-2 shrink-0 rounded-full border-[1.5px] border-[var(--route-vivid)] bg-[var(--surface)]" />
+      <span className="relative h-px flex-1 bg-[repeating-linear-gradient(to_right,var(--route-border)_0_5px,transparent_5px_10px)]">
+        <span className="lejant absolute left-1/2 -translate-x-1/2 -top-[1.15rem] whitespace-nowrap text-[var(--fg-subtle)] sayisal">
+          {sure}
+        </span>
+      </span>
+      <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--route-vivid)]" />
+    </div>
+  );
+}
 
+/* -------------------------------------------------------------------------- */
+
+export default function TransportationPage() {
+  const { status } = useSession();
+
+  const [planlar, setPlanlar] = useState<Plan[]>([]);
+  const [seciliPlan, setSeciliPlan] = useState<Plan | null>(null);
+
+  const [from, setFrom] = useState("Ankara");
+  const [to, setTo] = useState("İstanbul");
+  const [date, setDate] = useState(() => gunEkle(0));
+  const [saat, setSaat] = useState("09:00");
+  const [type, setType] = useState("all");
+  const [sortBy, setSortBy] = useState("price");
+
+  const [rota, setRota] = useState<Rota | null>(null);
+  const [araniyor, setAraniyor] = useState(false);
+  const [kaydedilen, setKaydedilen] = useState<string | null>(null);
+
+  /* Planları getir; güzergâhı ilk plandan ön doldur. */
+  const planlariGetir = useCallback(async () => {
+    try {
+      const yanit = await fetch("/api/my-plans");
+      if (!yanit.ok) return;
+
+      const govde = await yanit.json();
+      const gelen: Plan[] = Array.isArray(govde?.plans) ? govde.plans : [];
+      setPlanlar(gelen);
+
+      if (gelen.length > 0) {
+        const p = gelen[0];
+        setSeciliPlan(p);
+        // Varış planın şehri; kalkış `originCity` doluysa oradan.
+        if (SEHIR_ADLARI.includes(p.city)) setTo(p.city);
+        const kalkis = p.originCity;
+        if (kalkis && SEHIR_ADLARI.includes(kalkis)) setFrom(kalkis);
+        // Tarih planın başlangıcı olsun: varsayılan "bugün" kalırsa
+        // kaydedilen ulaşım seyahat aralığının tamamen dışına düşüyor.
+        if (p.startDate) setDate(p.startDate.slice(0, 10));
+      }
+    } catch (hata) {
+      logger.error("Planlar getirilemedi", hata);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === "authenticated") planlariGetir();
+  }, [status, planlariGetir]);
+
+  const ara = useCallback(async () => {
+    if (from === to) {
+      toast.error("Kalkış ve varış şehri aynı olamaz");
+      return;
+    }
+
+    setAraniyor(true);
+    setKaydedilen(null);
+
+    try {
+      const yanit = await fetch(
+        `/api/transport-options?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      );
+      const govde = await yanit.json().catch(() => null);
+
+      if (!yanit.ok) {
+        toast.error(govde?.error || "Ulaşım seçenekleri alınamadı");
+        setRota(null);
+        return;
+      }
+
+      setRota(govde.rota as Rota);
+    } catch (hata) {
+      logger.error("Ulaşım seçenekleri alınamadı", hata);
+      toast.error("Ulaşım seçenekleri alınamadı");
+      setRota(null);
+    } finally {
+      setAraniyor(false);
+    }
+  }, [from, to]);
+
+  /** Seçeneği plana yazar (ilişkisel model). */
+  const planaKaydet = async (secenek: UlasimSecenegi) => {
+    if (!iliskiselMi(seciliPlan)) return;
+
+    try {
+      const yanit = await fetch("/api/trip/transportations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripId: seciliPlan.tripId,
+          type: secenek.tur,
+          provider: secenek.saglayici,
+          departureTime: kalkisZamani(date, saat),
+          // Varış saati TAHMİNİ süreden hesaplanıyor; gerçek bir tarife yok.
+          arrivalTime: varisZamani(date, saat, secenek.sureDk),
+          departureLocation: rota?.nereden ?? from,
+          arrivalLocation: rota?.nereye ?? to,
+          price: secenek.tahminiTl,
+          notes:
+            `Tahmini: ${secenek.sureMetni}, ${secenek.mesafeKm} km. ` +
+            `Tutar ${secenek.maliyetBirimi === "arac" ? "araç" : "kişi"} başına.`,
+        }),
+      });
+
+      const govde = await yanit.json().catch(() => null);
+      if (!yanit.ok) {
+        toast.error(govde?.error || "Plana kaydedilemedi");
+        return;
+      }
+
+      setKaydedilen(secenek.tur);
+      toast.success(`${secenek.tur} planınıza eklendi`);
+    } catch (hata) {
+      logger.error("Ulaşım plana kaydedilemedi", hata);
+      toast.error("Plana kaydedilemedi");
+    }
+  };
+
+  const secenekler = useMemo(() => {
+    const hepsi = rota?.secenekler ?? [];
+    const suzulmus = type === "all" ? hepsi : hepsi.filter((s) => s.tur === type);
+
+    return [...suzulmus].sort((a, b) => {
+      if (sortBy === "price") return a.tahminiTl - b.tahminiTl;
+      if (sortBy === "duration") return a.sureDk - b.sureDk;
+      return 0;
+    });
+  }, [rota, type, sortBy]);
+
+  if (status === "loading") {
+    return (
+      <SayfaKabugu>
+        <Yukleniyor metin="Yükleniyor…" />
+      </SayfaKabugu>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <SayfaKabugu>
+        <GirisGerekli aciklama="Ulaşım seçeneklerini görmek ve planınıza eklemek için giriş yapın." />
+      </SayfaKabugu>
+    );
+  }
+
+  const kaydedilebilir = iliskiselMi(seciliPlan);
+
+  return (
+    <SayfaKabugu>
+      <SayfaBasi
+        baslik="Ulaşım seçenekleri"
+        aciklama="Uçak, otobüs, tren ve kendi aracı alternatiflerini yan yana karşılaştırın."
+        yan={
+          <BagDugme href="/travel-mode" tur="ikincil">
+            Plana dön
+          </BagDugme>
+        }
+      />
+
+      {/* Uyarı sonuçların ÜSTÜNDE: kullanıcı neyle karşılaştığını, sayıları
+          okumadan önce bilmeli. Artık "demo" değil ama yine de TAHMİN. */}
+      <div className="mb-8">
+        <Serit ton="bilgi" baslik="Bu sayılar tahmindir">
+          Süre ve maliyet, iki şehir arasındaki mesafeden hesaplanır; sefer
+          tarifesi ya da canlı bilet fiyatı değildir. Güncel fiyat için her
+          seçeneğin altındaki satış sitesi bağlantılarını kullanın. Uygulama
+          üzerinden bilet satın alınmaz.
+        </Serit>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Arama                                                               */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] p-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+          <Alan etiket="Nereden" htmlFor="from">
+            <select
+              id="from"
+              className={GIRDI_SINIFI}
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            >
+              {SEHIR_ADLARI.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Alan>
+
+          <Alan etiket="Nereye" htmlFor="to">
+            <select
+              id="to"
+              className={GIRDI_SINIFI}
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            >
+              {SEHIR_ADLARI.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Alan>
+
+          <Alan etiket="Tarih" htmlFor="date">
+            <input
+              type="date"
+              id="date"
+              className={cx(GIRDI_SINIFI, "sayisal")}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </Alan>
+
+          {/* Kalkış saatini KULLANICI giriyor: gerçek tarife bilgimiz yok,
+              uydurmak demo veriye geri dönmek olurdu. */}
+          <Alan etiket="Kalkış saati" htmlFor="saat" ipucu="Varış süreden hesaplanır.">
+            <input
+              type="time"
+              id="saat"
+              className={cx(GIRDI_SINIFI, "sayisal")}
+              value={saat}
+              onChange={(e) => setSaat(e.target.value)}
+            />
+          </Alan>
+
+          <Alan etiket="Ulaşım tipi" htmlFor="type">
+            <select
+              id="type"
+              className={GIRDI_SINIFI}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            >
+              <option value="all">Tümü</option>
+              <option value="Uçak">Uçak</option>
+              <option value="Otobüs">Otobüs</option>
+              <option value="Tren">Tren</option>
+              <option value="Kendi aracı">Kendi aracı</option>
+            </select>
+          </Alan>
+
+          <Dugme type="button" className="w-full" onClick={ara} bekliyor={araniyor}>
+            Ara
+          </Dugme>
+        </div>
+
+        {planlar.length > 0 && (
+          <div className="mt-5 border-t border-[var(--line)] pt-5">
+            <Alan
+              etiket="Hangi plana eklenecek?"
+              htmlFor="plan"
+              ipucu={
+                kaydedilebilir
+                  ? undefined
+                  : "Bu plan henüz yeni veri modeline taşınmadı; profil sayfasından taşıyabilirsiniz."
+              }
+            >
+              <select
+                id="plan"
+                className={GIRDI_SINIFI}
+                value={seciliPlan?.id ?? ""}
+                onChange={(e) => {
+                  const secilen = planlar.find((p) => p.id === e.target.value) ?? null;
+                  setSeciliPlan(secilen);
+                  // Plan değişince güzergâh ve tarih de o plana uysun;
+                  // aksi halde kullanıcı A planına bakarken B planının
+                  // güzergâhını kaydedebiliyordu.
+                  if (secilen) {
+                    if (SEHIR_ADLARI.includes(secilen.city)) setTo(secilen.city);
+                    if (secilen.originCity && SEHIR_ADLARI.includes(secilen.originCity)) {
+                      setFrom(secilen.originCity);
+                    }
+                    if (secilen.startDate) setDate(secilen.startDate.slice(0, 10));
+                  }
+                }}
+              >
+                {planlar.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.city}
+                    {p.country ? `, ${p.country}` : ""}
+                    {p.migratedAt ? "" : " (taşınmamış)"}
+                  </option>
+                ))}
+              </select>
+            </Alan>
+          </div>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Sonuçlar                                                            */}
+      {/* ------------------------------------------------------------------ */}
+      {rota && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)]">
+            {rota.nereden} → {rota.nereye}
+            <span className="lejant text-[var(--fg-subtle)] ml-3 sayisal">
+              {rota.karayoluKm} km karayolu
+            </span>
+          </h2>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="sortBy" className="lejant text-[var(--fg-subtle)]">
+              Sırala
+            </label>
+            <select
+              id="sortBy"
+              className="rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--fg)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="price">Maliyet</option>
+              <option value="duration">Süre</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {!rota ? (
+        <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--line-strong)] px-6 py-14 text-center">
+          <h3 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)]">
+            Güzergâh seçin
+          </h3>
+          <p className="text-[var(--fg-muted)] mt-2 max-w-md mx-auto leading-relaxed">
+            Kalkış ve varış şehrini seçip &ldquo;Ara&rdquo;ya basın. Süre ve
+            maliyet iki şehrin mesafesinden hesaplanır.
+          </p>
+        </div>
+      ) : secenekler.length === 0 ? (
+        <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--line-strong)] px-6 py-14 text-center">
+          <h3 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)]">
+            Bu güzergâhta seçenek yok
+          </h3>
+          <p className="text-[var(--fg-muted)] mt-2 max-w-md mx-auto leading-relaxed">
+            Seçtiğiniz ulaşım tipi bu güzergâhta sunulmuyor. Örneğin tren,
+            yalnızca demiryolu ağındaki iller arasında gösteriliyor.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {secenekler.map((secenek) => (
+            <li
+              key={secenek.tur}
+              className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] p-5 transition-[border-color,box-shadow] duration-200 hover:border-[var(--line-strong)] hover:shadow-[var(--shadow-pop)]"
+            >
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+                <div className="flex items-center gap-3 lg:w-48 shrink-0">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius)] border border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]">
+                    <TipIkonu tip={secenek.tur} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-[var(--fg)] truncate">{secenek.tur}</p>
+                    <p className="text-sm text-[var(--fg-muted)] truncate">
+                      {secenek.saglayici}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-1 items-center gap-4 pt-4 lg:pt-0">
+                  <div className="text-right shrink-0">
+                    <p className="font-[family-name:var(--font-geist-mono)] text-lg text-[var(--fg)] sayisal leading-none">
+                      {saat}
+                    </p>
+                    <p className="text-sm text-[var(--fg-muted)] mt-1">{rota.nereden}</p>
+                  </div>
+
+                  <RotaHatti sure={secenek.sureMetni} />
+
+                  <div className="shrink-0">
+                    <p className="font-[family-name:var(--font-geist-mono)] text-lg text-[var(--fg)] sayisal leading-none">
+                      {secenek.mesafeKm} km
+                    </p>
+                    <p className="text-sm text-[var(--fg-muted)] mt-1">{rota.nereye}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between gap-4 border-t border-[var(--line)] pt-4 lg:w-56 lg:shrink-0 lg:border-t-0 lg:pt-0 lg:justify-end">
+                  <div>
+                    <Olcum
+                      etiket={
+                        // Bilette maliyet kişi başına, kendi aracında araç
+                        // başınadır ve yolcu sayısına bölünür. İkisini aynı
+                        // etiketle göstermek kalabalık grupta araba
+                        // maliyetini kat kat şişiriyordu.
+                        secenek.maliyetBirimi === "arac" ? "Araç başı" : "Kişi başı"
+                      }
+                      deger={`${secenek.tahminiTl.toLocaleString("tr-TR")} ₺`}
+                      ton="aksan"
+                    />
+                    <div className="mt-2">
+                      <Rozet ton="notr">tahmini</Rozet>
+                    </div>
+                  </div>
+
+                  {kaydedilebilir && (
+                    <Dugme
+                      boy="sm"
+                      tur={kaydedilen === secenek.tur ? "ikincil" : "rota"}
+                      onClick={() => planaKaydet(secenek)}
+                    >
+                      {kaydedilen === secenek.tur ? "Eklendi" : "Plana ekle"}
+                    </Dugme>
+                  )}
+                </div>
+              </div>
+
+              {/* Gerçek satış siteleri. Boşsa hiç gösterilmiyor: "kaynak yok"
+                  başlığı altında boş bir alan bırakmak bilgi vermiyor. */}
+              {secenek.kaynaklar.length > 0 && (
+                <div className="mt-4 border-t border-[var(--line)] pt-4">
+                  <p className="lejant text-[var(--fg-subtle)] mb-2">Güncel fiyat için</p>
+                  <ul className="flex flex-wrap gap-2">
+                    {secenek.kaynaklar.map((k) => (
+                      <li key={k.url}>
+                        <a
+                          href={k.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-full border border-[var(--line-strong)] px-3 py-1 text-xs text-[var(--fg-muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                          title={k.ozet}
+                        >
+                          {k.baslik}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </SayfaKabugu>
+  );
+}

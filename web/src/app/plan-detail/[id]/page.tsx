@@ -9,11 +9,27 @@ import {
   TripStatus,
   getTripStatus,
   getStatusLabel,
-  getStatusColor,
+  getStatusTone,
   canCancel,
   canMarkAsDone,
 } from '@/lib/trip-status';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { REZERV_ORANI } from '@/lib/plan-budget';
+import { ButceDokumu, tl } from '@/components/ButceDokumu';
+import {
+  BagDugme,
+  Damga,
+  Dugme,
+  Kocan,
+  KonturDoku,
+  Olcum,
+  Rozet,
+  SayfaHatasi,
+  SayfaKabugu,
+  Serit,
+  Yukleniyor,
+  cx,
+} from '@/components/ui';
 import { logger } from "@/lib/logger";
 
 interface DayActivity {
@@ -42,6 +58,8 @@ interface PlanDetail {
   id: string;
   city: string;
   country: string | null;
+  /** Kalkış şehri (B6); eski planlarda ve yurt dışı planlarında null. */
+  originCity: string | null;
   // API null döndürebiliyor; tip bunu saklarsa `new Date(null)` 1970 üretir.
   startDate: string | null;
   endDate: string | null;
@@ -63,6 +81,27 @@ interface PlanDetail {
   raw_markdown: string | null;
   status: TripStatus;
   raw_html: string | null;
+}
+
+/**
+ * Basit markdown → HTML. Modül düzeyinde: bileşen durumuna bağlı değil ve
+ * `ButceDokumu`ya yedek olarak da geçiriliyor (eski markdown satırları).
+ *
+ * İçerik LLM tarafından üretilip DB'ye yazılıyor; ham HTML asla doğrudan
+ * `dangerouslySetInnerHTML`'e verilmiyor.
+ */
+function formatContent(content: string | null): string | null {
+  if (!content) return null;
+
+  const html = content
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/###\s(.*?)\n/g, '<h3 class="text-lg font-semibold text-[var(--fg)] mt-4 mb-2">$1</h3>')
+    .replace(/##\s(.*?)\n/g, '<h2 class="text-xl font-bold text-[var(--fg)] mt-6 mb-3">$1</h2>')
+    .replace(/^\-\s(.*?)$/gm, '<li class="ml-4">• $1</li>')
+    .replace(/\n/g, '<br />');
+
+  return sanitizeHtml(html);
 }
 
 export default function PlanDetailPage() {
@@ -147,92 +186,6 @@ export default function PlanDetailPage() {
       logger.error("Plan silinemedi", err);
       toast.error('Plan silinemedi');
     }
-  };
-
-  const formatContent = (content: string | null) => {
-    if (!content) return null;
-
-    // Markdown formatını basic HTML'e çevir.
-    const html = content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/###\s(.*?)\n/g, '<h3 class="text-lg font-semibold text-[var(--fg)] mt-4 mb-2">$1</h3>')
-      .replace(/##\s(.*?)\n/g, '<h2 class="text-xl font-bold text-[var(--fg)] mt-6 mb-3">$1</h2>')
-      .replace(/^\-\s(.*?)$/gm, '<li class="ml-4">• $1</li>')
-      .replace(/\n/g, '<br />');
-
-    // İçerik LLM tarafından üretilip DB'ye yazılıyor; ham HTML'i asla
-    // doğrudan dangerouslySetInnerHTML'e vermiyoruz.
-    return sanitizeHtml(html);
-  };
-
-  // Render budget details as HTML string if JSON is provided; fallback to formatted content
-  const renderBudgetHtml = (raw: string | null) => {
-    if (!raw) return null;
-    try {
-      type BudgetItem = { description?: string; amount?: number; isPaid?: boolean };
-      type BudgetCategory = { items?: Array<BudgetItem>; total?: number };
-      type BudgetData = {
-        categories?: Record<string, BudgetCategory>;
-        Categories?: Record<string, BudgetCategory>;
-        totalCostWithExtras?: number;
-        extraItemsTotal?: number;
-        suggestedBudget?: number;
-      };
-      const data = JSON.parse(raw as string) as BudgetData;
-      const categories = (data && (data.categories || data.Categories)) as Record<string, BudgetCategory> | undefined;
-      const extraItemsTotal = Number(data?.totalCostWithExtras ?? data?.extraItemsTotal ?? 0) || 0;
-      const suggested = Number(data?.suggestedBudget ?? 0) || 0;
-
-      if (categories && typeof categories === 'object') {
-        const entries = Object.entries(categories) as Array<[string, { items?: Array<{ description?: string; amount?: number; isPaid?: boolean }>; total?: number }]>;
-        const sumFromCats = entries.reduce((acc, [, v]) => acc + Number(v?.total ?? 0), 0);
-        const grandTotal = extraItemsTotal > 0 ? extraItemsTotal : sumFromCats;
-
-        let html = '';
-        // Summary cards
-        html += '<div class="grid md:grid-cols-3 gap-6 mb-4">';
-        html += '<div class="p-4 rounded-lg border bg-[var(--ok-soft)] border-transparent">'
-              + '<div class="text-sm font-medium text-[var(--ok)]">Toplam</div>'
-              + '<div class="text-2xl font-bold text-[var(--ok)]">₺' + grandTotal.toLocaleString('tr-TR') + '</div>'
-              + '</div>';
-        if (suggested > 0) {
-          html += '<div class="p-4 rounded-lg border bg-purple-50 dark:bg-[var(--surface-2)] border-[var(--line)] dark:border-[var(--line)]">'
-               + '<div class="text-sm font-medium text-[var(--fg)] dark:text-[var(--fg)]">Önerilen Bütçe</div>'
-               + '<div class="text-2xl font-bold text-[var(--fg)] dark:text-[var(--fg)]">₺' + suggested.toLocaleString('tr-TR') + '</div>'
-               + '</div>';
-        }
-        html += '</div>';
-
-        // Category breakdown
-        for (const [cat, details] of entries) {
-          const items = (details?.items ?? []) as Array<{ description?: string; amount?: number; isPaid?: boolean }>;
-          const total = Number(details?.total ?? 0) || items.reduce((s, it) => s + Number(it.amount ?? 0), 0);
-          html += '<div class="rounded-lg border border-[var(--line)] mb-3">';
-          html += '<div class="flex items-center justify-between p-3 bg-[var(--surface-2)]/40">'
-               +  '<div class="font-semibold text-[var(--fg)] capitalize">' + cat + '</div>'
-               +  '<div class="text-sm font-bold text-[var(--fg)] dark:text-[var(--fg-muted)]">₺' + total.toLocaleString('tr-TR') + '</div>'
-               +  '</div>';
-          if (items.length > 0) {
-            html += '<div class="divide-y divide-[var(--line)]">';
-            for (const it of items) {
-              const amt = Number(it?.amount ?? 0);
-              html += '<div class="flex items-start justify-between p-3">'
-                   +   '<div class="text-sm text-[var(--fg-muted)]">' + (it?.description || 'Kalem') + '</div>'
-                   +   '<div class="text-sm font-medium text-[var(--fg)] dark:text-[var(--fg-muted)]">₺' + amt.toLocaleString('tr-TR') + '</div>'
-                   + '</div>';
-            }
-            html += '</div>';
-          }
-          html += '</div>';
-        }
-
-        return sanitizeHtml(html);
-      }
-    } catch {}
-
-    // Fallback to original formatter (markdown/html)
-    return formatContent(raw);
   };
 
   const parseDailyPlan = (content: string | null) => {
@@ -441,498 +394,568 @@ export default function PlanDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-[var(--fg-muted)]">Plan detayları yükleniyor...</p>
-        </div>
-      </div>
+      <SayfaKabugu>
+        <Yukleniyor metin="Plan detayları yükleniyor…" />
+      </SayfaKabugu>
     );
   }
 
   if (error || !plan) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-        <div className="text-center">
-                    <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">Bir Hata Oluştu</h2>
-          <p className="text-[var(--fg-muted)] mb-4">{error}</p>
-          <div className="space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="bg-[var(--surface-2)] text-[var(--fg)] border border-[var(--line-strong)] px-6 py-2 rounded-lg hover:bg-[var(--surface-3)]"
-            >
-              Geri Dön
-            </button>
-            <Link
-              href="/my-plans"
-              className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-2 rounded-lg hover:bg-[var(--accent-hover)] inline-block"
-            >
-              Planlarım
-            </Link>
-          </div>
-        </div>
-      </div>
+      <SayfaHatasi
+        mesaj={error ?? 'Bu plan bulunamadı ya da erişim izniniz yok.'}
+        yenidenDene={() => window.location.reload()}
+      />
     );
   }
 
-  const tabs = [
-    { id: 'overview', label: 'Genel Bakış', icon: '' },
-    { id: 'city-info', label: 'Şehir Bilgisi', icon: '' },
-    { id: 'daily-plan', label: 'Günlük Plan', icon: '' },
-    { id: 'food-guide', label: 'Yemek Rehberi', icon: '' },
-    { id: 'practical-info', label: 'Pratik Bilgiler', icon: '' },
-    { id: 'budget', label: 'Maliyet', icon: '' }
+  const guncelDurum = getTripStatus(
+    plan.startDate ? new Date(plan.startDate) : null,
+    plan.endDate ? new Date(plan.endDate) : null,
+    plan.status
+  );
+
+  /**
+   * İlgi alanları listesi.
+   *
+   * İki savunma var:
+   *  1. `JSON.parse` ham DB içeriğinde patlayabiliyor; bozuk bir kayıt tüm
+   *     sayfayı düşürmemeli.
+   *  2. İÇ İŞARETÇİ SIZINTISI: manuel planlarda sunucu bu alanı
+   *     `["manuel_planlama"]` ile dolduruyor ve bu, kullanıcıya gerçek bir
+   *     ilgi alanıymış gibi rozet olarak görünüyordu. Alt çizgi taşıyan
+   *     teknik değerler kullanıcıya ait değil.
+   */
+  const ilgiAlanlari: string[] = (() => {
+    if (!plan.interests) return [];
+    let ham: string[];
+    try {
+      const cozulen = JSON.parse(plan.interests) as unknown;
+      ham = Array.isArray(cozulen) ? (cozulen as string[]) : [];
+    } catch {
+      ham = plan.interests.split(',');
+    }
+    return ham
+      .map((i) => (typeof i === 'string' ? i.trim() : ''))
+      .filter((i) => i.length > 0 && !i.includes('_'));
+  })();
+
+  const SEKMELER = [
+    { id: 'overview', label: 'Genel bakış' },
+    { id: 'city-info', label: 'Şehir bilgisi' },
+    { id: 'daily-plan', label: 'Günlük plan' },
+    { id: 'food-guide', label: 'Yemek rehberi' },
+    { id: 'practical-info', label: 'Pratik bilgiler' },
+    { id: 'budget', label: 'Maliyet' },
   ];
 
+  /** Künye satırı: etiket solda lejant dilinde, değer sağda hizalı. */
+  const Satir = ({ etiket, deger }: { etiket: string; deger: React.ReactNode }) => (
+    <div className="flex items-baseline justify-between gap-3 py-2.5 border-b border-[var(--line)] last:border-b-0">
+      <dt className="lejant text-[var(--fg-subtle)] shrink-0">{etiket}</dt>
+      <dd className="text-[var(--fg)] text-right truncate">{deger}</dd>
+    </div>
+  );
+
+  const bosMetin = (ne: string) => (
+    <p className="text-[var(--fg-subtle)] py-8 text-center">
+      Bu plan için {ne} mevcut değil.
+    </p>
+  );
+
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center text-[var(--accent)] hover:opacity-80"
-            >
-              ← Geri Dön
-            </button>
-            <div className="flex space-x-2">
-              <button
-                onClick={deletePlan}
-                className="bg-[var(--danger)] text-white px-4 py-2 rounded-lg hover:bg-[var(--danger-hover)] text-sm"
-              >
-                Planı Sil
-              </button>
-            </div>
-          </div>
-          
-          <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[var(--fg)]">
-                  {plan.city}
-                  {plan.country && (
-                    <span className="text-xl text-[var(--fg-subtle)] ml-2">
-                      {plan.country}
-                    </span>
-                  )}
-                </h1>
-                <p className="text-[var(--fg-muted)] mt-2">
-                  {plan.startDate && plan.endDate && (
-                    <>
-                      {new Date(plan.startDate).toLocaleDateString('tr-TR')} - 
-                      {new Date(plan.endDate).toLocaleDateString('tr-TR')}
-                    </>
-                  )}
-                  {plan.duration && <span className="ml-2">({plan.duration})</span>}
+    <SayfaKabugu>
+      {/* ================================================================== */}
+      {/* Belge başlığı                                                       */}
+      {/* ================================================================== */}
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="group inline-flex items-center gap-1.5 py-2.5 -my-2.5 text-sm font-medium text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        >
+          {/* Unicode "←" yerine çizilmiş ikon. */}
+          <svg
+            className="h-4 w-4 transition-transform duration-150 group-hover:-translate-x-0.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M19 12H6M11 18l-6-6 6-6" />
+          </svg>
+          Geri
+        </button>
+
+        {/* Silme dolu kırmızı bir düğmeydi; yanlışlıkla tıklanması en pahalı
+            olan eylem, en çok dikkat çeken biçim olmamalı. */}
+        <Dugme tur="tehlike" boy="sm" onClick={deletePlan}>
+          Planı sil
+        </Dugme>
+      </div>
+
+      <div className="relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] mb-6">
+        <KonturDoku yogunluk={0.5} />
+
+        <div className="relative p-6 md:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="min-w-0">
+              {/* GÜZERGÂH (B6). Bir seyahat planı "Roma" değil, "İstanbul'dan
+                  Roma'ya" demektir: bütçedeki ulaşım kalemi de bu güzergâha
+                  göre hesaplanıyor, dolayısıyla kullanıcı rakamın neye
+                  dayandığını başlıkta görebilmeli. */}
+              {plan.originCity && (
+                <p className="lejant text-[var(--route)] mb-1">
+                  {plan.originCity} → {plan.city}
                 </p>
-              </div>
-              
-              <div className="text-right">
-                <div className="flex flex-col items-end space-y-2 mb-2">
-                  {/* Status Display */}
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(getTripStatus(
-                    plan.startDate ? new Date(plan.startDate) : null,
-                    plan.endDate ? new Date(plan.endDate) : null,
-                    plan.status
-                  ))}`}>
-                    {getStatusLabel(getTripStatus(
-                      plan.startDate ? new Date(plan.startDate) : null,
-                      plan.endDate ? new Date(plan.endDate) : null,
-                      plan.status
-                    ))}
-                  </span>
-                  
-                  {/* Plan Type */}
-                  {plan.ai_model === 'manual_planning' ? (
-                    <span className="bg-[var(--ok-soft)] text-[var(--ok)] px-3 py-1 rounded-full text-sm">
-                      Manuel Plan
-                    </span>
-                  ) : (
-                    <span className="bg-[var(--info-soft)] text-[var(--info)] px-3 py-1 rounded-full text-sm">
-                      AI Plan
-                    </span>
-                  )}
-                </div>
+              )}
 
-                {/* Status Action Buttons */}
-                {(() => {
-                  const currentStatus = getTripStatus(
-                    plan.startDate ? new Date(plan.startDate) : null,
-                    plan.endDate ? new Date(plan.endDate) : null,
-                    plan.status
-                  );
-                  
-                  return (
-                    <div className="flex flex-col space-y-2 mb-4">
-                      {canCancel(currentStatus) && (
-                        <button
-                          onClick={() => updatePlanStatus(TripStatus.CANCELLED)}
-                          className="bg-[var(--accent)] text-[var(--accent-contrast)] px-3 py-1 rounded-lg hover:bg-[var(--accent-hover)] transition-colors duration-150 text-sm font-medium"
-                        >
-                          İptal Et
-                        </button>
-                      )}
-                      {canMarkAsDone(currentStatus) && (
-                        <button
-                          onClick={() => updatePlanStatus(TripStatus.DONE)}
-                          className="bg-[var(--accent)] text-[var(--accent-contrast)] px-3 py-1 rounded-lg hover:bg-[var(--accent-hover)] transition-colors duration-150 text-sm font-medium"
-                        >
-                          Tamamlandı
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {plan.total_cost && (
-                  <div className="text-2xl font-bold text-[var(--accent)]">
-                    ₺{plan.total_cost.toLocaleString('tr-TR')}
-                  </div>
+              <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] leading-tight">
+                {plan.city}
+                {plan.country && (
+                  <span className="text-[var(--fg-muted)]">, {plan.country}</span>
                 )}
-                {plan.daily_cost && (
-                  <div className="text-sm text-[var(--fg-subtle)]">
-                    Günlük: ₺{plan.daily_cost.toLocaleString('tr-TR')}
-                  </div>
+              </h1>
+
+              <p className="text-[var(--fg-muted)] mt-2 sayisal">
+                {plan.startDate && plan.endDate && (
+                  <>
+                    {new Date(plan.startDate).toLocaleDateString('tr-TR')} –{' '}
+                    {new Date(plan.endDate).toLocaleDateString('tr-TR')}
+                  </>
                 )}
+                {plan.duration && <span className="ml-2">· {plan.duration}</span>}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2 mt-4">
+                <Rozet ton={getStatusTone(guncelDurum)}>{getStatusLabel(guncelDurum)}</Rozet>
+                <Rozet ton={plan.ai_model === 'manual_planning' ? 'notr' : 'aksan'}>
+                  {plan.ai_model === 'manual_planning' ? 'Manuel plan' : 'Yapay zekâ planı'}
+                </Rozet>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="mb-6">
-          <div className="flex space-x-1 bg-[var(--surface-2)] rounded-lg p-1 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-[var(--surface)] text-[var(--accent)] shadow-sm'
-                    : 'text-[var(--fg-muted)] hover:text-[var(--fg)] dark:hover:text-[var(--fg-muted)]'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+            {/* Tek bir plan, tek bir hüküm: damga burada hak ediliyor. */}
+            <div className="flex flex-col items-end gap-5 shrink-0">
+              <Damga ton={guncelDurum === TripStatus.DONE ? 'aksan' : 'muhur'}>
+                {getStatusLabel(guncelDurum)}
+              </Damga>
 
-        {/* Content */}
-        <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-[var(--fg)]">Plan Özeti</h2>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg-muted)]">Seyahat Bilgileri</h3>
-                    <div className="mt-2 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Şehir:</span>
-                        <span className="font-medium">{plan.city}</span>
-                      </div>
-                      {plan.country && (
-                        <div className="flex justify-between">
-                          <span>Ülke:</span>
-                          <span className="font-medium">{plan.country}</span>
-                        </div>
-                      )}
-                      {plan.duration && (
-                        <div className="flex justify-between">
-                          <span>Süre:</span>
-                          <span className="font-medium">{plan.duration}</span>
-                        </div>
-                      )}
-                      {plan.travel_style && (
-                        <div className="flex justify-between">
-                          <span>Seyahat Tarzı:</span>
-                          <span className="font-medium capitalize">{plan.travel_style}</span>
-                        </div>
-                      )}
-                      {plan.budget_level && (
-                        <div className="flex justify-between">
-                          <span>Bütçe Seviyesi:</span>
-                          <span className="font-medium capitalize">{plan.budget_level}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg-muted)]">Maliyet Bilgileri</h3>
-                    <div className="mt-2 space-y-2 text-sm">
-                      {plan.total_cost && (
-                        <div className="flex justify-between">
-                          <span>Toplam Maliyet:</span>
-                          <span className="font-bold text-[var(--accent)]">₺{plan.total_cost.toLocaleString('tr-TR')}</span>
-                        </div>
-                      )}
-                      {plan.daily_cost && (
-                        <div className="flex justify-between">
-                          <span>Günlük Maliyet:</span>
-                          <span className="font-medium">₺{plan.daily_cost.toLocaleString('tr-TR')}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg-muted)]">Plan Bilgileri</h3>
-                    <div className="mt-2 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Oluşturma Tarihi:</span>
-                        <span className="font-medium">{new Date(plan.createdAt).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Plan Türü:</span>
-                        <span className="font-medium">{plan.ai_model === 'manual_planning' ? 'Manuel' : 'AI'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {plan.interests && (
-                <div>
-                  <h3 className="font-semibold text-[var(--fg-muted)] mb-2">İlgi Alanları</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {JSON.parse(plan.interests).map((interest: string, index: number) => (
-                      <span key={index} className="bg-[var(--info-soft)] text-[var(--info)] px-3 py-1 rounded-full text-sm">
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'city-info' && (
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--fg)] mb-4">Şehir Bilgisi</h2>
-              {plan.sehir_bilgisi ? (
-                <div 
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: formatContent(plan.sehir_bilgisi) || '' }}
-                />
-              ) : (
-                <p className="text-[var(--fg-subtle)]">Bu plan için şehir bilgisi mevcut değil.</p>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'daily-plan' && (
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--fg)] mb-6">Günlük Plan</h2>
-              {plan.gun_plani ? (
-                (() => {
-                  const dailyPlans = parseDailyPlan(plan.gun_plani);
-                  
-                  if (dailyPlans.length === 0) {
-                    return (
-                      <div 
-                        className="prose dark:prose-invert max-w-none"
-                        dangerouslySetInnerHTML={{ __html: formatContent(plan.gun_plani) || '' }}
-                      />
-                    );
-                  }
-                  
-                  return (
-                    <div className="space-y-6">
-                      {dailyPlans.map((dayPlan, index) => (
-                        <div key={index} className={`rounded-[var(--radius-lg)] p-6 border shadow-sm transition-colors hover:shadow-md ${
-                          dayPlan.isEmpty 
-                            ? 'bg-[var(--surface-2)] border-[var(--line)]' 
-                            : 'bg-[var(--accent)] border-[var(--line)] dark:border-[var(--line-strong)]'
-                        }`}>
-                          <div className="flex items-center mb-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mr-4 ${
-                              dayPlan.isEmpty 
-                                ? 'bg-[var(--line-strong)] text-white' 
-                                : 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                            }`}>
-                              {dayPlan.day}
-                            </div>
-                            <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
-                              {dayPlan.day}. Gün
-                            </h3>
-                            {plan.startDate && (
-                              <span className="ml-auto text-sm text-[var(--fg-subtle)]">
-                                {new Date(new Date(plan.startDate).getTime() + (dayPlan.day - 1) * 24 * 60 * 60 * 1000).toLocaleDateString('tr-TR', { 
-                                  weekday: 'long', 
-                                  day: 'numeric', 
-                                  month: 'long' 
-                                })}
-                              </span>
-                            )}
-                            {dayPlan.isEmpty && (
-                              <span className="ml-2 px-2 py-1 bg-[var(--surface-3)] dark:bg-[var(--surface-3)] text-[var(--fg-muted)] text-xs rounded-full">
-                                Boş
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div className="bg-[var(--surface)] rounded-lg p-4 shadow-sm">
-                            <div 
-                              className="prose dark:prose-invert max-w-none text-[var(--fg-muted)]"
-                              dangerouslySetInnerHTML={{ __html: dayPlan.isEmpty ? 
-                                '<div class="text-center py-8 text-[var(--fg-subtle)]"><p>Bu gün için henüz plan yapılmamış</p></div>' :
-                                formatDayContent(dayPlan.content) 
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {dailyPlans.length > 0 && (
-                        <div className="mt-8 p-4 bg-[var(--ok-soft)] rounded-lg border border-transparent">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <svg className="w-5 h-5 text-[var(--accent)] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span className="text-[var(--ok)] font-medium">
-                                Toplam {dailyPlans.length} günlük plan
-                              </span>
-                            </div>
-                            <div className="text-sm text-[var(--accent)]">
-                              {dailyPlans.filter(day => !day.isEmpty).length} dolu, {dailyPlans.filter(day => day.isEmpty).length} boş gün
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="text-center py-12">
-                                    <p className="text-[var(--fg-subtle)] text-lg">Bu plan için günlük plan mevcut değil.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'food-guide' && (
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--fg)] mb-4">Yemek Rehberi</h2>
-              {plan.yemek_rehberi ? (
-                <div 
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: formatContent(plan.yemek_rehberi) || '' }}
-                />
-              ) : (
-                <p className="text-[var(--fg-subtle)]">Bu plan için yemek rehberi mevcut değil.</p>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'practical-info' && (
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--fg)] mb-4">Pratik Bilgiler</h2>
-              {plan.pratik_bilgiler ? (
-                <div 
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: formatContent(plan.pratik_bilgiler) || '' }}
-                />
-              ) : (
-                <p className="text-[var(--fg-subtle)]">Bu plan için pratik bilgiler mevcut değil.</p>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'budget' && (
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--fg)] mb-6">Plan Maliyeti</h2>
-              
-              {/* Maliyet Özeti */}
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-[var(--accent)] p-6 rounded-[var(--radius-lg)] border border-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--accent)]">Toplam Maliyet</p>
-                      <p className="text-2xl font-bold text-[var(--ok)]">
-                        ₺{plan.total_cost ? plan.total_cost.toLocaleString('tr-TR') : '0'}
-                      </p>
-                    </div>
-                                      </div>
-                </div>
-                
-                <div className="bg-[var(--accent)] p-6 rounded-[var(--radius-lg)] border border-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--accent)]">Günlük Ortalama</p>
-                      <p className="text-2xl font-bold text-[var(--info)]">
-                        ₺{plan.daily_cost ? plan.daily_cost.toLocaleString('tr-TR') : '0'}
-                      </p>
-                    </div>
-                                      </div>
-                </div>
-                
-                <div className="bg-[var(--accent)] p-6 rounded-[var(--radius-lg)] border border-[var(--line)] dark:border-[var(--line)]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--fg)]">Önerilen Bütçe</p>
-                      <p className="text-2xl font-bold text-[var(--fg)] dark:text-[var(--fg)]">
-                        ₺{plan.total_cost ? Math.round(plan.total_cost * 1.2).toLocaleString('tr-TR') : '0'}
-                      </p>
-                      <p className="text-xs text-[var(--fg)] mt-1">%20 rezerv ile</p>
-                    </div>
-                                      </div>
-                </div>
-              </div>
-
-              {/* Detaylı Maliyet */}
-              {plan.butce_tahmini ? (
-                <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] p-6 border border-[var(--line)]">
-                  <h3 className="text-lg font-semibold text-[var(--fg)] mb-4">Detaylı Maliyet Dağılımı</h3>
-                  <div 
-                    className="prose dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: renderBudgetHtml(plan.butce_tahmini) || '' }}
-                  />
-                  
-                  <div className="mt-6 p-4 bg-yellow-50 dark:bg-[var(--warn-soft)] rounded-lg border border-[var(--line)] dark:border-[var(--line)]">
-                    <div className="flex items-start space-x-3">
-                                            <div>
-                        <p className="text-sm font-medium text-[var(--warn)] dark:text-[var(--warn)] mb-1">
-                          Maliyet Düzenleme
-                        </p>
-                        <p className="text-sm text-[var(--warn)] dark:text-[var(--warn)]">
-                          Bu planın maliyetlerini düzenlemek için <strong>Maliyet Planlayıcı</strong>&apos;ya gidin.
-                          Orada her kalemi tek tek düzenleyebilir ve planın toplam maliyetini güncelleyebilirsiniz.
-                        </p>
-                        <a 
-                          href="/budget" 
-                          className="inline-flex items-center mt-2 text-sm font-medium text-[var(--warn)] hover:text-[var(--warn)] dark:hover:text-[var(--warn)]"
-                        >
-                          Maliyet Planlayıcıya Git →
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                                    <h3 className="text-lg font-medium text-[var(--fg)] mb-2">Maliyet Detayı Yok</h3>
-                  <p className="text-[var(--fg-muted)] mb-4">
-                    Bu plan için detaylı maliyet bilgisi mevcut değil.
-                  </p>
-                  <a 
-                    href="/budget" 
-                    className="inline-flex items-center px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+              <div className="flex flex-wrap justify-end gap-2">
+                {canCancel(guncelDurum) && (
+                  <Dugme
+                    tur="ikincil"
+                    boy="sm"
+                    onClick={() => updatePlanStatus(TripStatus.CANCELLED)}
                   >
-                    Maliyet Planlayıcıya Git
-                  </a>
-                </div>
-              )}
+                    İptal et
+                  </Dugme>
+                )}
+                {canMarkAsDone(guncelDurum) && (
+                  <Dugme boy="sm" onClick={() => updatePlanStatus(TripStatus.DONE)}>
+                    Tamamlandı
+                  </Dugme>
+                )}
+              </div>
             </div>
+          </div>
+
+          {(plan.total_cost || plan.daily_cost) && (
+            <>
+              <div className="my-6">
+                <Kocan />
+              </div>
+              <div className="flex flex-wrap gap-x-12 gap-y-4">
+                {plan.total_cost != null && (
+                  <Olcum
+                    etiket="Toplam"
+                    deger={`₺${plan.total_cost.toLocaleString('tr-TR')}`}
+                    ton="aksan"
+                  />
+                )}
+                {plan.daily_cost != null && (
+                  <Olcum
+                    etiket="Günlük"
+                    deger={`₺${plan.daily_cost.toLocaleString('tr-TR')}`}
+                  />
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
-    </div>
+
+      {/* ================================================================== */}
+      {/* Sekmeler                                                            */}
+      {/* ================================================================== */}
+      <div
+        role="tablist"
+        aria-label="Plan bölümleri"
+        className="flex gap-1 overflow-x-auto border-b border-[var(--line)] mb-6"
+      >
+        {SEKMELER.map((sekme) => {
+          const aktif = activeTab === sekme.id;
+          return (
+            <button
+              key={sekme.id}
+              role="tab"
+              type="button"
+              aria-selected={aktif}
+              onClick={() => setActiveTab(sekme.id)}
+              className={cx(
+                'relative whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-t',
+                aktif
+                  ? 'text-[var(--fg)]'
+                  : 'text-[var(--fg-muted)] hover:text-[var(--fg)]'
+              )}
+            >
+              {sekme.label}
+              {/* Aktif sekme: gezinme çubuğundaki "buradasınız" işaretinin
+                  aynısı — macenta bir hat. */}
+              {aktif && (
+                <span
+                  className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-[var(--route)]"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ================================================================== */}
+      {/* İçerik                                                              */}
+      {/* ================================================================== */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] p-6 md:p-7">
+        {activeTab === 'overview' && (
+          <div>
+            <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)]">
+              Plan özeti
+            </h2>
+
+            <div className="grid md:grid-cols-2 gap-x-10 gap-y-8 mt-6">
+              <div>
+                <p className="lejant text-[var(--route)] mb-3">Seyahat</p>
+                <dl>
+                  {plan.originCity && (
+                    <Satir etiket="Kalkış" deger={plan.originCity} />
+                  )}
+                  <Satir etiket="Şehir" deger={plan.city} />
+                  {plan.country && <Satir etiket="Ülke" deger={plan.country} />}
+                  {plan.duration && <Satir etiket="Süre" deger={plan.duration} />}
+                  {plan.travel_style && (
+                    <Satir
+                      etiket="Tarz"
+                      deger={<span className="capitalize">{plan.travel_style}</span>}
+                    />
+                  )}
+                  {/* `budget_level` sunucuda seyahat tarzıyla AYNI değerle
+                      doldurulabiliyor (manuel planlarda öyle geliyor). Aynı
+                      bilgiyi iki satırda göstermek künyeyi kirletiyor. */}
+                  {plan.budget_level && plan.budget_level !== plan.travel_style && (
+                    <Satir
+                      etiket="Bütçe seviyesi"
+                      deger={<span className="capitalize">{plan.budget_level}</span>}
+                    />
+                  )}
+                </dl>
+              </div>
+
+              <div>
+                <p className="lejant text-[var(--route)] mb-3">Künye</p>
+                <dl>
+                  {plan.total_cost != null && (
+                    <Satir
+                      etiket="Toplam maliyet"
+                      deger={
+                        <span className="sayisal text-[var(--accent)] font-medium">
+                          ₺{plan.total_cost.toLocaleString('tr-TR')}
+                        </span>
+                      }
+                    />
+                  )}
+                  {plan.daily_cost != null && (
+                    <Satir
+                      etiket="Günlük maliyet"
+                      deger={
+                        <span className="sayisal">
+                          ₺{plan.daily_cost.toLocaleString('tr-TR')}
+                        </span>
+                      }
+                    />
+                  )}
+                  <Satir
+                    etiket="Oluşturma"
+                    deger={
+                      <span className="sayisal">
+                        {new Date(plan.createdAt).toLocaleDateString('tr-TR')}
+                      </span>
+                    }
+                  />
+                  <Satir
+                    etiket="Kaynak"
+                    deger={plan.ai_model === 'manual_planning' ? 'Manuel' : 'Yapay zekâ'}
+                  />
+                </dl>
+              </div>
+            </div>
+
+            {ilgiAlanlari.length > 0 && (
+              <div className="mt-8">
+                <p className="lejant text-[var(--route)] mb-3">İlgi alanları</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {ilgiAlanlari.map((ilgi, i) => (
+                    <li key={`${ilgi}-${i}`}>
+                      <Rozet ton="aksan">{ilgi}</Rozet>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'city-info' && (
+          <div>
+            <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] mb-5">
+              Şehir bilgisi
+            </h2>
+            {plan.sehir_bilgisi ? (
+              <div
+                className="plan-govde"
+                dangerouslySetInnerHTML={{ __html: formatContent(plan.sehir_bilgisi) || '' }}
+              />
+            ) : (
+              bosMetin('şehir bilgisi')
+            )}
+          </div>
+        )}
+
+        {activeTab === 'daily-plan' && (
+          <div>
+            <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] mb-5">
+              Günlük plan
+            </h2>
+            {plan.gun_plani ? (
+              (() => {
+                const gunler = parseDailyPlan(plan.gun_plani);
+
+                if (gunler.length === 0) {
+                  return (
+                    <div
+                      className="plan-govde"
+                      dangerouslySetInnerHTML={{ __html: formatContent(plan.gun_plani) || '' }}
+                    />
+                  );
+                }
+
+                const dolu = gunler.filter((g) => !g.isEmpty).length;
+
+                return (
+                  <>
+                    <ol className="space-y-4">
+                      {gunler.map((gun, i) => (
+                        /*
+                          DÜZELTİLEN GÖRÜNMEZ METİN HATASI: dolu günlerin kartı
+                          `bg-[var(--accent)]` (koyu teal) idi ama içindeki
+                          başlık `text-[var(--fg)]` (koyu mürekkep) — koyu
+                          üstüne koyu, okunmuyordu. Gün numarası dairesi de
+                          aksan zemin üzerinde aksan renkliydi. Kart artık
+                          normal yüzey; ayrım solundaki rota işaretinde.
+                        */
+                        <li
+                          key={i}
+                          className={cx(
+                            'rounded-[var(--radius-lg)] border p-5 transition-colors',
+                            gun.isEmpty
+                              ? 'border-dashed border-[var(--line-strong)] bg-[var(--surface-2)]'
+                              : 'border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)]'
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span
+                              className={cx(
+                                'grid h-9 w-9 shrink-0 place-items-center rounded-full font-[family-name:var(--font-geist-mono)] text-sm font-semibold sayisal',
+                                gun.isEmpty
+                                  ? 'bg-[var(--surface-3)] text-[var(--fg-muted)]'
+                                  : 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+                              )}
+                            >
+                              {gun.day}
+                            </span>
+
+                            <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
+                              {gun.day}. Gün
+                            </h3>
+
+                            {plan.startDate && (
+                              <span className="ml-auto text-sm text-[var(--fg-subtle)] sayisal">
+                                {new Date(
+                                  new Date(plan.startDate).getTime() +
+                                    (gun.day - 1) * 24 * 60 * 60 * 1000
+                                ).toLocaleDateString('tr-TR', {
+                                  weekday: 'long',
+                                  day: 'numeric',
+                                  month: 'long',
+                                })}
+                              </span>
+                            )}
+
+                            {gun.isEmpty && <Rozet>Boş</Rozet>}
+                          </div>
+
+                          <div className="mt-4">
+                            {gun.isEmpty ? (
+                              <p className="text-[var(--fg-subtle)] text-sm">
+                                Bu gün için henüz plan yapılmamış.
+                              </p>
+                            ) : (
+                              <div
+                                className="plan-govde"
+                                dangerouslySetInnerHTML={{
+                                  __html: formatDayContent(gun.content),
+                                }}
+                              />
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] bg-[var(--surface-2)] px-4 py-3">
+                      <span className="lejant text-[var(--fg-subtle)]">
+                        Toplam {gunler.length} gün
+                      </span>
+                      <span className="text-sm text-[var(--fg-muted)] sayisal">
+                        {dolu} dolu · {gunler.length - dolu} boş
+                      </span>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
+              bosMetin('günlük plan')
+            )}
+          </div>
+        )}
+
+        {activeTab === 'food-guide' && (
+          <div>
+            <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] mb-5">
+              Yemek rehberi
+            </h2>
+            {plan.yemek_rehberi ? (
+              <div
+                className="plan-govde"
+                dangerouslySetInnerHTML={{ __html: formatContent(plan.yemek_rehberi) || '' }}
+              />
+            ) : (
+              bosMetin('yemek rehberi')
+            )}
+          </div>
+        )}
+
+        {activeTab === 'practical-info' && (
+          <div>
+            <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] mb-5">
+              Pratik bilgiler
+            </h2>
+            {plan.pratik_bilgiler ? (
+              <div
+                className="plan-govde"
+                dangerouslySetInnerHTML={{ __html: formatContent(plan.pratik_bilgiler) || '' }}
+              />
+            ) : (
+              bosMetin('pratik bilgi')
+            )}
+          </div>
+        )}
+
+        {activeTab === 'budget' && (
+          <div>
+            <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)] mb-5">
+              Plan maliyeti
+            </h2>
+
+            {/*
+              DÜZELTİLEN GÖRÜNMEZ METİN HATASI: üç maliyet kartı da
+              `bg-[var(--accent)]` zemindeydi ve etiketleri
+              `text-[var(--accent)]` ile yazılmıştı — yani "Toplam Maliyet"
+              ve "Günlük Ortalama" etiketleri kendi zeminleriyle aynı renkti,
+              hiç görünmüyordu. Değerler de teal üstünde yeşil/mavi idi.
+              Üç ölçüm artık tek yüzeyde, ayrım çizgiyle.
+            */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--line)] rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface-2)] mb-8">
+              <Olcum
+                etiket="Toplam maliyet"
+                deger={`₺${plan.total_cost ? plan.total_cost.toLocaleString('tr-TR') : '0'}`}
+                ton="aksan"
+                className="px-5 py-4"
+              />
+              <Olcum
+                etiket="Günlük ortalama"
+                deger={`₺${plan.daily_cost ? plan.daily_cost.toLocaleString('tr-TR') : '0'}`}
+                className="px-5 py-4"
+              />
+              <div className="px-5 py-4">
+                <Olcum
+                  etiket="Önerilen bütçe"
+                  // Katsayı elle `1.2` yazılıydı. `REZERV_ORANI` değişse bu
+                  // kutu eski değerde kalır ve aynı sayfa iki farklı
+                  // "önerilen bütçe" gösterirdi (aşağıdaki döküm katsayıyı
+                  // kütüphaneden alıyor).
+                  deger={tl(plan.total_cost ? plan.total_cost * REZERV_ORANI : 0)}
+                  ton="rota"
+                />
+                <p className="text-xs text-[var(--fg-subtle)] mt-1.5">
+                  %{Math.round((REZERV_ORANI - 1) * 100)} rezerv dâhil
+                </p>
+              </div>
+            </div>
+
+            {plan.butce_tahmini ? (
+              <>
+                <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-4">
+                  Detaylı dağılım
+                </h3>
+                <ButceDokumu
+                  raw={plan.butce_tahmini}
+                  yedekHtml={formatContent(plan.butce_tahmini)}
+                />
+
+                <div className="mt-8">
+                  <Serit ton="bilgi" baslik="Maliyetleri düzenlemek">
+                    Her kalemi tek tek düzenlemek ve toplamı güncellemek için bütçe
+                    sayfasına gidin.{' '}
+                    <Link
+                      href="/budget"
+                      className="font-medium underline underline-offset-4"
+                    >
+                      Bütçeyi aç
+                    </Link>
+                  </Serit>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--line-strong)] px-6 py-12 text-center">
+                <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
+                  Maliyet detayı yok
+                </h3>
+                <p className="text-[var(--fg-muted)] mt-2 max-w-md mx-auto leading-relaxed">
+                  Bu plan için kalem kalem maliyet bilgisi kaydedilmemiş.
+                </p>
+                <div className="mt-6">
+                  <BagDugme href="/budget">Bütçe sayfasına git</BagDugme>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </SayfaKabugu>
   );
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-session";
 import { TripStatus, isTripStatus } from "@/lib/trip-status";
 import { logger } from "@/lib/logger";
+import { toplamlariTazele } from "@/lib/iliskisel-plan-ozeti";
 
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -52,11 +53,18 @@ export async function GET(request: Request): Promise<NextResponse> {
         completedAt: true,
         createdAt: true,
         updatedAt: true,
+        // Toplamın ilişkisel modelden tazelenebilmesi için (B4 · Adım 5).
+        tripId: true,
+        migratedAt: true,
       },
     });
 
+    // Taşınmış planların toplamı `BudgetItem`dan geliyor; `total_cost`
+    // sütunu salt okunur arşiv (bkz. iliskisel-plan-ozeti.ts).
+    const tazelenmis = await toplamlariTazele(trips);
+
     // Response formatını düzenle
-    const formattedTrips = trips.map(trip => ({
+    const formattedTrips = tazelenmis.map(trip => ({
       id: trip.id,
       city: trip.city,
       country: trip.country,

@@ -63,13 +63,47 @@ const KORUMALI_YOLLAR = [
  * teorik bir risk değil. Statik üretimi geri istiyorsanız tek yol nonce'tan
  * vazgeçmek, o da script CSP'sini anlamsızlaştırır.
  *
- * VARSAYILAN RAPOR MODU. `CSP_MODE=enforce` verilmedikçe politika
- * `Content-Security-Policy-Report-Only` olarak gönderiliyor: ihlaller
- * tarayıcı konsoluna düşüyor ama hiçbir şey engellenmiyor. Doğrulanmamış
- * bir politikayı doğrudan zorlamak, harita ya da giriş akışını sessizce
- * kırma riski demek. Üretimde bir süre rapor modunda izleyip ihlal
- * kalmadığında `CSP_MODE=enforce` yapın.
+ * VARSAYILAN: ÜRETİMDE ZORLA, GELİŞTİRMEDE RAPOR ET.
+ *
+ * Politika bir süre rapor modunda izlendi ve ÖLÇÜLDÜ (4 Eylül 2026):
+ * gezilen sayfalarda (ana sayfa, giriş, harita, planlar, bütçe, günlük
+ * plan) tek bir ihlal SINIFI çıktı — `unsafe-eval`. Google Maps script'i,
+ * fontlar, görseller, `connect-src`, `style-src`, `frame-src`: hiçbiri
+ * ihlal üretmedi. Yani politika uygulamaya hazır.
+ *
+ * `unsafe-eval` ihlalleri UYGULAMADAN GELMİYOR: Next.js dev sunucusu
+ * webpack'in `eval` tabanlı kaynak haritalarını kullanıyor. Üretim
+ * derlemesinde durum farklı ve bu da ölçüldü — `.next/static/chunks`
+ * içinde `eval(` ve `new Function(` sayısı SIFIR.
+ *
+ * Bu yüzden mod ortama göre ayrılıyor:
+ *   üretim      → `Content-Security-Policy` (zorlanıyor)
+ *   geliştirme  → `Content-Security-Policy-Report-Only`
+ *
+ * Geliştirmede zorlamak, webpack'in `eval`ini bloklayıp uygulamayı yerelde
+ * tamamen çalışmaz hale getirirdi.
+ *
+ * `CSP_MODE` İKİ YÖNDE DE geçersiz kılıyor:
+ *   CSP_MODE=enforce  → her ortamda zorla (yerelde politikayı denemek için)
+ *   CSP_MODE=report   → her ortamda rapor et (üretimde bir şey kırılırsa
+ *                       kod değişikliği olmadan geri dönüş yolu)
  */
+/**
+ * Politika zorlanacak mı, yalnızca raporlanacak mı?
+ *
+ * Ayrı bir fonksiyon: karar tek satırlık bir koşuldan fazlası ve
+ * testlenebilir olması gerekiyor (bkz. tests/csp.test.ts).
+ */
+export function cspZorlanacakMi(
+  ortam: string | undefined = process.env.NODE_ENV,
+  mod: string | undefined = process.env.CSP_MODE
+): boolean {
+  const normal = (mod ?? "").trim().toLowerCase();
+  if (normal === "enforce") return true;
+  if (normal === "report" || normal === "report-only") return false;
+  return ortam === "production";
+}
+
 function cspUret(nonce: string, zorla: boolean): string {
   const yonergeler = [
     `default-src 'self'`,
@@ -130,7 +164,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const nonce = nonceUret();
-  const zorla = process.env.CSP_MODE === "enforce";
+  const zorla = cspZorlanacakMi();
   const csp = cspUret(nonce, zorla);
   const cspBasligi = zorla
     ? "Content-Security-Policy"

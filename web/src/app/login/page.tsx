@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { logger } from "@/lib/logger";
-import { Alan, Dugme, GIRDI_SINIFI, Kart, Yukleniyor } from "@/components/ui";
+import { Alan, Dugme, GIRDI_SINIFI, KonturDoku, Pusula, Yukleniyor } from "@/components/ui";
 
 /**
  * Giriş sayfası.
@@ -14,6 +14,9 @@ import { Alan, Dugme, GIRDI_SINIFI, Kart, Yukleniyor } from "@/components/ui";
  *  - ÖLÜ "Beni hatırla" ONAY KUTUSU KALDIRILDI. Hiçbir şeye bağlı değildi:
  *    `checked`/`onChange` yok, `handleSubmit` okumuyor, oturum süresini
  *    etkilemiyordu. Çalışmayan bir söz vermek, hiç söz vermemekten kötü.
+ *  - Düğme artık `bekliyor` prop'unu kullanıyor. Metni elle değiştirmek
+ *    ("Giriş yapılıyor…") düğmenin GENİŞLİĞİNİ zıplatıyordu; bileşen
+ *    bunun yerine sabit metnin yanına dönen gösterge koyuyor.
  *  - Alan `id`'leri (`email`, `password`) ve `button[type="submit"]`
  *    KORUNDU — e2e testleri bu seçicilere bağlı.
  */
@@ -56,10 +59,17 @@ function GirisFormu() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--bg)] px-4 py-12 md:py-20 flex items-start justify-center">
-      <div className="w-full max-w-md">
+    <div className="harita-zemin relative min-h-screen px-4 py-12 md:py-20 flex items-start justify-center overflow-hidden">
+      {/* Kontur dokusu giriş ekranında da duruyor: kullanıcı uygulamanın
+          içine girmeden önce de aynı yüzeyde olduğunu biliyor. */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <KonturDoku yogunluk={0.7} />
+      </div>
+
+      <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)]">
+          <Pusula className="h-9 w-9 mx-auto text-[var(--accent)]" />
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)] mt-4">
             Tekrar hoş geldiniz
           </h1>
           <p className="text-[var(--fg-muted)] mt-2">
@@ -67,7 +77,7 @@ function GirisFormu() {
           </p>
         </div>
 
-        <Kart>
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[var(--radius-lg)] shadow-[var(--shadow-pop)]">
           <div className="p-6 md:p-7">
             {hata && (
               <p
@@ -93,7 +103,21 @@ function GirisFormu() {
                 />
               </Alan>
 
-              <Alan etiket="Şifre" htmlFor="password">
+              {/* ŞİFREMİ UNUTTUM (B9). Etiketin YANINDA duruyor, formun
+                  altında değil: kullanıcı buna, şifre alanına baktığı anda
+                  ihtiyaç duyuyor. */}
+              <Alan
+                etiket="Şifre"
+                htmlFor="password"
+                yardim={
+                  <Link
+                    href="/forgot-password"
+                    className="text-[var(--accent)] hover:underline underline-offset-4"
+                  >
+                    Şifremi unuttum
+                  </Link>
+                }
+              >
                 <input
                   id="password"
                   name="password"
@@ -107,8 +131,8 @@ function GirisFormu() {
                 />
               </Alan>
 
-              <Dugme type="submit" boy="lg" disabled={yukleniyor} className="w-full">
-                {yukleniyor ? "Giriş yapılıyor…" : "Giriş yap"}
+              <Dugme type="submit" boy="lg" bekliyor={yukleniyor} className="w-full">
+                Giriş yap
               </Dugme>
             </form>
 
@@ -149,7 +173,7 @@ function GirisFormu() {
               Google ile devam et
             </button>
           </div>
-        </Kart>
+        </div>
 
         <p className="text-sm text-[var(--fg-muted)] text-center mt-6">
           Hesabınız yok mu?{" "}
@@ -161,7 +185,7 @@ function GirisFormu() {
           </Link>
         </p>
       </div>
-    </main>
+    </div>
   );
 }
 

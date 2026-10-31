@@ -6,6 +6,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { KonturDoku, Serit } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "Gizlilik Politikası - Trip Planner",
@@ -14,8 +15,13 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-[var(--bg)] px-4 md:px-8 py-12 md:py-16">
-      <div className="mx-auto max-w-[68ch]">
+    <div className="harita-zemin relative min-h-screen px-4 md:px-8 py-12 md:py-16 overflow-hidden">
+      {/* Kontur dokusu: hukuki metin de uygulamanın yüzeyinde duruyor. */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <KonturDoku yogunluk={0.45} />
+      </div>
+
+      <div className="relative mx-auto max-w-[68ch]">
         <div>
           <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-2">
             Gizlilik Politikası
@@ -24,17 +30,62 @@ export default function PrivacyPage() {
             Son güncelleme: [doldurulacak] &middot; Yürürlük tarihi: [doldurulacak]
           </p>
 
-          <div className="rounded-[var(--radius)] bg-[var(--warn-soft)] p-4 mb-8">
-            <p className="text-sm text-[var(--warn)] leading-relaxed">
-              <strong>Taslak metin.</strong> Bu sayfa henüz hukuki incelemeden geçmemiştir.
-              Köşeli parantez içindeki alanlar doldurulmadan yayına alınmamalıdır.
-            </p>
+          {/* Ölçek çubuğu: sayfanın nerede başladığını söyleyen işaret. */}
+          <div className="flex items-center mb-10" aria-hidden="true">
+            <span className="h-[3px] w-14 rounded-full bg-[var(--accent)]" />
+            <span className="h-px flex-1 bg-[var(--line)]" />
           </div>
 
-          <section className="space-y-8 text-[var(--fg-muted)] leading-relaxed">
+          {/* İçindekiler: 9–11 bölümlük bir metinde okuyucu aradığı
+              maddeye doğrudan gitmeli. */}
+          <nav
+            aria-label="Bölümler"
+            className="mb-12 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] p-5"
+          >
+            <p className="lejant text-[var(--fg-subtle)] mb-3">İçindekiler</p>
+            <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+              {[
+                  { no: "01", ad: "Veri Sorumlusu", kimlik: "b-veri-sorumlusu" },
+                  { no: "02", ad: "İşlenen Veriler", kimlik: "b-islenen-veriler" },
+                  { no: "03", ad: "İşleme Amaçları ve Hukuki Sebep", kimlik: "b-isleme-amaclari-ve-hukuki-sebep" },
+                  { no: "04", ad: "Aktarım ve Yurt Dışına Aktarım", kimlik: "b-aktarim-ve-yurt-disina-aktarim" },
+                  { no: "05", ad: "Saklama Süresi", kimlik: "b-saklama-suresi" },
+                  { no: "06", ad: "Haklarınız", kimlik: "b-haklariniz" },
+                  { no: "07", ad: "Güvenlik", kimlik: "b-guvenlik" },
+                  { no: "08", ad: "Çocukların Verileri", kimlik: "b-cocuklarin-verileri" },
+                  { no: "09", ad: "Değişiklikler", kimlik: "b-degisiklikler" },
+              ].map((b) => (
+                <li key={b.kimlik}>
+                  <a
+                    href={`#${b.kimlik}`}
+                    className="group flex items-baseline gap-2.5 py-1.5 text-sm text-[var(--fg-muted)] hover:text-[var(--accent)] transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  >
+                    <span className="lejant text-[var(--fg-subtle)] group-hover:text-[var(--route)] shrink-0">
+                      {b.no}
+                    </span>
+                    {b.ad}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+
+
+          <div className="mb-10">
+            <Serit ton="uyari" baslik="Taslak metin">
+              Bu sayfa henüz hukuki incelemeden geçmemiştir.
+              Köşeli parantez içindeki alanlar doldurulmadan yayına alınmamalıdır.
+            </Serit>
+          </div>
+
+          <section className="space-y-10 text-[var(--fg)] leading-[1.75]">
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                1. Veri Sorumlusu
+              <h2
+                id="b-veri-sorumlusu"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">01</span>
+                Veri Sorumlusu
               </h2>
               <p>
                 Kişisel verileriniz, 6698 sayılı Kişisel Verilerin Korunması Kanunu
@@ -52,8 +103,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                2. İşlenen Veriler
+              <h2
+                id="b-islenen-veriler"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">02</span>
+                İşlenen Veriler
               </h2>
 
               <h3 className="font-semibold text-[var(--fg)] mt-4 mb-1">
@@ -106,8 +161,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                3. İşleme Amaçları ve Hukuki Sebep
+              <h2
+                id="b-isleme-amaclari-ve-hukuki-sebep"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">03</span>
+                İşleme Amaçları ve Hukuki Sebep
               </h2>
               <ul className="list-disc pl-5 space-y-2">
                 <li>
@@ -133,8 +192,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                4. Aktarım ve Yurt Dışına Aktarım
+              <h2
+                id="b-aktarim-ve-yurt-disina-aktarim"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">04</span>
+                Aktarım ve Yurt Dışına Aktarım
               </h2>
               <p>
                 Hizmetin çalışabilmesi için verilerin bir bölümü aşağıdaki sağlayıcılara
@@ -166,8 +229,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                5. Saklama Süresi
+              <h2
+                id="b-saklama-suresi"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">05</span>
+                Saklama Süresi
               </h2>
               <p>
                 Hesap ve plan verileriniz, hesabınız açık olduğu sürece saklanır. Bir
@@ -180,8 +247,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                6. Haklarınız
+              <h2
+                id="b-haklariniz"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">06</span>
+                Haklarınız
               </h2>
               <p>
                 KVKK m.11 ve GDPR kapsamında; kişisel verilerinizin işlenip
@@ -199,8 +270,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                7. Güvenlik
+              <h2
+                id="b-guvenlik"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">07</span>
+                Güvenlik
               </h2>
               <p>
                 Şifreler tek yönlü hash algoritmasıyla saklanır, oturumlar imzalı
@@ -212,8 +287,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                8. Çocukların Verileri
+              <h2
+                id="b-cocuklarin-verileri"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">08</span>
+                Çocukların Verileri
               </h2>
               <p>
                 Hizmet 13 yaşından küçük kullanıcılara yönelik değildir ve bu yaş
@@ -223,8 +302,12 @@ export default function PrivacyPage() {
             </div>
 
             <div>
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
-                9. Değişiklikler
+              <h2
+                id="b-degisiklikler"
+                className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-3 flex items-baseline gap-3 scroll-mt-24"
+              >
+                <span className="lejant text-[var(--route)] shrink-0">09</span>
+                Değişiklikler
               </h2>
               <p>
                 Bu politikayı güncelleyebiliriz. Önemli değişiklikleri uygulama içinde
@@ -249,6 +332,6 @@ export default function PrivacyPage() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

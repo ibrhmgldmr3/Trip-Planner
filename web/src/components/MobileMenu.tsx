@@ -6,19 +6,19 @@ import { useEffect, useState } from "react";
 import UserNav from "./UserNav";
 import ThemeToggle from "./ThemeToggle";
 import { useSession } from "next-auth/react";
-import { BagDugme, cx } from "./ui";
+import { BagDugme, Pusula, cx } from "./ui";
 
 /**
  * Üst gezinme çubuğu.
  *
- * Bu turda düzeltilenler:
- *  - BAĞLANTILAR İKİ KEZ YAZILIYORDU (masaüstü + mobil). Yeni bir sayfa
- *    eklerken birini güncelleyip diğerini unutmak an meselesiydi; artık tek
- *    bir `BAGLANTILAR` dizisi var.
- *  - AKTİF SAYFA BELLİ DEĞİLDİ. Kullanıcı hangi bölümde olduğunu menüden
- *    anlayamıyordu; `usePathname` ile aktif bağlantı işaretleniyor.
- *  - Mobil menü yalnızca bağlantıya tıklayınca kapanıyordu: Escape'e ve
- *    rota değişimine de kapanıyor.
+ * Bağlantılar TEK dizide (masaüstü + mobil aynı kaynaktan). Aktif sayfa
+ * `usePathname` ile işaretleniyor; mobil menü Escape'e ve rota değişimine
+ * kapanıyor.
+ *
+ * AKTİF DURUM NEDEN BÖYLE: "bulunduğunuz yer" bir harita fikri. Aktif
+ * bağlantının altında macenta bir işaret var — yumuşak dolgu bir hap
+ * yerine, haritadaki iğnenin karşılığı. Renk burada dekor değil: rota
+ * rengi sayfa boyunca "buradasınız / buraya gidiyorsunuz" demek.
  */
 
 const BAGLANTILAR = [
@@ -62,20 +62,21 @@ export default function MobileMenu() {
   return (
     <header
       className={cx(
-        "sticky top-0 z-50 bg-[var(--surface)]/85 backdrop-blur-md",
-        "border-b transition-colors duration-150",
-        kaydirildi ? "border-[var(--line)]" : "border-transparent"
+        "sticky top-0 z-50 backdrop-blur-md transition-colors duration-200",
+        kaydirildi
+          ? "bg-[var(--bg)]/88 border-b border-[var(--line)]"
+          : "bg-transparent border-b border-transparent"
       )}
     >
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-[var(--radius)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            // py-2.5: dokunma hedefi 36px'ten 48px'e çıkıyor (mobilde 44px
+            // altı hedefler ıskalanıyor); görsel yükseklik değişmiyor.
+            className="group flex items-center gap-2.5 rounded-[var(--radius)] py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
-            <span className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--accent)] text-[var(--accent-contrast)] grid place-items-center text-xs font-semibold tracking-wide">
-              TP
-            </span>
+            <Pusula className="h-7 w-7 text-[var(--accent)] transition-transform duration-500 group-hover:rotate-45" />
             <span className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
               Trip Planner
             </span>
@@ -89,14 +90,21 @@ export default function MobileMenu() {
                     href={bag.href}
                     aria-current={aktifMi(bag.href) ? "page" : undefined}
                     className={cx(
-                      "px-3 py-2 rounded-[var(--radius)] text-sm font-medium transition-colors",
+                      "relative block px-3 py-2 text-sm font-medium rounded-[var(--radius)]",
+                      "transition-colors duration-150",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",
                       aktifMi(bag.href)
-                        ? "text-[var(--accent)] bg-[var(--accent-soft)]"
+                        ? "text-[var(--fg)]"
                         : "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-2)]"
                     )}
                   >
                     {bag.etiket}
+                    {aktifMi(bag.href) && (
+                      <span
+                        className="absolute inset-x-3 -bottom-px h-[2px] rounded-full bg-[var(--route)]"
+                        aria-hidden="true"
+                      />
+                    )}
                   </Link>
                 </li>
               ))}
@@ -137,24 +145,34 @@ export default function MobileMenu() {
       {menuAcik && (
         <div
           id="mobil-menu"
-          className="md:hidden border-t border-[var(--line)] bg-[var(--surface)]"
+          className="md:hidden border-t border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-pop)]"
         >
-          <div className="px-4 py-4 space-y-1">
-            {BAGLANTILAR.map((bag) => (
-              <Link
-                key={bag.href}
-                href={bag.href}
-                aria-current={aktifMi(bag.href) ? "page" : undefined}
-                className={cx(
-                  "block px-3 py-3 rounded-[var(--radius)] font-medium transition-colors",
-                  aktifMi(bag.href)
-                    ? "text-[var(--accent)] bg-[var(--accent-soft)]"
-                    : "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-2)]"
-                )}
-              >
-                {bag.etiket}
-              </Link>
-            ))}
+          <div className="px-4 py-4">
+            <ul className="space-y-0.5">
+              {BAGLANTILAR.map((bag) => (
+                <li key={bag.href}>
+                  <Link
+                    href={bag.href}
+                    aria-current={aktifMi(bag.href) ? "page" : undefined}
+                    className={cx(
+                      "flex items-center gap-3 px-3 py-3 rounded-[var(--radius)] font-medium transition-colors",
+                      aktifMi(bag.href)
+                        ? "text-[var(--fg)] bg-[var(--surface-2)]"
+                        : "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-2)]"
+                    )}
+                  >
+                    <span
+                      className={cx(
+                        "h-1.5 w-1.5 rounded-full shrink-0",
+                        aktifMi(bag.href) ? "bg-[var(--route)]" : "bg-[var(--line-strong)]"
+                      )}
+                      aria-hidden="true"
+                    />
+                    {bag.etiket}
+                  </Link>
+                </li>
+              ))}
+            </ul>
 
             <div className="pt-4 mt-3 border-t border-[var(--line)] space-y-2">
               <BagDugme href="/travel-mode" className="w-full">

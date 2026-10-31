@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-session";
 import { rateLimitAsync } from "@/lib/rate-limit";
 import { planRequestSchema, ilkHataMesaji } from "@/lib/api-schemas";
 import { tarihiCoz } from "@/lib/trip-dates";
 import { calistir, devamEdenIs, isOlustur } from "@/lib/plan-job";
 import { logger } from "@/lib/logger";
+
+/**
+ * Doğrulanmış hesabın saatlik plan hakkı.
+ */
+const DOGRULANMIS_KOTA = 5;
+
+/**
+ * DOĞRULANMAMIŞ hesabın saatlik plan hakkı (B9).
+ *
+ * NEDEN TAMAMEN ENGELLENMİYOR: yeni kullanıcı, ürünü denemeden önce bir
+ * posta beklemek zorunda kalırsa çoğu geri gelmiyor. Dar bir kota hem
+ * denemeye izin veriyor hem de sahte adreslerle açılan hesapların LLM
+ * maliyetini sınırlıyor — bir plan üretimi en kötü durumda 8 ardışık
+ * model çağrısı.
+ */
+const DOGRULANMAMIS_KOTA = 1;
 
 /**
  * AI plan üretimini BAŞLATIR.
@@ -29,24 +46,21 @@ export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
-    // Ücretli bir LLM zinciri başlatılıyor: önce kimlik, sonra kota.
+    // Ücretli bir LLM zinciri başlatılıyor: önce kimlik.
     const auth = await requireUser();
     if (!auth.ok) return auth.response;
 
     const userId = auth.user.id;
 
-    const quota = await rateLimitAsync(`trip-plan:${userId}`, 5, 60 * 60 * 1000);
-    if (!quota.success) {
-      return NextResponse.json(
-        {
-          error: `Saatlik plan oluşturma limitine ulaştınız. ${Math.ceil(
-            quota.retryAfter / 60
-          )} dakika sonra tekrar deneyin.`,
-        },
-        { status: 429, headers: { "Retry-After": String(quota.retryAfter) } }
-      );
-    }
-
+    // SIRA ÖNEMLİ: kota EN SONDA, üretim gerçekten başlatılacakken
+    // tüketiliyor.
+    //
+    // Eskiden sayaç ilk satırdaydı ve ÜRETİM YAPMAYAN yollar da hakkı
+    // yakıyordu: devam eden bir işe bağlanan istek (kullanıcı sabırsızlanıp
+    // "Plan oluştur"a ikinci kez bastığında olan tam olarak bu) ve geçersiz
+    // gövdeyle dönen 400'ler. Saatlik hak 5; üç kere üst üste tıklamak
+    // hakkın %60'ını hiç plan üretmeden harcıyordu.
+    //
     // Aynı anda ikinci bir üretim başlatmak hem kotayı hem sağlayıcı
     // maliyetini boşa harcıyor; kullanıcı "bir şey olmadı" sanıp tekrar
     // tıkladığında mevcut işe bağlanıyor.
@@ -93,6 +107,36 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    // Kota, e-posta DOĞRULAMA durumuna bağlı (B9).
+    const kullanici = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true },
+    });
+
+    const dogrulanmis = Boolean(kullanici?.emailVerified);
+    const hak = dogrulanmis ? DOGRULANMIS_KOTA : DOGRULANMAMIS_KOTA;
+
+    // Buradan sonrası gerçekten üretim başlatıyor: kota şimdi tüketilir.
+    const quota = await rateLimitAsync(`trip-plan:${userId}`, hak, 60 * 60 * 1000);
+    if (!quota.success) {
+      // Doğrulanmamış kullanıcıya ÇIKIŞ YOLU gösteriliyor: yalnızca
+      // "limitiniz doldu" demek, sınırın kaldırılabilir olduğunu gizlerdi.
+      const ek = dogrulanmis
+        ? ""
+        : " E-posta adresinizi doğrularsanız saatlik hakkınız 5'e çıkar.";
+
+      return NextResponse.json(
+        {
+          error:
+            `Saatlik plan oluşturma limitine ulaştınız. ${Math.ceil(
+              quota.retryAfter / 60
+            )} dakika sonra tekrar deneyin.` + ek,
+          emailVerified: dogrulanmis,
+        },
+        { status: 429, headers: { "Retry-After": String(quota.retryAfter) } }
+      );
     }
 
     const is = await isOlustur(userId, parsed.data);

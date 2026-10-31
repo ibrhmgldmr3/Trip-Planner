@@ -215,11 +215,71 @@ export function isLevelEnabled(level: LogLevel): boolean {
   return LEVEL_WEIGHT[level] >= LEVEL_WEIGHT[MIN_LEVEL];
 }
 
+/* -------------------------------------------------------------------------- */
+/* Hata izleme kancası                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `logger.error` çağrıldığında ayrıca tetiklenen dinleyici.
+ *
+ * NEDEN KANCA, DOĞRUDAN SAĞLAYICI ÇAĞRISI DEĞİL: bu modül hem sunucu
+ * rotalarından, hem `"use client"` bileşenlerinden, hem Edge middleware'den
+ * import ediliyor. Sentry gibi bir SDK'yı buraya sabitlemek üç ortamın
+ * üçünde de çalışan bir paket seçmeyi zorunlu kılar ve bu dosyanın
+ * bağımsızlığını (bugün sıfır bağımlılık, ~1.5 KB) bozardı.
+ *
+ * Kanca yerine: uygulama açılışında bir kez `hataDinleyicisiKur()` çağırıp
+ * sağlayıcıyı oraya bağlıyorsunuz. Kurulmazsa hiçbir şey olmuyor — bugünkü
+ * davranış aynen sürüyor.
+ *
+ * KULLANIM (örnek, bir `instrumentation.ts` içinde):
+ *
+ *   import * as Sentry from "@sentry/nextjs";
+ *   hataDinleyicisiKur((mesaj, cause, detay) => {
+ *     Sentry.captureException(cause ?? new Error(mesaj), { extra: detay });
+ *   });
+ *
+ * DETAY ZATEN MASKELENMİŞ olarak geliyor (`redact` uygulanmış): dinleyiciye
+ * ham PII gitmiyor.
+ */
+export type HataDinleyicisi = (
+  mesaj: string,
+  cause: unknown,
+  detay: LogContext
+) => void;
+
+let hataDinleyicisi: HataDinleyicisi | null = null;
+
+/** Hata dinleyicisini kurar. İkinci çağrı öncekini değiştirir. */
+export function hataDinleyicisiKur(dinleyici: HataDinleyicisi | null): void {
+  hataDinleyicisi = dinleyici;
+}
+
+/**
+ * Dinleyiciyi çağırır; ASLA fırlatmaz.
+ *
+ * İzleme sağlayıcısının patlaması, log'lanmakta olan asıl hatayı
+ * gizlememeli — hata izlemenin kendisi bir kesinti kaynağı olamaz.
+ */
+function dinleyiciyeBildir(mesaj: string, cause: unknown, detay: LogContext): void {
+  if (!hataDinleyicisi) return;
+
+  try {
+    hataDinleyicisi(mesaj, cause, detay);
+  } catch {
+    // Bilinçli olarak sessiz: buradan log'lamak sonsuz döngü riski taşır.
+  }
+}
+
 function emit(level: LogLevel, message: string, cause?: unknown, context?: LogContext): void {
   if (!isLevelEnabled(level)) return;
 
   const detail: LogContext = context ? (redact(context) as LogContext) : {};
   if (cause !== undefined) detail.err = serializeError(cause);
+
+  // Yalnızca `error`: uyarı ve bilgi satırları izleme sağlayıcısını
+  // doldurup gerçek hataları gömerdi.
+  if (level === "error") dinleyiciyeBildir(message, cause, detail);
 
   const write = CONSOLE[level];
   const time = new Date().toISOString();

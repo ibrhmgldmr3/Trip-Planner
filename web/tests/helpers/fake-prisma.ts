@@ -24,6 +24,33 @@
 
 export type Kayit = Record<string, unknown>;
 
+/** `select: { id: true, city: true }` biçimindeki alan seçimi. */
+export type Secim = Record<string, boolean>;
+
+/**
+ * Prisma'nın `select` davranışını taklit eder.
+ *
+ * NEDEN GEREKLİ: sahte istemci `select`i tamamen yok sayıyordu, yani her
+ * sorgu satırın TÜM alanlarını döndürüyordu. Sonuç: bir rota yanıtına
+ * `userId` ya da `password` sızdırsa bile "yanıtta bu alan olmamalı"
+ * testleri yanlış sebeple KIRMIZI, alanı doğru dışlayan bir rota da yanlış
+ * sebeple kırmızı oluyordu — iki yönde de sinyal değersizdi.
+ *
+ * Kopya döndürülüyor: çağıranın yanıt üzerinde yaptığı bir değişiklik
+ * "veritabanındaki" satıra yazmasın.
+ */
+function projeksiyon(kayit: Kayit, select?: Secim): Kayit {
+  if (!select) return { ...kayit };
+
+  const cikti: Kayit = {};
+  for (const [alan, istendi] of Object.entries(select)) {
+    // Prisma'da `false` da "bu alanı verme" demek; yalnızca `true` seçer.
+    if (istendi !== true) continue;
+    cikti[alan] = kayit[alan];
+  }
+  return cikti;
+}
+
 /** Prisma'nın desteklediği filtrelerden burada karşılanan alt küme. */
 type AlanFiltresi =
   | { equals?: unknown; not?: unknown; in?: unknown[]; gte?: unknown; lte?: unknown; gt?: unknown; lt?: unknown }
@@ -132,37 +159,44 @@ class SahteTablo {
     );
   }
 
-  async findUnique({ where }: { where: Kayit }) {
+  async findUnique({ where, select }: { where: Kayit; select?: Secim }) {
     // Prisma findUnique'te de ek skaler filtreler kabul ediyor (extended
     // where unique) ve orada da `undefined` filtreyi düşürüyor.
-    return this.kayitlar.find((k) => kayitEslesiyorMu(k, where)) ?? null;
+    const kayit = this.kayitlar.find((k) => kayitEslesiyorMu(k, where));
+    return kayit ? projeksiyon(kayit, select) : null;
   }
 
-  async findFirst({ where, orderBy }: { where?: Kayit; orderBy?: unknown } = {}) {
+  async findFirst({
+    where,
+    orderBy,
+    select,
+  }: { where?: Kayit; orderBy?: unknown; select?: Secim } = {}) {
     const eslesenler = sirala(
       this.kayitlar.filter((k) => kayitEslesiyorMu(k, where)),
       orderBy
     );
-    return eslesenler[0] ?? null;
+    return eslesenler[0] ? projeksiyon(eslesenler[0], select) : null;
   }
 
   async findMany({
     where,
     orderBy,
     take,
-  }: { where?: Kayit; orderBy?: unknown; take?: number } = {}) {
+    select,
+  }: { where?: Kayit; orderBy?: unknown; take?: number; select?: Secim } = {}) {
     const eslesenler = sirala(
       this.kayitlar.filter((k) => kayitEslesiyorMu(k, where)),
       orderBy
     );
-    return typeof take === "number" ? eslesenler.slice(0, take) : eslesenler;
+    const kesit = typeof take === "number" ? eslesenler.slice(0, take) : eslesenler;
+    return kesit.map((k) => projeksiyon(k, select));
   }
 
   async count({ where }: { where?: Kayit } = {}) {
     return this.kayitlar.filter((k) => kayitEslesiyorMu(k, where)).length;
   }
 
-  async create({ data }: { data: Kayit }) {
+  async create({ data, select }: { data: Kayit; select?: Secim }) {
     const kayit: Kayit = {
       id: data.id ?? yeniId(this.ad),
       createdAt: new Date(),
@@ -175,7 +209,7 @@ class SahteTablo {
     }
 
     this.kayitlar.push(kayit);
-    return kayit;
+    return projeksiyon(kayit, select);
   }
 
   async createMany({
@@ -205,12 +239,12 @@ class SahteTablo {
     return { count: sayi };
   }
 
-  async update({ where, data }: { where: Kayit; data: Kayit }) {
+  async update({ where, data, select }: { where: Kayit; data: Kayit; select?: Secim }) {
     const kayit = this.kayitlar.find((k) => kayitEslesiyorMu(k, where));
     if (!kayit) throw sahteBulunamadiHatasi();
 
     Object.assign(kayit, data, { updatedAt: new Date() });
-    return kayit;
+    return projeksiyon(kayit, select);
   }
 
   async updateMany({ where, data }: { where?: Kayit; data: Kayit }) {

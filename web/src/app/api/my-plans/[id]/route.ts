@@ -16,23 +16,18 @@ export async function DELETE(
     const auth = await requireUser();
     if (!auth.ok) return auth.response;
 
-    // Plan var mı ve sahibi mi?
-    const plan = await prisma.tripPlan.findUnique({
-      where: { id: planId },
-      select: { userId: true, city: true },
+    // Sahiplik sorgunun içinde; "yok" ile "senin değil" ayrımı YAPILMIYOR.
+    // Ayrım, id'yi bilen birine o planın var olduğunu doğrular — ilişkisel
+    // model uçları (src/lib/trip-ownership.ts) bu kuralı zaten uyguluyor.
+    const plan = await prisma.tripPlan.findFirst({
+      where: { id: planId, userId: auth.user.id },
+      select: { id: true },
     });
 
     if (!plan) {
       return NextResponse.json(
         { error: "Plan bulunamadı" },
         { status: 404 }
-      );
-    }
-
-    if (plan.userId !== auth.user.id) {
-      return NextResponse.json(
-        { error: "Bu planı silme yetkiniz yok" },
-        { status: 403 }
       );
     }
 

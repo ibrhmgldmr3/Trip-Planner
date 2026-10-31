@@ -15,6 +15,7 @@ import {
   bosButce,
 } from "@/lib/plan-budget";
 import { logger } from "@/lib/logger";
+import { arsivUstuneYazilacaklar } from "@/lib/iliskisel-plan-ozeti";
 
 /**
  * Plan detayı okuma/güncelleme.
@@ -32,10 +33,19 @@ import { logger } from "@/lib/logger";
  *  - Hata yanıtları iç hata mesajını (`details`) istemciye sızdırıyordu.
  */
 
-/** Sahiplik kontrolü; üç handler da aynı kontrolü yapıyordu. */
+/**
+ * Sahiplik kontrolü; üç handler da aynı kontrolü yapıyordu.
+ *
+ * "YOK" İLE "SENİN DEĞİL" AYRIMI YAPILMIYOR: ikisi de 404. 403 dönmek,
+ * id'yi bilen birine o planın VAR OLDUĞUNU doğrular; cuid'ler tahmin
+ * edilemez ama bir kez sızdıklarında (log, paylaşılan ekran görüntüsü,
+ * Referer başlığı) 403 ile 404 arasındaki fark doğrudan bir bilgi
+ * sızıntısıdır. İlişkisel model uçları (`src/lib/trip-ownership.ts`) bu
+ * kuralı zaten uyguluyordu; TripPlan uçları geride kalmıştı.
+ */
 async function planiSahiplenDogrula(planId: string, userId: string) {
-  const plan = await prisma.tripPlan.findUnique({
-    where: { id: planId },
+  const plan = await prisma.tripPlan.findFirst({
+    where: { id: planId, userId },
     select: {
       userId: true,
       startDate: true,
@@ -48,16 +58,6 @@ async function planiSahiplenDogrula(planId: string, userId: string) {
     return {
       ok: false as const,
       response: NextResponse.json({ error: "Plan bulunamadı" }, { status: 404 }),
-    };
-  }
-
-  if (plan.userId !== userId) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { error: "Bu plana erişim yetkiniz yok" },
-        { status: 403 }
-      ),
     };
   }
 
@@ -75,15 +75,19 @@ export async function GET(
     const auth = await requireUser();
     if (!auth.ok) return auth.response;
 
-    // Planı getir ve kullanıcının kendi planı olup olmadığını kontrol et
-    const plan = await prisma.tripPlan.findUnique({
+    // Sahiplik SORGUNUN İÇİNDE: önce oku sonra karşılaştır deseni, filtre
+    // unutulduğunda sessizce başkasının planını döndürüyor.
+    const plan = await prisma.tripPlan.findFirst({
       where: {
-        id: planId
+        id: planId,
+        userId: auth.user.id
       },
       select: {
         id: true,
         city: true,
         country: true,
+        // Kalkış şehri (B6): başlıkta güzergâh olarak gösteriliyor.
+        originCity: true,
         startDate: true,
         endDate: true,
         duration: true,
@@ -103,12 +107,15 @@ export async function GET(
         butce_tahmini: true,
         raw_markdown: true,
         raw_html: true,
-        // Yalnızca yetkilendirme için okunuyor; yanıttan çıkarılıyor.
-        userId: true,
-        status: true
+        status: true,
+        // Taşınmışsa JSON sütunlarının yerine ilişkisel karşılıkları
+        // döndürülüyor (B4 · Adım 5).
+        tripId: true,
+        migratedAt: true
       }
     });
 
+    // "Yok" ile "senin değil" ayrımı yapılmıyor (bkz. planiSahiplenDogrula).
     if (!plan) {
       return NextResponse.json(
         { error: "Plan bulunamadı" },
@@ -116,22 +123,17 @@ export async function GET(
       );
     }
 
-    // Kullanıcının kendi planı olup olmadığını kontrol et
-    if (plan.userId !== auth.user.id) {
-      return NextResponse.json(
-        { error: "Bu plana erişim yetkiniz yok" },
-        { status: 403 }
-      );
-    }
-
-
-    // Sahip id'si yanıtta yer almıyor; istemci için bir faydası yok.
-    const { userId: _sahipId, ...planResponse } = plan;
-    void _sahipId;
+    // TAŞINMIŞ PLANDA JSON SÜTUNLARI ARŞİV (B4 · Adım 5).
+    //
+    // `butce_tahmini`, `gun_plani` ve toplamlar ilişkisel tablolardan
+    // üretilip AYNI ŞEKİLDE döndürülüyor; bu yüzden plan detayı sayfası
+    // hiç değişmedi. Alternatif, sayfayı iki ayrı veri yoluna bölmekti —
+    // aynı ekranın iki farklı okuma kodu, iki farklı bozulma yolu demek.
+    const ustuneYaz = await arsivUstuneYazilacaklar(plan);
 
     return NextResponse.json({
       success: true,
-      plan: planResponse
+      plan: { ...plan, ...ustuneYaz }
     });
 
   } catch (error: unknown) {

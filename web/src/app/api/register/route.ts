@@ -1,10 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { rateLimitAsync, clientIp } from "@/lib/rate-limit";
 import { registerSchema, ilkHataMesaji } from "@/lib/api-schemas";
 import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
+import {
+  EPOSTA_DOGRULAMA_OMRU_MS,
+  JETON_AMACLARI,
+  jetonOlustur,
+} from "@/lib/dogrulama-jetonu";
+import { epostaDogrulamaMesaji, epostaGonder, epostaYapilandirilmisMi } from "@/lib/eposta";
 
 /**
  * Saatlik IP başına kayıt hakkı.
@@ -87,6 +93,29 @@ export async function POST(request: Request) {
         );
       }
       throw createError;
+    }
+
+    // DOĞRULAMA POSTASI — KAYDI BLOKLAMAZ (B9).
+    //
+    // `after()` içinde ve hatası yutuluyor: sağlayıcı kesintisi yüzünden
+    // kaydın başarısız olması, kullanıcıyı hesabı olmadan bırakırdı.
+    // Doğrulanmamış hesap zaten çalışıyor, yalnızca plan kotası dar
+    // (bkz. api/trip-plan-model). Kullanıcı postayı profil sayfasından
+    // yeniden isteyebiliyor.
+    if (epostaYapilandirilmisMi() && user.email) {
+      const adres = user.email;
+      after(async () => {
+        try {
+          const jeton = await jetonOlustur(
+            JETON_AMACLARI.epostaDogrulama,
+            adres,
+            EPOSTA_DOGRULAMA_OMRU_MS
+          );
+          await epostaGonder(epostaDogrulamaMesaji(adres, jeton));
+        } catch (postaHatasi) {
+          logger.error("Doğrulama postası gönderilemedi", postaHatasi);
+        }
+      });
     }
 
     // Remove password from returned user object

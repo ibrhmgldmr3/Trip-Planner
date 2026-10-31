@@ -7,13 +7,36 @@ import { toast } from "react-hot-toast";
 import Image from "next/image";
 import { logger } from "@/lib/logger";
 import {
+  Alan,
+  BagDugme,
+  Dugme,
+  GIRDI_SINIFI,
   GirisGerekli,
+  Kocan,
+  KonturDoku,
+  Rozet,
+  SayfaBasi,
+  SayfaKabugu,
+  Yukleniyor,
+  cx,
 } from "@/components/ui";
+import { PlanTasima } from "@/components/PlanTasima";
+import { EpostaDogrulama, HesapSilme } from "@/components/HesapYonetimi";
 
 interface UserProfile {
   id: string;
   name: string;
   email: string;
+  /** Doğrulama damgası; null ise adres doğrulanmamış (B9). */
+  emailVerified?: string | null;
+  /**
+   * Hesabın ŞİFRESİ var mı — değerin kendisi değil, varlığı.
+   *
+   * Hesap silme onayının şifre mi yoksa e-posta adresi mi isteyeceğini
+   * belirliyor: yalnızca Google ile açılmış hesaplarda doğrulanacak bir
+   * şifre yok.
+   */
+  sifreVar?: boolean;
   phone?: string;
   bio?: string;
   location?: string;
@@ -131,425 +154,456 @@ export default function ProfilePage() {
     }
   }, [status, router]);
 
-  // Loading durumu
+  // Yükleme durumu
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-[var(--fg-muted)]">
-            Profil yükleniyor...
-          </p>
-        </div>
-      </div>
+      <SayfaKabugu>
+        <Yukleniyor
+          metin={status === 'loading' ? 'Oturum kontrol ediliyor…' : 'Profiliniz yükleniyor…'}
+        />
+      </SayfaKabugu>
     );
   }
 
-  // Giriş yapmamış kullanıcı
   if (status === 'unauthenticated') {
     return <GirisGerekli />;
   }
 
+  /** Kod → etiket çevirileri; iki yerde (görünüm ve düzenleme) kullanılıyor. */
+  const ULASIM: Record<string, string> = {
+    all: 'Hepsi',
+    plane: 'Uçak',
+    car: 'Araba',
+    bus: 'Otobüs',
+    train: 'Tren',
+    boat: 'Gemi',
+  };
+
+  const PARA: Record<string, string> = {
+    TRY: 'Türk Lirası (TRY)',
+    USD: 'Amerikan Doları (USD)',
+    EUR: 'Euro (EUR)',
+    GBP: 'İngiliz Sterlini (GBP)',
+  };
+
+  const adBasHarfi = (profile?.name || session?.user?.name || '?').trim().charAt(0).toUpperCase();
+
+  /**
+   * Görünüm modundaki değer satırı.
+   *
+   * Eskiden her değer `bg-[var(--surface-2)] px-4 py-3 rounded-lg` ile bir
+   * KUTU içindeydi; on bir kutu üst üste gelince sayfa forma benziyordu ama
+   * düzenlenebilir değildi. Görünüm modunda kutu yok — etiket + değer.
+   */
+  const Deger = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[var(--fg)] leading-relaxed">{children}</p>
+  );
+
+  const BosDeger = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[var(--fg-subtle)] leading-relaxed">{children}</p>
+  );
+
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-3">
-            Profilim
-          </h1>
-          <p className="text-[var(--fg-muted)]">
-            Hesap bilgilerinizi görüntüleyin ve düzenleyin
-          </p>
-        </div>
-
-        {/* Navigation */}
-        <div className="text-center mb-8 flex justify-center space-x-4">
-          <button
-            onClick={() => router.push('/my-plans')}
-            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-          >
-            Planlarım
-          </button>
-          <button
-            onClick={() => router.push('/budget')}
-            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-          >
-            Finansal Tercihler
-          </button>
-          <button
-            onClick={() => router.push('/daily-planner')}
-            className="bg-[var(--accent)] text-[var(--accent-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-          >
-            Günlük Plan
-          </button>
-        </div>
-
-        <div className="max-w-4xl mx-auto">
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Profile Info */}
-            <div className="lg:col-span-2">
-              <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-[var(--fg)]">
-                    Profil Bilgileri
-                  </h2>
-                  <div className="space-x-2">
-                    {editing ? (
-                      <>
-                        <button
-                          onClick={() => setEditing(false)}
-                          className="px-4 py-2 text-[var(--fg-muted)] hover:bg-[var(--surface-2)] dark:hover:bg-[var(--surface-2)] rounded-lg transition-colors"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          onClick={updateProfile}
-                          disabled={saving}
-                          className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
-                        >
-                          {saving ? 'Kaydediliyor...' : 'Kaydet'}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => setEditing(true)}
-                        className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-contrast)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-                      >
-                        Düzenle
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Profile Photo */}
-                <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6 mb-8">
-                  <div className="relative">
-                    {profile?.image || session?.user?.image ? (
-                      <Image
-                        src={profile?.image || session?.user?.image || ''}
-                        alt="Profile"
-                        width={120}
-                        height={120}
-                        className="rounded-full border-4 border-[var(--line)] dark:border-[var(--line)]"
-                      />
-                    ) : (
-                      <div className="w-30 h-30 rounded-full bg-[var(--bg)] flex items-center justify-center text-white text-4xl font-bold">
-                        {profile?.name?.charAt(0) || session?.user?.name?.charAt(0) || '?'}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="text-center md:text-left">
-                    <h3 className="text-2xl font-bold text-[var(--fg)]">
-                      {profile?.name || session?.user?.name}
-                    </h3>
-                    <p className="text-[var(--fg-muted)] mb-2">
-                      {profile?.email || session?.user?.email}
-                    </p>
-                    <p className="text-sm text-[var(--fg-subtle)]">
-                      Üye olma tarihi: {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('tr-TR') : 'Bilinmiyor'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Profile Form */}
-                <div className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                        Ad Soyad
-                      </label>
-                      {editing ? (
-                        <input
-                          type="text"
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                          placeholder="Adınızı ve soyadınızı girin"
-                        />
-                      ) : (
-                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
-                          {profile?.name || 'Belirtilmemiş'}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                        Telefon
-                      </label>
-                      {editing ? (
-                        <input
-                          type="tel"
-                          value={editForm.phone}
-                          onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                          placeholder="Telefon numaranızı girin"
-                        />
-                      ) : (
-                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
-                          {profile?.phone || 'Belirtilmemiş'}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                        Konum
-                      </label>
-                      {editing ? (
-                        <input
-                          type="text"
-                          value={editForm.location}
-                          onChange={(e) => setEditForm({...editForm, location: e.target.value})}
-                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                          placeholder="Şehir, Ülke"
-                        />
-                      ) : (
-                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
-                          {profile?.location || 'Belirtilmemiş'}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                        Doğum Tarihi
-                      </label>
-                      {editing ? (
-                        <input
-                          type="date"
-                          value={editForm.birthDate}
-                          onChange={(e) => setEditForm({...editForm, birthDate: e.target.value})}
-                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                        />
-                      ) : (
-                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
-                          {profile?.birthDate ? new Date(profile.birthDate).toLocaleDateString('tr-TR') : 'Belirtilmemiş'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                      Hakkımda
-                    </label>
-                    {editing ? (
-                      <textarea
-                        value={editForm.bio}
-                        onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
-                        rows={4}
-                        className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                        placeholder="Kendiniz hakkında kısa bir açıklama yazın..."
-                      />
-                    ) : (
-                      <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)] min-h-[100px]">
-                        {profile?.bio || 'Henüz bir açıklama eklenmemiş.'}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Preferred Transport */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                        Tercih Edilen Ulaşım
-                      </label>
-                      {editing ? (
-                        <select
-                          value={editForm.preferredTransport}
-                          onChange={(e) => setEditForm({...editForm, preferredTransport: e.target.value})}
-                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                        >
-                          <option value="all">Hepsi</option>
-                          <option value="plane">Uçak</option>
-                          <option value="car">Araba</option>
-                          <option value="bus">Otobüs</option>
-                          <option value="train">Tren</option>
-                          <option value="boat">Gemi</option>
-                        </select>
-                      ) : (
-                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
-                          {(() => {
-                            const transport = profile?.preferredTransport || 'all';
-                            switch(transport) {
-                              case 'plane': return 'Uçak';
-                              case 'car': return 'Araba';
-                              case 'bus': return 'Otobüs';
-                              case 'train': return 'Tren';
-                              case 'boat': return 'Gemi';
-                              default: return 'Hepsi';
-                            }
-                          })()}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                        Tercih Edilen Para Birimi
-                      </label>
-                      {editing ? (
-                        <select
-                          value={editForm.preferredCurrency}
-                          onChange={(e) => setEditForm({...editForm, preferredCurrency: e.target.value})}
-                          className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                        >
-                          <option value="TRY">Türk Lirası (TRY)</option>
-                          <option value="USD">Amerikan Doları (USD)</option>
-                          <option value="EUR">Euro (EUR)</option>
-                          <option value="GBP">İngiliz Sterlini (GBP)</option>
-                        </select>
-                      ) : (
-                        <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)]">
-                          {(() => {
-                            const currency = profile?.preferredCurrency || 'TRY';
-                            switch(currency) {
-                              case 'USD': return 'Amerikan Doları (USD)';
-                              case 'EUR': return 'Euro (EUR)';
-                              case 'GBP': return 'İngiliz Sterlini (GBP)';
-                              default: return 'Türk Lirası (TRY)';
-                            }
-                          })()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Interests */}
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                      İlgi Alanları
-                    </label>
-                    {editing ? (
-                      <textarea
-                        value={editForm.interests}
-                        onChange={(e) => setEditForm({...editForm, interests: e.target.value})}
-                        rows={3}
-                        className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-[var(--line)] dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                        placeholder="Örn: Tarih, müze, doğa yürüyüşü, gastronomi, fotoğrafçılık..."
-                      />
-                    ) : (
-                      <p className="px-4 py-3 bg-[var(--surface-2)] rounded-lg text-[var(--fg)] min-h-[80px]">
-                        {profile?.interests || 'İlgi alanları belirtilmemiş.'}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                      E-posta
-                    </label>
-                    <p className="px-4 py-3 bg-[var(--surface-2)] dark:bg-[var(--surface-3)] rounded-lg text-[var(--fg-muted)]">
-                      {profile?.email || session?.user?.email} (Değiştirilemez)
-                    </p>
-                  </div>
-                </div>
-              </div>
+    <SayfaKabugu>
+      <SayfaBasi
+        baslik="Profil"
+        aciklama="Hesap bilgileriniz ve seyahat tercihleriniz. Tercihler yeni plan oluştururken başlangıç değeri olarak kullanılır."
+        yan={
+          editing ? (
+            <div className="flex gap-2">
+              <Dugme
+                tur="ikincil"
+                onClick={() => {
+                  setEditing(false);
+                  // İptal düzenlemeyi GERİ ALMALI: eskiden yalnızca modu
+                  // kapatıyordu, girilen değerler formda kalıyordu ve bir
+                  // sonraki "Düzenle"de kaydedilmemiş veri görünüyordu.
+                  if (profile) {
+                    setEditForm({
+                      name: profile.name || '',
+                      phone: profile.phone || '',
+                      bio: profile.bio || '',
+                      location: profile.location || '',
+                      birthDate: profile.birthDate || '',
+                      preferredTransport: profile.preferredTransport || 'all',
+                      preferredCurrency: profile.preferredCurrency || 'TRY',
+                      interests: profile.interests || '',
+                    });
+                  }
+                }}
+              >
+                Vazgeç
+              </Dugme>
+              <Dugme onClick={updateProfile} bekliyor={saving}>
+                Kaydet
+              </Dugme>
             </div>
+          ) : (
+            <Dugme tur="ikincil" onClick={() => setEditing(true)}>
+              Düzenle
+            </Dugme>
+          )
+        }
+      />
 
-            {/* Stats & Actions */}
-            <div className="space-y-6">
-              {/* Travel Stats */}
-              {stats && (
-                <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
-                  <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-5">
-                    Seyahat İstatistiklerim
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-[var(--accent-soft)] rounded-lg">
-                      <span className="text-[var(--fg-muted)]">Toplam Plan</span>
-                      <span className="font-bold text-[var(--accent)]">{stats.totalTrips}</span>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-[var(--ok-soft)] rounded-lg">
-                      <span className="text-[var(--fg-muted)]">Tamamlanan</span>
-                      <span className="font-bold text-[var(--accent)]">{stats.completedTrips}</span>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-[var(--surface-2)] rounded-lg">
-                      <span className="text-[var(--fg-muted)]">Toplam Bütçe</span>
-                      <span className="font-bold text-[var(--fg)]">
-                        ₺{stats.totalBudget.toLocaleString('tr-TR')}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-[var(--warn-soft)] rounded-lg">
-                      <span className="text-[var(--fg-muted)]">Ort. Süre</span>
-                      <span className="font-bold text-[var(--warn)]">
-                        {stats.averageTripDuration} gün
-                      </span>
-                    </div>
-                    
-                    {stats.favoriteDestination && (
-                      <div className="flex justify-between items-center p-3 bg-pink-50 dark:bg-[var(--surface-2)] rounded-lg">
-                        <span className="text-[var(--fg-muted)]">Favori Şehir</span>
-                        <span className="font-bold text-[var(--fg)] dark:text-[var(--fg)]">
-                          {stats.favoriteDestination}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
+        {/* ================================================================ */}
+        {/* Kimlik belgesi                                                    */}
+        {/* ================================================================ */}
+        <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)]">
+          {/* Künye başlığı */}
+          <div className="relative overflow-hidden p-6">
+            <KonturDoku yogunluk={0.5} />
+            <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
+              {profile?.image ? (
+                <Image
+                  src={profile.image}
+                  alt=""
+                  width={96}
+                  height={96}
+                  className="h-24 w-24 shrink-0 rounded-full border-2 border-[var(--line)] object-cover"
+                />
+              ) : (
+                /* DÜZELTİLDİ: burada `w-30 h-30` yazıyordu — Tailwind'in
+                   varsayılan ölçeğinde 30 adımı YOK, yani kutunun boyutu
+                   hiç uygulanmıyordu. Metin de `text-white` idi ve zemin
+                   `--bg` (açık temada neredeyse beyaz kâğıt) olduğu için
+                   baş harf GÖRÜNMÜYORDU. */
+                <span
+                  className="grid h-24 w-24 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-[var(--accent-contrast)] font-[family-name:var(--font-serif)] text-4xl"
+                  aria-hidden="true"
+                >
+                  {adBasHarfi}
+                </span>
               )}
 
-              {/* Quick Actions */}
-              <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
-                <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-5">
-                  Hızlı İşlemler
-                </h3>
-                
-                <div className="space-y-3">
-                  <button
-                    onClick={() => router.push('/travel-mode')}
-                    className="w-full bg-[var(--accent)] text-white py-3 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-                  >
-                    Yeni Plan Oluştur
-                  </button>
-                  
-                  <button
-                    onClick={() => router.push('/my-plans')}
-                    className="w-full bg-[var(--accent)] text-[var(--accent-contrast)] py-3 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-                  >
-                    Planlarımı Görüntüle
-                  </button>
-                  
-                  <button
-                    onClick={() => router.push('/profile/my-trips')}
-                    className="w-full bg-[var(--accent)] text-[var(--accent-contrast)] py-3 px-4 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-                  >
-                     Seyahat Geçmişi
-                  </button>
-                </div>
-              </div>
-
-              {/* Account Actions */}
-              <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-6">
-                <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] mb-5">
-                  Hesap İşlemleri
-                </h3>
-                
-                <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
-                        signOut({ callbackUrl: '/' });
-                      }
-                    }}
-                    className="w-full bg-[var(--danger)] text-white py-3 px-4 rounded-lg hover:bg-[var(--danger-hover)] transition-colors"
-                  >
-                    Çıkış Yap
-                  </button>
-                </div>
+              <div className="min-w-0">
+                <h2 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--fg)]">
+                  {profile?.name || session?.user?.name || 'İsimsiz kullanıcı'}
+                </h2>
+                <p className="text-[var(--fg-muted)] mt-1 break-all">
+                  {profile?.email || session?.user?.email}
+                </p>
+                {profile?.createdAt && (
+                  <p className="lejant text-[var(--fg-subtle)] mt-3 sayisal">
+                    Üyelik ·{' '}
+                    {new Date(profile.createdAt).toLocaleDateString('tr-TR', {
+                      year: 'numeric',
+                      month: 'long',
+                    })}
+                  </p>
+                )}
               </div>
             </div>
           </div>
+
+          <div className="px-6">
+            <Kocan />
+          </div>
+
+          {/* Alanlar */}
+          <div className="p-6 space-y-6">
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+              <Alan etiket="Ad Soyad" htmlFor="p-name">
+                {editing ? (
+                  <input
+                    id="p-name"
+                    type="text"
+                    className={GIRDI_SINIFI}
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    placeholder="Adınız ve soyadınız"
+                  />
+                ) : profile?.name ? (
+                  <Deger>{profile.name}</Deger>
+                ) : (
+                  <BosDeger>Belirtilmemiş</BosDeger>
+                )}
+              </Alan>
+
+              <Alan etiket="Telefon" htmlFor="p-phone">
+                {editing ? (
+                  <input
+                    id="p-phone"
+                    type="tel"
+                    className={cx(GIRDI_SINIFI, 'sayisal')}
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="05XX XXX XX XX"
+                  />
+                ) : profile?.phone ? (
+                  <Deger>
+                    <span className="sayisal">{profile.phone}</span>
+                  </Deger>
+                ) : (
+                  <BosDeger>Belirtilmemiş</BosDeger>
+                )}
+              </Alan>
+
+              <Alan etiket="Konum" htmlFor="p-location">
+                {editing ? (
+                  <input
+                    id="p-location"
+                    type="text"
+                    className={GIRDI_SINIFI}
+                    value={editForm.location}
+                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                    placeholder="Şehir, ülke"
+                  />
+                ) : profile?.location ? (
+                  <Deger>{profile.location}</Deger>
+                ) : (
+                  <BosDeger>Belirtilmemiş</BosDeger>
+                )}
+              </Alan>
+
+              <Alan etiket="Doğum tarihi" htmlFor="p-birth">
+                {editing ? (
+                  <input
+                    id="p-birth"
+                    type="date"
+                    className={cx(GIRDI_SINIFI, 'sayisal')}
+                    value={editForm.birthDate}
+                    onChange={(e) => setEditForm({ ...editForm, birthDate: e.target.value })}
+                  />
+                ) : profile?.birthDate ? (
+                  <Deger>
+                    <span className="sayisal">
+                      {new Date(profile.birthDate).toLocaleDateString('tr-TR')}
+                    </span>
+                  </Deger>
+                ) : (
+                  <BosDeger>Belirtilmemiş</BosDeger>
+                )}
+              </Alan>
+            </div>
+
+            <Alan etiket="Hakkımda" htmlFor="p-bio">
+              {editing ? (
+                <textarea
+                  id="p-bio"
+                  rows={3}
+                  className={GIRDI_SINIFI}
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  placeholder="Kendinizden kısaca bahsedin…"
+                />
+              ) : profile?.bio ? (
+                <Deger>{profile.bio}</Deger>
+              ) : (
+                <BosDeger>Henüz bir şey yazmadınız.</BosDeger>
+              )}
+            </Alan>
+
+            <div className="pt-2">
+              <Kocan />
+            </div>
+
+            <div>
+              <p className="lejant text-[var(--fg-subtle)] mb-4">Seyahat tercihleri</p>
+
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+                <Alan etiket="Tercih edilen ulaşım" htmlFor="p-transport">
+                  {editing ? (
+                    <select
+                      id="p-transport"
+                      className={GIRDI_SINIFI}
+                      value={editForm.preferredTransport}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, preferredTransport: e.target.value })
+                      }
+                    >
+                      {Object.entries(ULASIM).map(([kod, etiket]) => (
+                        <option key={kod} value={kod}>
+                          {etiket}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Deger>{ULASIM[profile?.preferredTransport || 'all'] ?? 'Hepsi'}</Deger>
+                  )}
+                </Alan>
+
+                <Alan etiket="Para birimi" htmlFor="p-currency">
+                  {editing ? (
+                    <select
+                      id="p-currency"
+                      className={GIRDI_SINIFI}
+                      value={editForm.preferredCurrency}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, preferredCurrency: e.target.value })
+                      }
+                    >
+                      {Object.entries(PARA).map(([kod, etiket]) => (
+                        <option key={kod} value={kod}>
+                          {etiket}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Deger>{PARA[profile?.preferredCurrency || 'TRY'] ?? PARA.TRY}</Deger>
+                  )}
+                </Alan>
+              </div>
+            </div>
+
+            <Alan
+              etiket="İlgi alanları"
+              htmlFor="p-interests"
+              ipucu={editing ? 'Virgülle ayırın; plan üretilirken dikkate alınır.' : undefined}
+            >
+              {editing ? (
+                <textarea
+                  id="p-interests"
+                  rows={3}
+                  className={GIRDI_SINIFI}
+                  value={editForm.interests}
+                  onChange={(e) => setEditForm({ ...editForm, interests: e.target.value })}
+                  placeholder="Tarih, müze, doğa yürüyüşü, gastronomi, fotoğrafçılık…"
+                />
+              ) : profile?.interests ? (
+                /* Virgülle ayrılmış metin, etiketlere dönüyor: göz tek tek
+                   ilgi alanını bir metin bloğundan daha hızlı tarıyor. */
+                <ul className="flex flex-wrap gap-1.5">
+                  {profile.interests
+                    .split(',')
+                    .map((i) => i.trim())
+                    .filter(Boolean)
+                    .map((ilgi) => (
+                      <li key={ilgi}>
+                        <Rozet ton="aksan">{ilgi}</Rozet>
+                      </li>
+                    ))}
+                </ul>
+              ) : (
+                <BosDeger>Belirtilmemiş</BosDeger>
+              )}
+            </Alan>
+
+            <Alan
+              etiket="E-posta"
+              htmlFor="p-email"
+              ipucu="E-posta adresi hesabınızın kimliğidir ve değiştirilemez."
+            >
+              <p
+                id="p-email"
+                className="text-[var(--fg-muted)] leading-relaxed break-all"
+              >
+                {profile?.email || session?.user?.email}
+              </p>
+            </Alan>
+          </div>
+        </div>
+
+        {/* ================================================================ */}
+        {/* Yan sütun                                                         */}
+        {/* ================================================================ */}
+        <div className="space-y-6">
+          {stats && (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] p-6">
+              <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
+                Seyahat özetiniz
+              </h3>
+
+              {/*
+                BEŞ İSTATİSTİK, BEŞ AYRI RENK VARDI (aksan / yeşil / mor /
+                sarı / pembe) — üstelik ikisi ham Tailwind rengiydi
+                (`bg-purple-50`, `bg-pink-50`) ve paletin dışındaydı. Renk
+                "bunlar farklı türde şeyler" diyordu; oysa hepsi aynı türde:
+                bir ölçüm. Artık hepsi aynı yüzeyde, ayrım çizgiyle.
+              */}
+              <dl className="mt-5 divide-y divide-[var(--line)]">
+                {[
+                  { etiket: 'Toplam plan', deger: stats.totalTrips.toLocaleString('tr-TR') },
+                  { etiket: 'Tamamlanan', deger: stats.completedTrips.toLocaleString('tr-TR') },
+                  {
+                    etiket: 'Toplam bütçe',
+                    deger: `₺${stats.totalBudget.toLocaleString('tr-TR')}`,
+                  },
+                  { etiket: 'Ortalama süre', deger: `${stats.averageTripDuration} gün` },
+                  ...(stats.favoriteDestination
+                    ? [{ etiket: 'Favori şehir', deger: stats.favoriteDestination }]
+                    : []),
+                ].map((satir) => (
+                  <div
+                    key={satir.etiket}
+                    className="flex items-baseline justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <dt className="lejant text-[var(--fg-subtle)]">{satir.etiket}</dt>
+                    <dd className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)] sayisal">
+                      {satir.deger}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
+          <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] p-6">
+            <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
+              Hızlı işlemler
+            </h3>
+
+            {/* Üç eşit ağırlıkta aksan düğmesi vardı; hangisinin asıl eylem
+                olduğu belli değildi. Tek birincil, ikisi ikincil. */}
+            <div className="mt-5 space-y-2.5">
+              <BagDugme href="/travel-mode" className="w-full">
+                Yeni plan oluştur
+              </BagDugme>
+              <BagDugme href="/my-plans" tur="ikincil" className="w-full">
+                Planlarım
+              </BagDugme>
+              <BagDugme href="/profile/my-trips" tur="ikincil" className="w-full">
+                Seyahat geçmişi
+              </BagDugme>
+            </div>
+          </div>
+
+          {/* Doğrulanmış hesapta hiçbir şey basmıyor (bkz. bileşen notu).
+              Profil henüz okunamadıysa da basmıyor: doğrulama DURUMU
+              bilinmeden uyarı göstermek, doğrulanmış kullanıcıya yanlış
+              bir eksiklik bildirmek olurdu. */}
+          {profile && <EpostaDogrulama dogrulanmis={Boolean(profile.emailVerified)} />}
+
+          <PlanTasima />
+
+          <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-kart)] p-6">
+            <h3 className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
+              Hesap
+            </h3>
+
+            {/* Çıkış yıkıcı olmasa da geri dönüşü zahmetli: dolu kırmızı bir
+                düğme yerine sessiz tehlike biçimi. */}
+            <div className="mt-5">
+              <Dugme
+                tur="tehlike"
+                className="w-full"
+                onClick={() => {
+                  if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
+                    signOut({ callbackUrl: '/' });
+                  }
+                }}
+              >
+                Çıkış yap
+              </Dugme>
+            </div>
+
+            {/* Hesap silme, çıkışın ALTINDA ve ayrı bir onay akışında:
+                aynı görsel ağırlıkta iki tehlike düğmesi yan yana
+                durursa yanlışına basmak an meselesi.
+
+                Profil okunamadıysa gösterilmiyor: onayın şifre mi adres mi
+                isteyeceğini profil belirliyor ve yanlış alanı sormak,
+                kullanıcıyı silemediği bir hesapla baş başa bırakırdı. */}
+            {profile && (
+              <HesapSilme
+                eposta={profile.email}
+                sifreVar={profile.sifreVar !== false}
+              />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </SayfaKabugu>
   );
 }
-
-

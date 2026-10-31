@@ -45,11 +45,48 @@ export function tarihiCoz(value: string | Date | null | undefined): Date | null 
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Yerel gün başlangıcı; iki tarihi gün çözünürlüğünde karşılaştırmak için. */
+/**
+ * Yerel gün başlangıcı; iki tarihi gün çözünürlüğünde KARŞILAŞTIRMAK için.
+ *
+ * DİKKAT: bunu veritabanına YAZMAYIN. `setHours(0,...)` yerel gece
+ * yarısını üretiyor ve pozitif UTC farkında (Türkiye GMT+3) bu, bir ÖNCEKİ
+ * günün UTC damgasına denk geliyor. `@db.Date` sütunu damganın UTC gün
+ * kısmını sakladığı için tarih bir gün geri kayıyor. Yazmak için
+ * `utcGunBasi` kullanın.
+ */
 export function gunBasi(value: Date): Date {
   const d = new Date(value);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+/**
+ * Takvim gününü UTC gece yarısına sabitler — `@db.Date` sütunlarına
+ * YAZMAK için doğru olan bu.
+ *
+ * DÜZELTİLEN HATA: `DailyPlan.date` bir `@db.Date` sütunu ve
+ * `/api/trip/daily-plans` oraya `gunBasi()` sonucunu yazıyordu. GMT+3'te
+ * ölçüldü:
+ *
+ *   gunBasi(4 Kasım 2026)  ->  2026-11-03T21:00:00.000Z  ->  @db.Date: 03 Kasım
+ *
+ * Yani her POST/PUT tarihi bir gün geriye kaydırıyordu. Sonuç yalnızca
+ * yanlış tarih değildi: kaydırılan gün bir önceki günün tarihine çarpıp
+ * `@@unique([tripId, date])` kısıtını ihlal ediyor ve uç 500 dönüyordu.
+ * Üç günlük bir planda ikinci günü düzenlemek kaydetmeyi tamamen
+ * kırıyordu.
+ *
+ * Gün/ay/yıl YEREL bileşenlerden alınıyor: kullanıcının "4 Kasım" dediği
+ * gün, kendi takvimindeki gündür.
+ *
+ * (`tarihiCoz` düz tarihleri zaten yerel ÖĞLENE sabitliyor ve bu, aynı
+ * sorunu bir başka yoldan önlüyor — bkz. o fonksiyonun notu. Buradaki
+ * fonksiyon niyeti örtük bırakmıyor.)
+ */
+export function utcGunBasi(value: Date): Date {
+  return new Date(
+    Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())
+  );
 }
 
 /**

@@ -309,6 +309,32 @@ export function webAramaAracKaydi(defter?: KaynakDefteri): ToolRegistry {
  * Arama sağlayıcısı yapılandırılmamışsa boş kayıt döner — araçlar modele
  * hiç sunulmaz (bkz. `webAramaAracKaydi`).
  */
+/**
+ * Otel arama sorgusunu kurar.
+ *
+ * DIŞA AÇIK çünkü iki tüketicisi var: modele sunulan `get_hotel_prices`
+ * aracı ve `GET /api/accommodation-options` ucu (konaklama ekranı). Sorgu
+ * metni gerçek Tavily sonuçlarıyla AYARLANDI — kopyalanırsa iki taraf
+ * zamanla ayrışır ve biri kötü sonuç vermeye başlar.
+ *
+ * Çıkış tarihi sorguya GİRMİYOR: aralık bilgisinin arama sonucuna katkısı
+ * yok, sorguyu uzatıp isabeti düşürüyor.
+ */
+export function otelAramaSorgusu(
+  city: string,
+  checkIn?: string,
+  budgetLevel?: string
+): string {
+  return [
+    city,
+    butceSeviyesiKelimesi(budgetLevel),
+    "otel fiyatları gecelik ortalama",
+    ayYilMetni(checkIn),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function fiyatAraclariKaydi(defter?: KaynakDefteri): ToolRegistry {
   if (!aramaYapilandirilmisMi()) return bosAracKaydi();
 
@@ -361,18 +387,11 @@ export function fiyatAraclariKaydi(defter?: KaynakDefteri): ToolRegistry {
         if (!cozum.ok) return cozum.hata;
 
         const { city, checkIn, budgetLevel } = cozum.data;
-        // Çıkış tarihi sorguya girmiyor: aralık bilgisinin arama sonucuna
-        // katkısı yok, sorguyu uzatıp isabeti düşürüyor.
-        const sorgu = [
-          city,
-          butceSeviyesiKelimesi(budgetLevel),
-          "otel fiyatları gecelik ortalama",
-          ayYilMetni(checkIn),
-        ]
-          .filter(Boolean)
-          .join(" ");
-
-        return aramaSonucuMetni(sorgu, defter, FIYAT_UYARISI);
+        return aramaSonucuMetni(
+          otelAramaSorgusu(city, checkIn, budgetLevel),
+          defter,
+          FIYAT_UYARISI
+        );
       },
 
       async [ULASIM_FIYAT_ARAC_ADI](argsJson) {

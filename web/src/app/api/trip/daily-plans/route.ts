@@ -8,8 +8,9 @@ import {
   dailyPlanUpdateSchema,
   ilkHataMesaji,
 } from "@/lib/api-schemas";
-import { tarihiCoz, gunBasi } from "@/lib/trip-dates";
+import { tarihiCoz, gunBasi, utcGunBasi } from "@/lib/trip-dates";
 import { logger } from "@/lib/logger";
+import { aktiviteButcesiniEsitle, toplamOzeti } from "@/lib/iliskisel-plan-ozeti";
 
 /**
  * Seyahatin günlük planları.
@@ -22,7 +23,27 @@ import { logger } from "@/lib/logger";
  * Bir seyahatte bir tarih için EN FAZLA BİR günlük plan olur. Şemada
  * `@@unique([tripId, date])` kısıtı var; burada da aynı kural uygulanıyor ki
  * hata Prisma'dan değil, anlamlı bir 409 olarak dönsün.
+ *
+ * HER YAZMA BÜTÇEYİ DE EŞİTLİYOR (B4 · Adım 5). Aktivite maliyetleri
+ * bütçenin "aktiviteler" kategorisine yansıtılıyor. Bu kural JSON modelinde
+ * `PUT /api/plan-detail/[id]` içinde yaşıyordu ve günlük planlayıcı taşınmış
+ * planlarda o ucu bir de ONUN İÇİN çağırıyordu (geçiş dönemi çift yazması).
+ * Çift yazma kaldırıldı; kural yazmanın gerçekleştiği yere, buraya geldi.
+ * Aksi halde eklenen bir aktivitenin maliyeti hiçbir toplamda görünmezdi.
  */
+
+/**
+ * Gün planı değiştikten sonra bütçeyi eşitler ve yeni toplamı döndürür.
+ *
+ * Yanıtta dönmesinin sebebi: günlük planlayıcı toplamı ekranda anında
+ * gösteriyor. Dönmeseydi istemci ya toplamı kendi hesaplardı (aktivite dışı
+ * kalemleri göremediği için YANLIŞ çıkardı) ya da her kaydetmeden sonra
+ * fazladan bir okuma yapardı.
+ */
+async function gunlerDegistiginde(trip: { id: string; startDate: Date; endDate: Date }) {
+  const toplam = await aktiviteButcesiniEsitle(trip.id);
+  return toplamOzeti(toplam, trip.startDate, trip.endDate);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -46,9 +67,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Geçersiz tarih" }, { status: 400 });
       }
 
-      const baslangic = gunBasi(gun);
+      // `date` bir `@db.Date` sütunu: değerler UTC gece yarısında duruyor.
+      // Yerel gün başıyla filtrelemek GMT+3'te bir gün kaydırıyordu.
+      const baslangic = utcGunBasi(gun);
       const bitis = new Date(baslangic);
-      bitis.setHours(23, 59, 59, 999);
+      bitis.setUTCHours(23, 59, 59, 999);
 
       whereCondition.date = { gte: baslangic, lte: bitis };
     }
@@ -108,7 +131,7 @@ export async function POST(request: NextRequest) {
       const dailyPlan = await prisma.dailyPlan.create({
         data: {
           tripId: sahiplik.trip.id,
-          date: gunBasi(gun),
+          date: utcGunBasi(gun),
           title: title ?? null,
           notes: notes ?? null,
           activities: activities as unknown as Prisma.InputJsonValue,
@@ -116,7 +139,11 @@ export async function POST(request: NextRequest) {
       });
 
       logger.info("Günlük plan oluşturuldu", { dailyPlanId: dailyPlan.id });
-      return NextResponse.json({ dailyPlan }, { status: 201 });
+
+      return NextResponse.json(
+        { dailyPlan, ozet: await gunlerDegistiginde(sahiplik.trip) },
+        { status: 201 }
+      );
     } catch (createError) {
       if (
         createError instanceof Prisma.PrismaClientKnownRequestError &&
@@ -168,7 +195,7 @@ export async function PUT(request: NextRequest) {
       if (!gun) {
         return NextResponse.json({ error: "Geçersiz tarih" }, { status: 400 });
       }
-      updateData.date = gunBasi(gun);
+      updateData.date = utcGunBasi(gun);
     }
 
     if (title !== undefined) updateData.title = title;
@@ -183,7 +210,11 @@ export async function PUT(request: NextRequest) {
     });
 
     logger.info("Günlük plan güncellendi", { dailyPlanId: id });
-    return NextResponse.json({ dailyPlan });
+
+    return NextResponse.json({
+      dailyPlan,
+      ozet: await gunlerDegistiginde(sahiplik.trip),
+    });
   } catch (error) {
     logger.error("Günlük plan güncellenemedi", error);
     return NextResponse.json(
@@ -211,7 +242,11 @@ export async function DELETE(request: NextRequest) {
     await prisma.dailyPlan.delete({ where: { id: id as string } });
 
     logger.info("Günlük plan silindi", { dailyPlanId: id });
-    return NextResponse.json({ success: true });
+
+    return NextResponse.json({
+      success: true,
+      ozet: await gunlerDegistiginde(sahiplik.trip),
+    });
   } catch (error) {
     logger.error("Günlük plan silinemedi", error);
     return NextResponse.json(

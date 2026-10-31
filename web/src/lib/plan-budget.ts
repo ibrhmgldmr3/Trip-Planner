@@ -46,6 +46,15 @@ export interface ButceKategorisi {
 export interface PlanButcesi {
   categories: Record<string, ButceKategorisi>;
   currency: string;
+  /**
+   * ARTIK KULLANILMIYOR — her yazıcı 0 koyuyor, hiçbir okuyucu hesaba
+   * katmıyor. Sütundaki eski satırlarda bulunduğu için alan korunuyor;
+   * `butceyiYenidenHesapla` toplamı YALNIZCA kategorilerden üretiyor.
+   *
+   * DİKKAT: buraya sıfırdan farklı bir değer yazmak sessizce KAYBOLUR —
+   * `totalCostWithExtras` adına rağmen bu alanı toplamaz. Kategori dışı
+   * kalemler gerçekten gerekiyorsa doğru yol ayrı bir kategori açmaktır.
+   */
   extraItemsTotal: number;
   totalCostWithExtras: number;
   suggestedBudget: number;
@@ -339,18 +348,21 @@ export function butceyiYenidenHesapla(butce: PlanButcesi, gunSayisi: number): Pl
 }
 
 /**
- * Günlük plandaki aktivite maliyetlerini bütçenin "aktiviteler" kategorisine
- * yansıtır ve toplamları yeniden hesaplar.
+ * Gün planındaki aktivite maliyetlerini bütçe kalemlerine çevirir.
  *
- * Bu, günlük planlayıcıda bir aktivite eklendiğinde/silindiğinde bütçenin
- * eskimesini engelleyen tek mekanizma. Aktivite kategorisi tamamen yeniden
- * yazılıyor: kaynak artık gün planı, elle girilmiş kalemler değil.
+ * İKİ MODEL DE BUNU KULLANIYOR: JSON tarafında `butceyiGunlerleEsitle`,
+ * ilişkisel tarafta `aktiviteButcesiniEsitle` (iliskisel-plan-ozeti.ts).
+ * Açıklama metni ("3. gün — Kolezyum") kullanıcıya GÖRÜNEN bir şey; iki
+ * modelde ayrı ayrı üretilseydi taşınmış bir planda aynı aktivite iki
+ * farklı kalem adıyla durur, fark hesapları da her kaydetmede "değişmiş"
+ * derdi.
+ *
+ * Girdi tipi bilinçli olarak gevşek: hem `PlanGunu` (JSON modeli) hem
+ * `EkranGunu` (ilişkisel çeviri) bu şekle uyuyor.
  */
-export function butceyiGunlerleEsitle(
-  butce: PlanButcesi,
-  gunler: PlanGunu[],
-  gunSayisi: number
-): PlanButcesi {
+export function aktiviteButceKalemleri(
+  gunler: Array<{ day: number; activities: Array<{ name?: string; cost?: number }> }>
+): ButceKalemi[] {
   const kalemler: ButceKalemi[] = [];
 
   for (const gun of gunler) {
@@ -364,6 +376,24 @@ export function butceyiGunlerleEsitle(
       });
     }
   }
+
+  return kalemler;
+}
+
+/**
+ * Günlük plandaki aktivite maliyetlerini bütçenin "aktiviteler" kategorisine
+ * yansıtır ve toplamları yeniden hesaplar.
+ *
+ * Bu, günlük planlayıcıda bir aktivite eklendiğinde/silindiğinde bütçenin
+ * eskimesini engelleyen tek mekanizma. Aktivite kategorisi tamamen yeniden
+ * yazılıyor: kaynak artık gün planı, elle girilmiş kalemler değil.
+ */
+export function butceyiGunlerleEsitle(
+  butce: PlanButcesi,
+  gunler: PlanGunu[],
+  gunSayisi: number
+): PlanButcesi {
+  const kalemler = aktiviteButceKalemleri(gunler);
 
   const categories: Record<string, ButceKategorisi> = { ...butce.categories };
   categories[AKTIVITE_KATEGORISI] = {

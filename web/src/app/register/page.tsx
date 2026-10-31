@@ -6,7 +6,7 @@ import { signIn } from "next-auth/react";
 import { z } from "zod";
 import { registerSchema, ilkHataMesaji } from "@/lib/api-schemas";
 import { logger } from "@/lib/logger";
-import { Alan, Dugme, GIRDI_SINIFI, Kart } from "@/components/ui";
+import { Alan, Dugme, GIRDI_SINIFI, KonturDoku, Pusula } from "@/components/ui";
 
 /**
  * Form şeması sunucudaki `registerSchema`yı GENİŞLETİYOR, tekrar
@@ -97,10 +97,17 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--bg)] px-4 py-12 md:py-20 flex items-start justify-center">
-      <div className="w-full max-w-md">
+    <div className="harita-zemin relative min-h-screen px-4 py-12 md:py-20 flex items-start justify-center overflow-hidden">
+      {/* Giriş ekranıyla aynı yüzey: kullanıcı iki sayfa arasında gidip
+          gelirken zemin değişmiyor. */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <KonturDoku yogunluk={0.7} />
+      </div>
+
+      <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)]">
+          <Pusula className="h-9 w-9 mx-auto text-[var(--accent)]" />
+          <h1 className="font-[family-name:var(--font-serif)] text-3xl text-[var(--fg)] mt-4">
             Hesap oluşturun
           </h1>
           <p className="text-[var(--fg-muted)] mt-2">
@@ -108,7 +115,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <Kart>
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[var(--radius-lg)] shadow-[var(--shadow-pop)]">
           <div className="p-6 md:p-7">
             {error && (
               <p
@@ -220,8 +227,9 @@ export default function RegisterPage() {
                 </label>
               </div>
 
-              <Dugme type="submit" boy="lg" disabled={isLoading} className="w-full">
-                {isLoading ? "Kayıt yapılıyor…" : "Kayıt ol"}
+              {/* Metni elle değiştirmek düğmenin genişliğini zıplatıyordu. */}
+              <Dugme type="submit" boy="lg" bekliyor={isLoading} className="w-full">
+                Kayıt ol
               </Dugme>
             </form>
 
@@ -262,7 +270,7 @@ export default function RegisterPage() {
               Google ile devam et
             </button>
           </div>
-        </Kart>
+        </div>
 
         <p className="text-sm text-[var(--fg-muted)] text-center mt-6">
           Zaten hesabınız var mı?{" "}
@@ -274,6 +282,6 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
-    </main>
+    </div>
   );
 }

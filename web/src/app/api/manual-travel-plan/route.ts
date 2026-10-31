@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth-session";
 import { rateLimitAsync } from "@/lib/rate-limit";
 import { manualPlanSchema, ilkHataMesaji } from "@/lib/api-schemas";
 import { gunSayisi, isoGunTarihi, gunlukOrtalama, tarihiCoz } from "@/lib/trip-dates";
+import { REZERV_ORANI } from "@/lib/plan-budget";
 import { logger } from "@/lib/logger";
 
 /**
@@ -67,13 +68,20 @@ export async function POST(request: NextRequest) {
 
     // Günlük planlara tarih ekleyip tüketicilerin (daily-planner, plan-detail)
     // beklediği şekle getiriyoruz; bu iki sayfa `date` alanını okuyor.
-    const gunler = planData.dailyPlans.map((day, index) => ({
-      day: day.day > 0 ? day.day : index + 1,
-      date: isoGunTarihi(startDate, index),
-      activities: day.activities,
-      notes: day.notes,
-      isEmpty: day.activities.length === 0,
-    }));
+    const gunler = planData.dailyPlans.map((day, index) => {
+      const gunNo = day.day > 0 ? day.day : index + 1;
+      return {
+        day: gunNo,
+        // Tarih GÜN NUMARASINDAN türetiliyor, dizideki sıradan değil.
+        // İstemci gün atlayarak gönderdiğinde (ör. yalnızca 1. ve 3. gün
+        // doldurulduğunda) sıraya bakan hesap 3. güne 2. günün tarihini
+        // yazıyordu; plan detayında gün başlığı ile tarih çelişiyordu.
+        date: isoGunTarihi(startDate, gunNo - 1),
+        activities: day.activities,
+        notes: day.notes,
+        isEmpty: day.activities.length === 0,
+      };
+    });
 
     // Bütçe, plan-detail ve budget sayfalarının tanıdığı kategori şekline
     // çevriliyor. Eskiden ham `breakdown` objesi yazılıyordu; o şekilde
@@ -109,12 +117,18 @@ export async function POST(request: NextRequest) {
       currency: "TRY",
       extraItemsTotal: 0,
       totalCostWithExtras: toplam,
-      suggestedBudget: Math.round(toplam * 1.2),
+      // Katsayı tek yerde: plan-budget.ts. Buraya 1.2 elle yazılıydı;
+      // katsayı orada değişse manuel planlar eski değerle kalır ve aynı
+      // uygulama iki farklı "önerilen bütçe" gösterirdi.
+      suggestedBudget: Math.round(toplam * REZERV_ORANI),
       dailyAverage: gunlukMaliyet,
     };
 
     const savedPlan = await prisma.tripPlan.create({
       data: {
+        // Kalkış artık kendi sütununda (20260902120000 migration'ı).
+        // Boş string yerine null: "bilinmiyor" ile "boş" aynı şey değil.
+        originCity: basicInfo.origin || null,
         city: basicInfo.destination,
         country: basicInfo.country || null,
         startDate,
@@ -133,7 +147,12 @@ export async function POST(request: NextRequest) {
 
         ai_model: "manual_planning",
         raw_markdown: [
-          `# ${basicInfo.destination} Seyahat Planı`,
+          // Güzergâh başlıkta: planın hangi şehirden çıktığı, varış kadar
+          // plana ait bir bilgi. Ayrı bir DB sütunu yok, o yüzden plan
+          // metnine yazılıyor.
+          basicInfo.origin
+            ? `# ${basicInfo.origin} → ${basicInfo.destination} Seyahat Planı`
+            : `# ${basicInfo.destination} Seyahat Planı`,
           `## Tarih: ${basicInfo.startDate} - ${basicInfo.endDate}`,
           `## Kişi Sayısı: ${basicInfo.travelers}`,
           `## Toplam Maliyet: ₺${toplam.toLocaleString("tr-TR")}`,
@@ -142,7 +161,9 @@ export async function POST(request: NextRequest) {
         travel_style: basicInfo.travelStyle || null,
         interests: JSON.stringify(["manuel_planlama"]),
 
-        sehir_bilgisi: `Manuel olarak planlanmış ${basicInfo.destination} seyahati`,
+        sehir_bilgisi: basicInfo.origin
+          ? `Manuel olarak planlanmış ${basicInfo.origin} → ${basicInfo.destination} seyahati`
+          : `Manuel olarak planlanmış ${basicInfo.destination} seyahati`,
         pratik_bilgiler: `${basicInfo.travelers} kişi için ${duration} günlük plan`,
         butce_tahmini: JSON.stringify(butceJson),
 

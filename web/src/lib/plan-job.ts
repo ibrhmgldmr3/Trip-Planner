@@ -27,8 +27,19 @@ import { logger } from "@/lib/logger";
 /** Bu süreden uzun süre RUNNING kalan iş ölmüş sayılır. */
 const ASILMA_SINIRI_MS = 10 * 60 * 1000;
 
-/** Aynı anda birden çok üretim başlatmayı engelleyen pencere. */
-const DEVAM_EDEN_SAYILIR_MS = 6 * 60 * 1000;
+/**
+ * Aynı anda birden çok üretim başlatmayı engelleyen pencere.
+ *
+ * ASILMA SINIRIYLA AYNI OLMAK ZORUNDA. Daha kısa tutulduğunda (önceki
+ * değer 6 dakikaydı) 6–10 dakika arası bir boşluk açılıyordu: o aralıktaki
+ * bir iş "devam eden" sayılmıyor ama henüz ölmüş de sayılmıyor, yani hâlâ
+ * RUNNING. Kullanıcı o pencerede tekrar denediğinde ikinci bir üretim
+ * başlıyor ve iki iş aynı anda LLM zincirini çalıştırıyordu.
+ *
+ * İki eşiği tek sabite bağlamak boşluğu tanım gereği kapatıyor: bir iş ya
+ * devam ediyordur ya da `asilKalanlariTemizle` onu FAILED'a çekmiştir.
+ */
+const DEVAM_EDEN_SAYILIR_MS = ASILMA_SINIRI_MS;
 
 export interface IsOzeti {
   id: string;
@@ -186,19 +197,15 @@ export async function calistir(jobId: string): Promise<void> {
   }
 }
 
-/**
- * Asılı kalmış işleri FAILED'a çeker.
- *
- * Sunucu üretim ortasında yeniden başlarsa iş RUNNING'de kalır ve kullanıcı
- * sonsuza kadar "hazırlanıyor" görür. Durum sorgulama ucu her çağrıldığında
- * bu temizlik ucuza çalışıyor; ayrı bir zamanlanmış göreve gerek kalmıyor.
- */
-export async function asilKalanlariTemizle(userId: string): Promise<number> {
+/** Asılı kalmış işleri FAILED'a çeken ortak yazma. */
+async function asilKalanlariIsaretle(
+  ekFiltre: { userId?: string }
+): Promise<number> {
   const esik = new Date(Date.now() - ASILMA_SINIRI_MS);
 
   const { count } = await prisma.planJob.updateMany({
     where: {
-      userId,
+      ...ekFiltre,
       status: { in: [PlanJobStatus.QUEUED, PlanJobStatus.RUNNING] },
       createdAt: { lt: esik },
     },
@@ -210,8 +217,50 @@ export async function asilKalanlariTemizle(userId: string): Promise<number> {
     },
   });
 
+  return count;
+}
+
+/**
+ * Kullanıcının asılı kalmış işlerini FAILED'a çeker.
+ *
+ * Sunucu üretim ortasında yeniden başlarsa iş RUNNING'de kalır ve kullanıcı
+ * sonsuza kadar "hazırlanıyor" görür. Durum sorgulama ucu her çağrıldığında
+ * bu temizlik ucuza çalışıyor.
+ *
+ * AMA YETMİYOR: kullanıcı durumu hiç sormazsa (sekmeyi kapattı, vazgeçti)
+ * iş sonsuza kadar RUNNING kalıyor ve `devamEdenIs` yüzünden o kullanıcı
+ * 10 dakika boyunca yeni plan üretemiyor. Kapsamdan bağımsız temizlik için
+ * `tumAsilKalanlariTemizle` + zamanlanmış görev var.
+ */
+export async function asilKalanlariTemizle(userId: string): Promise<number> {
+  const count = await asilKalanlariIsaretle({ userId });
+
   if (count > 0) {
     logger.warn("Asılı kalmış plan işleri temizlendi", undefined, { count });
+  }
+
+  return count;
+}
+
+/**
+ * TÜM kullanıcıların asılı kalmış işlerini FAILED'a çeker.
+ *
+ * NEDEN AYRI FONKSİYON, `userId?: string` DEĞİL: bu kod tabanı tam olarak
+ * o hatadan yandı — Prisma'da `where: { userId: undefined }` "filtre yok"
+ * demek ve sahiplik koşulu SESSİZCE düşüyor (bkz. src/lib/auth-session.ts
+ * başlığı). Opsiyonel parametre, yanlışlıkla `undefined` geçen bir çağrının
+ * bütün kullanıcıların işlerini temizlemesine yol açardı. Kapsam farkı
+ * fonksiyon adında görünür olmalı.
+ *
+ * Yalnızca zamanlanmış görevden çağrılıyor: POST /api/plan-jobs/temizle.
+ */
+export async function tumAsilKalanlariTemizle(): Promise<number> {
+  const count = await asilKalanlariIsaretle({});
+
+  if (count > 0) {
+    logger.warn("Asılı kalmış plan işleri temizlendi (tüm kullanıcılar)", undefined, {
+      count,
+    });
   }
 
   return count;

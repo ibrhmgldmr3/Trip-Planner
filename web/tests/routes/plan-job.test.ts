@@ -182,6 +182,86 @@ describe("POST /api/trip-plan-model", () => {
     // Kota ve sağlayıcı maliyeti boşa gitmiyor.
     expect(kayitlar("planJob")).toHaveLength(1);
     expect(uretimMock.planUret).not.toHaveBeenCalled();
+    // SAYAÇ HİÇ ARTMIYOR: kota kontrolü eskiden handler'ın ilk satırındaydı
+    // ve devam eden işe bağlanan istek de bir hak yakıyordu. Saatlik hak 5;
+    // sabırsızlanıp üç kez tıklamak hakkın çoğunu HİÇ PLAN ÜRETMEDEN
+    // harcıyordu.
+    expect(sinirMock.rateLimitAsync).not.toHaveBeenCalled();
+  });
+
+  it("8 dakikadır süren iş hâlâ 'devam eden' sayılır", async () => {
+    // REGRESYON: "devam eden" penceresi 6 dakika, "asılı kalmış" eşiği 10
+    // dakikaydı. Aradaki 4 dakikada iş ne devam eden sayılıyor ne ölü
+    // sayılıyordu — ama hâlâ RUNNING'di. Kullanıcı o pencerede tekrar
+    // denediğinde İKİNCİ bir LLM zinciri başlıyordu. İki eşik artık tek
+    // sabite bağlı.
+    const { kayitlar } = kur(AHMET, {
+      planJob: [
+        {
+          id: "sekiz-dakikalik",
+          userId: AHMET,
+          status: "RUNNING",
+          request: {},
+          createdAt: new Date(Date.now() - 8 * 60 * 1000),
+          step: "agentic-uretim",
+          tripPlanId: null,
+          error: null,
+          finishedAt: null,
+        },
+      ],
+    });
+
+    const { POST } = await import("@/app/api/trip-plan-model/route");
+    const { status, body } = await yanit(
+      await POST(jsonIstek("/api/trip-plan-model", "POST", GECERLI_ISTEK))
+    );
+
+    expect(status).toBe(202);
+    expect(body.jobId).toBe("sekiz-dakikalik");
+    expect(kayitlar("planJob")).toHaveLength(1);
+    expect(uretimMock.planUret).not.toHaveBeenCalled();
+  });
+
+  it("geçersiz gövde kotadan hak yakmaz", async () => {
+    const { kayitlar } = kur(AHMET);
+
+    const { POST } = await import("@/app/api/trip-plan-model/route");
+    const { status } = await yanit(
+      // `city` zorunlu; şema reddediyor.
+      await POST(jsonIstek("/api/trip-plan-model", "POST", { country: "İtalya" }))
+    );
+
+    expect(status).toBe(400);
+    expect(kayitlar("planJob")).toHaveLength(0);
+    expect(sinirMock.rateLimitAsync).not.toHaveBeenCalled();
+  });
+
+  it("ters tarih aralığı kotadan hak yakmaz", async () => {
+    kur(AHMET);
+
+    const { POST } = await import("@/app/api/trip-plan-model/route");
+    await POST(
+      jsonIstek("/api/trip-plan-model", "POST", {
+        ...GECERLI_ISTEK,
+        startDate: "2026-05-05",
+        endDate: "2026-05-01",
+      })
+    );
+
+    expect(sinirMock.rateLimitAsync).not.toHaveBeenCalled();
+  });
+
+  it("üretim gerçekten başlatıldığında kota tüketilir", async () => {
+    kur(AHMET);
+    uretimMock.planUret.mockResolvedValue({
+      tripPlanId: "yeni-plan",
+      format: "structured",
+    });
+
+    const { POST } = await import("@/app/api/trip-plan-model/route");
+    await POST(jsonIstek("/api/trip-plan-model", "POST", GECERLI_ISTEK));
+
+    expect(sinirMock.rateLimitAsync).toHaveBeenCalledTimes(1);
   });
 
   it("ters tarih aralığını üretime hiç sokmaz", async () => {

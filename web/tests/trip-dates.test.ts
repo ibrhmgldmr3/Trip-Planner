@@ -6,6 +6,7 @@ import {
   isoGunTarihi,
   MAKS_GUN,
   tarihiCoz,
+  utcGunBasi,
 } from "@/lib/trip-dates";
 
 describe("tarihiCoz", () => {
@@ -141,5 +142,43 @@ describe("gunlukOrtalama", () => {
     expect(gunlukOrtalama(-100, 5)).toBe(0);
     expect(gunlukOrtalama(Number.NaN, 5)).toBe(0);
     expect(gunlukOrtalama(Number.POSITIVE_INFINITY, 5)).toBe(0);
+  });
+});
+
+describe("utcGunBasi", () => {
+  it("takvim gününü UTC gece yarısına sabitler", () => {
+    // REGRESYON — GMT+3'te ölçüldü (4 Eylül 2026):
+    //   gunBasi(4 Kasım) -> 2026-11-03T21:00:00.000Z -> @db.Date: 03 Kasım
+    // `DailyPlan.date` bir `@db.Date` sütunu, yani damganın UTC gün kısmı
+    // saklanıyor. Yerel gece yarısı yazmak tarihi bir gün geriye
+    // kaydırıyordu; kayan gün bir önceki günün tarihine çarpınca
+    // `@@unique([tripId, date])` ihlal oluyor ve uç 500 dönüyordu.
+    const yerelOglen = new Date(2026, 10, 4, 12, 0, 0);
+
+    expect(utcGunBasi(yerelOglen).toISOString()).toBe("2026-11-04T00:00:00.000Z");
+    expect(utcGunBasi(yerelOglen).toISOString().slice(0, 10)).toBe("2026-11-04");
+  });
+
+  it("günün saatinden bağımsız aynı takvim gününü verir", () => {
+    const gunler = [0, 1, 12, 23].map(
+      (saat) => utcGunBasi(new Date(2026, 10, 4, saat, 30)).toISOString()
+    );
+    expect(new Set(gunler).size).toBe(1);
+    expect(gunler[0]).toBe("2026-11-04T00:00:00.000Z");
+  });
+
+  it("tarihiCoz çıktısıyla birlikte kayıpsız çalışır", () => {
+    // Akış: istemci "2026-11-04" gönderiyor -> tarihiCoz -> utcGunBasi.
+    const cozulen = tarihiCoz("2026-11-04")!;
+    expect(utcGunBasi(cozulen).toISOString().slice(0, 10)).toBe("2026-11-04");
+  });
+
+  it("ardışık günler çakışmaz", () => {
+    // Asıl arıza buydu: 3. günü güncellemek 2. günün tarihine yazıyordu.
+    const gunler = [2, 3, 4].map((g) =>
+      utcGunBasi(new Date(2026, 10, g, 12)).toISOString().slice(0, 10)
+    );
+    expect(gunler).toEqual(["2026-11-02", "2026-11-03", "2026-11-04"]);
+    expect(new Set(gunler).size).toBe(3);
   });
 });

@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { useSession } from "next-auth/react";
 import { logger } from "@/lib/logger";
 import { gunSayisi } from "@/lib/trip-dates";
+import { SEHIRLER, rotaHesapla, type RotaOzeti } from "@/lib/seyahat-mesafe";
 import {
   GirisGerekli,
+  Olcum,
   SayfaKabugu,
+  Serit,
   Yukleniyor,
 } from "@/components/ui";
 
@@ -19,11 +22,22 @@ import {
  * (`dailyPlans.length * 150` ve `500`). Kullanıcı bunların nereden geldiğini
  * göremiyordu; en azından tek yerde ve adlandırılmış duruyorlar.
  */
+/** Bağlantı metninde tam URL değil, alan adı gösteriliyor. */
+function yeniAlanAdi(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 const GUNLUK_YEMEK_TAHMINI = 150;
 const DIGER_MASRAF_TAHMINI = 500;
 
 // TypeScript interfaces
 interface BasicInfo {
+  /** Kalkış şehri. Ulaşım süresi ve maliyeti buradan hesaplanıyor. */
+  origin: string;
   destination: string;
   country: string;
   startDate: string;
@@ -41,6 +55,12 @@ interface TransportOption {
   departure: string;
   arrival: string;
   selected: boolean;
+  /** Bu modda kat edilen tahmini mesafe (km). */
+  distanceKm?: number;
+  /** Maliyet kişi başına mı, araç başına mı? */
+  costUnit?: 'kisi' | 'arac';
+  /** Web aramasından gelen satış/karşılaştırma siteleri. */
+  sources?: { baslik: string; url: string }[];
 }
 
 interface AccommodationOption {
@@ -288,7 +308,7 @@ function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActiv
                 <span className="text-[var(--ok)]">
                   <strong>Günlük Özet:</strong> {day.activities.length} aktivite
                 </span>
-                <span className="text-[var(--ok)] font-bold">
+                <span className="text-[var(--ok)] font-medium sayisal">
                   Toplam: ₺{day.activities.reduce((sum, act) => (sum + act.cost), 0)}
                 </span>
               </div>
@@ -316,6 +336,7 @@ export default function ManualPlannerPage() {
   
   const [travelPlan, setTravelPlan] = useState<TravelPlan>({
     basicInfo: {
+      origin: '',
       destination: '',
       country: '',
       startDate: '',
@@ -341,6 +362,23 @@ export default function ManualPlannerPage() {
 
   // Mock data - gerçek uygulamada API'den gelecek
   const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
+  /** Seçilen iki şehir arasındaki mesafe özeti; ulaşım adımında gösteriliyor. */
+  const [rotaOzeti, setRotaOzeti] = useState<RotaOzeti | null>(null);
+  /** Web araması sürüyor mu? Liste zaten dolu; yalnızca kaynaklar bekleniyor. */
+  const [webAraniyor, setWebAraniyor] = useState(false);
+  /** Arama gerçekten sonuç döndürdü mü? Anahtar yoksa false kalır. */
+  const [webBulundu, setWebBulundu] = useState(false);
+
+  /**
+   * 1. adımdaki anlık mesafe önizlemesi.
+   *
+   * `rotaOzeti` ancak ulaşım adımına geçilince doluyor; kullanıcı şehirleri
+   * seçer seçmez mesafeyi görebilsin diye ayrı ve türetilmiş.
+   */
+  const onIzlemeRotasi = useMemo(
+    () => rotaHesapla(travelPlan.basicInfo.origin, travelPlan.basicInfo.destination),
+    [travelPlan.basicInfo.origin, travelPlan.basicInfo.destination]
+  );
   const [accommodationOptions, setAccommodationOptions] = useState<AccommodationOption[]>([]);
 
   const steps = [
@@ -443,48 +481,75 @@ export default function ManualPlannerPage() {
   }, [travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate, getTripDuration, travelPlan.dailyPlans.length]);
 
   // Mock API calls - Fetch data when needed
+  /**
+   * Ulaşım seçenekleri artık ROTADAN türüyor.
+   *
+   * Eskiden burada üç sabit seçenek vardı ve hangi şehirden hangi şehre
+   * gidildiğinden bağımsız olarak hep aynı süreyi/fiyatı gösteriyordu —
+   * İstanbul'dan Bolu'ya da, İstanbul'dan Kars'a da "Otobüs · 8 saat ·
+   * ₺150". Artık `rotaHesapla` iki şehir arasındaki mesafeden süre ve
+   * tahmini maliyet üretiyor; kısa mesafede uçak, demiryolu olmayan
+   * güzergâhta tren hiç sunulmuyor.
+   *
+   * Kalkış saatleri temsilî: elimizde sefer tarifesi yok, o yüzden
+   * "Esnek" yazıyoruz ve süreyi tarifeden değil mesafeden veriyoruz.
+   */
   const fetchTransportOptions = async () => {
-    // Simulated API call
-    const mockTransport: TransportOption[] = [
-      {
-        id: '1',
-        type: 'Uçak',
-        provider: 'Turkish Airlines',
-        price: 2500,
-        duration: '2 saat 30 dk',
-        departure: '10:00',
-        arrival: '12:30',
-        selected: false
-      },
-      {
-        id: '2',
-        type: 'Otobüs',
-        provider: 'Metro Turizm',
-        price: 150,
-        duration: '8 saat',
-        departure: '22:00',
-        arrival: '06:00',
-        selected: false
-      },
-      {
-        id: '3',
-        type: 'Kendi Aracı',
-        provider: 'Özel Araç',
-        price: 300,
-        duration: '6 saat',
-        departure: 'Esnek',
-        arrival: 'Esnek',
-        selected: false
-      }
-    ];
-    
-    // Mark selected transport if exists
-    const updatedOptions = mockTransport.map(option => ({
-      ...option,
-      selected: travelPlan.transport?.id === option.id
+    const rota = rotaHesapla(travelPlan.basicInfo.origin, travelPlan.basicInfo.destination);
+    setRotaOzeti(rota);
+
+    if (!rota || rota.secenekler.length === 0) {
+      setTransportOptions([]);
+      return;
+    }
+
+    // ÖNCE YEREL TAHMİN. Anında geliyor ve ağ olmadan da çalışıyor;
+    // kullanıcı listeyi beklemeden görüyor.
+    const yerel: TransportOption[] = rota.secenekler.map((s, i) => ({
+      id: `${s.tur}-${i}`,
+      type: s.tur,
+      provider: s.saglayici,
+      price: s.tahminiTl,
+      duration: s.sureMetni,
+      departure: 'Esnek',
+      arrival: 'Esnek',
+      distanceKm: s.mesafeKm,
+      costUnit: s.maliyetBirimi,
+      selected: travelPlan.transport?.type === s.tur,
     }));
-    
-    setTransportOptions(updatedOptions);
+    setTransportOptions(yerel);
+
+    // SONRA WEB KAYNAKLARI. Arka planda; başarısız olursa liste yerel
+    // tahminlerle olduğu gibi kalıyor — arama bir zenginleştirme, önkoşul
+    // değil.
+    setWebAraniyor(true);
+    try {
+      const yanit = await fetch(
+        `/api/transport-options?from=${encodeURIComponent(rota.nereden.ad)}` +
+          `&to=${encodeURIComponent(rota.nereye.ad)}`
+      );
+      if (!yanit.ok) return;
+
+      const govde = await yanit.json();
+      const gelen = govde?.rota?.secenekler;
+      if (!Array.isArray(gelen)) return;
+
+      const kaynakHaritasi = new Map<string, { baslik: string; url: string }[]>(
+        gelen.map((s: { tur: string; kaynaklar?: { baslik: string; url: string }[] }) => [
+          s.tur,
+          s.kaynaklar ?? [],
+        ])
+      );
+
+      setTransportOptions((onceki) =>
+        onceki.map((o) => ({ ...o, sources: kaynakHaritasi.get(o.type) ?? [] }))
+      );
+      setWebBulundu(Boolean(govde?.rota?.webAramasiYapildi));
+    } catch (error) {
+      logger.error('Ulaşım kaynakları alınamadı', error);
+    } finally {
+      setWebAraniyor(false);
+    }
   };
 
   const fetchAccommodationOptions = async () => {
@@ -629,8 +694,16 @@ export default function ManualPlannerPage() {
   const nextStep = () => {
     if (currentStep < steps.length) {
       if (currentStep === 1) {
+        if (!travelPlan.basicInfo.origin) {
+          toast.error('Lütfen kalkış şehrini seçin');
+          return;
+        }
         if (!travelPlan.basicInfo.destination) {
-          toast.error('Lütfen hedef şehri belirtin');
+          toast.error('Lütfen hedef şehri seçin');
+          return;
+        }
+        if (travelPlan.basicInfo.origin === travelPlan.basicInfo.destination) {
+          toast.error('Kalkış ve varış şehri aynı olamaz');
           return;
         }
         
@@ -736,8 +809,7 @@ export default function ManualPlannerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="container mx-auto px-4 py-8">
+    <SayfaKabugu>
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="font-[family-name:var(--font-serif)] text-3xl md:text-4xl text-[var(--fg)] mb-3">
@@ -752,9 +824,14 @@ export default function ManualPlannerPage() {
         <div className="mb-8">
           <div className="flex justify-center space-x-4 overflow-x-auto pb-4">
             {steps.map((step, index) => (
+              /* `relative` EKLENDİ. Aşağıdaki bağlayıcı çizgi `absolute
+                 left-full` ile konumlanıyor; konumlandırılmış bir ata
+                 olmadığı için beşi birden SAYFANIN sağ kenarına göre
+                 hizalanıyor ve gövdeyi 80px yatay kaydırmaya zorluyordu.
+                 Artık çizgi ait olduğu adımın sağına çıkıyor. */
               <div
                 key={step.id}
-                className={`flex flex-col items-center min-w-0 ${
+                className={`relative flex flex-col items-center min-w-0 ${
                   currentStep >= step.id
                     ? 'text-[var(--accent)]'
                     : 'text-[var(--fg-subtle)] dark:text-[var(--fg-muted)]'
@@ -763,7 +840,7 @@ export default function ManualPlannerPage() {
                 <div
                   className={`w-12 h-12 rounded-full flex items-center justify-center text-xl mb-2 transition-colors duration-150 ${
                     currentStep >= step.id
-                      ? 'bg-[var(--ok-soft)] border-2 border-[var(--accent)]'
+                      ? 'bg-[var(--accent-soft)] border-2 border-[var(--accent)]'
                       : 'bg-[var(--surface-2)] border-2 border-[var(--line-strong)]'
                   }`}
                 >
@@ -773,7 +850,7 @@ export default function ManualPlannerPage() {
                 {index < steps.length - 1 && (
                   <div
                     className={`hidden md:block absolute top-6 left-full w-16 h-0.5 ${
-                      currentStep > step.id ? 'bg-[var(--ok-soft)]' : 'bg-[var(--surface-3)] dark:bg-[var(--surface-3)]'
+                      currentStep > step.id ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
                     }`}
                     style={{ marginLeft: '1rem' }}
                   />
@@ -788,16 +865,53 @@ export default function ManualPlannerPage() {
           {/* Step 2: Ulaşım */}
           {currentStep === 2 && (
             <div className="bg-[var(--surface)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8">
-              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-5 flex items-center">
-                Ulaşım Seçenekleri
+              <h2 className="font-[family-name:var(--font-serif)] text-xl text-[var(--fg)] mb-2">
+                Ulaşım
               </h2>
-              
-              {/* Mevcut seçim göster */}
+
+              {/* Rota künyesi: seçenekler bu iki şehir arasındaki mesafeden
+                  hesaplandığı için mesafe listenin ÜSTÜNDE duruyor. */}
+              {rotaOzeti && (
+                <>
+                  <p className="text-[var(--fg-muted)] mb-5">
+                    {rotaOzeti.nereden.ad} → {rotaOzeti.nereye.ad}
+                    <span className="sayisal">
+                      {' · '}
+                      {rotaOzeti.karayoluKm.toLocaleString('tr-TR')} km karayolu
+                    </span>
+                  </p>
+
+                  <div className="mb-6">
+                    <Serit ton="bilgi">
+                      Süre ve fiyatlar mesafeden hesaplanan{' '}
+                      <strong>tahminlerdir</strong>; sefer tarifesi değildir.
+                      {webAraniyor && ' Güncel fiyatlar için satış siteleri aranıyor…'}
+                      {!webAraniyor && webBulundu && ' Güncel fiyat için aşağıdaki bağlantıları kullanın.'}
+                    </Serit>
+                  </div>
+                </>
+              )}
+
               {travelPlan.transport && (
-                <div className="mb-6 p-4 bg-[var(--ok-soft)] border border-transparent rounded-lg">
-                  <h3 className="text-[var(--ok)] font-semibold mb-2">Seçili Ulaşım:</h3>
-                  <p className="text-[var(--ok)]">
-                    {travelPlan.transport.type} - {travelPlan.transport.provider} (₺{travelPlan.transport.price})
+                <div className="mb-6 rounded-[var(--radius)] border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-3">
+                  <p className="lejant text-[var(--accent)]">Seçili ulaşım</p>
+                  <p className="text-[var(--fg)] mt-1">
+                    {travelPlan.transport.type} · {travelPlan.transport.provider}
+                    <span className="sayisal"> · ₺{travelPlan.transport.price.toLocaleString('tr-TR')}</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Rota hesaplanamadıysa liste boş kalır; kullanıcı neden
+                  boş olduğunu bilmeli. */}
+              {transportOptions.length === 0 && (
+                <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--line-strong)] px-6 py-10 text-center">
+                  <p className="font-[family-name:var(--font-serif)] text-lg text-[var(--fg)]">
+                    Ulaşım seçeneği hesaplanamadı
+                  </p>
+                  <p className="text-[var(--fg-muted)] mt-2 max-w-md mx-auto leading-relaxed">
+                    Önceki adımda kalkış ve varış şehirlerinin ikisini de seçtiğinizden
+                    emin olun.
                   </p>
                 </div>
               )}
@@ -809,7 +923,7 @@ export default function ManualPlannerPage() {
                     onClick={() => handleTransportSelect(option.id)}
                     className={`p-6 border-2 rounded-[var(--radius-lg)] cursor-pointer transition-colors duration-150 ${
                       travelPlan.transport?.id === option.id
-                        ? 'border-[var(--accent)] bg-[var(--ok-soft)]'
+                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
                         : 'border-[var(--line)] hover:border-[var(--line)] hover:shadow-md'
                     }`}
                   >
@@ -825,15 +939,59 @@ export default function ManualPlannerPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[var(--fg-muted)]">
-                          Süre: {option.duration} | {option.departure} - {option.arrival}
-                        </p>
+                        <dl className="flex flex-wrap gap-x-6 gap-y-1 mt-1">
+                          <div className="flex gap-2">
+                            <dt className="lejant text-[var(--fg-subtle)]">Süre</dt>
+                            <dd className="font-[family-name:var(--font-geist-mono)] text-sm text-[var(--fg)] sayisal">
+                              {option.duration}
+                            </dd>
+                          </div>
+                          {option.distanceKm != null && (
+                            <div className="flex gap-2">
+                              <dt className="lejant text-[var(--fg-subtle)]">Mesafe</dt>
+                              <dd className="font-[family-name:var(--font-geist-mono)] text-sm text-[var(--fg-muted)] sayisal">
+                                {option.distanceKm.toLocaleString('tr-TR')} km
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
+
+                        {/* Web kaynakları: TAHMİNİN yanında, onun yerine
+                            değil. Kullanıcı gerçek fiyatı buradan görüyor;
+                            biz uydurmuyoruz. */}
+                        {option.sources && option.sources.length > 0 && (
+                          <div className="mt-3">
+                            <p className="lejant text-[var(--fg-subtle)] mb-1.5">
+                              Güncel fiyat
+                            </p>
+                            <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                              {option.sources.map((k) => (
+                                <li key={k.url}>
+                                  <a
+                                    href={k.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-sm text-[var(--accent)] hover:underline underline-offset-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                                  >
+                                    {yeniAlanAdi(k.url)}
+                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                      <path d="M14 5h5v5M19 5l-8 8M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4" />
+                                    </svg>
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <span className="text-2xl font-bold text-[var(--accent)]">
-                          ₺{option.price}
+                      <div className="text-right shrink-0">
+                        <span className="font-[family-name:var(--font-serif)] text-2xl text-[var(--accent)] sayisal">
+                          ₺{option.price.toLocaleString('tr-TR')}
                         </span>
-                        <p className="text-sm text-[var(--fg-subtle)]">kişi başı</p>
+                        <p className="lejant text-[var(--fg-subtle)] mt-1">
+                          {option.costUnit === 'arac' ? 'Araç başı' : 'Kişi başı'} · tahmini
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -906,7 +1064,7 @@ export default function ManualPlannerPage() {
                       ))}
                     </div>
                     <div className="text-center">
-                      <span className="text-xl font-bold text-[var(--accent)]">
+                      <span className="font-[family-name:var(--font-serif)] text-xl text-[var(--accent)] sayisal">
                         ₺{option.price}
                       </span>
                       <p className="text-sm text-[var(--fg-subtle)]">gecelik</p>
@@ -980,7 +1138,7 @@ export default function ManualPlannerPage() {
                       </div>
                     ))}
                     <hr className="my-2" />
-                    <div className="flex justify-between text-lg font-bold">
+                    <div className="flex justify-between text-lg font-medium sayisal">
                       <span>Toplam:</span>
                       <span>₺{travelPlan.budget.estimatedTotal}</span>
                     </div>
@@ -1081,7 +1239,7 @@ export default function ManualPlannerPage() {
                   </div>
                   
                   {/* Bütçe Özeti */}
-                  <div className="p-4 bg-yellow-50 dark:bg-[var(--warn-soft)] rounded-lg">
+                  <div className="p-4 bg-[var(--warn-soft)] rounded-[var(--radius)]">
                     <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Bütçe Özeti
                     </h3>
@@ -1113,7 +1271,7 @@ export default function ManualPlannerPage() {
 
                 {/* Günlük Planlar Özeti */}
                 {travelPlan.dailyPlans.length > 0 && (
-                  <div className="p-4 bg-purple-50 dark:bg-[var(--surface-2)] rounded-lg">
+                  <div className="p-4 bg-[var(--surface-2)] rounded-[var(--radius)]">
                     <h3 className="font-semibold text-[var(--fg)] mb-3 flex items-center">
                       Günlük Planlar Özeti
                     </h3>
@@ -1143,17 +1301,41 @@ export default function ManualPlannerPage() {
               </h2>
               
               <div className="grid md:grid-cols-2 gap-6">
+                {/* Kalkış ve varış artık SEÇİLİYOR, serbest metin değil:
+                    ulaşım süresi ve maliyeti bu iki şehrin koordinatından
+                    hesaplanıyor, dolayısıyla tanınan bir il olmalı. */}
                 <div>
-                  <label className="block text-sm font-medium text-[var(--fg-muted)] mb-2">
-                    Hedef Şehir *
+                  <label htmlFor="origin" className="block text-sm font-medium text-[var(--fg)] mb-2">
+                    Kalkış şehri *
                   </label>
-                  <input
-                    type="text"
+                  <select
+                    id="origin"
+                    value={travelPlan.basicInfo.origin}
+                    onChange={(e) => handleBasicInfoChange('origin', e.target.value)}
+                    className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
+                  >
+                    <option value="">Seçin…</option>
+                    {SEHIRLER.map((sehir) => (
+                      <option key={sehir.ad} value={sehir.ad}>{sehir.ad}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="destination" className="block text-sm font-medium text-[var(--fg)] mb-2">
+                    Varış şehri *
+                  </label>
+                  <select
+                    id="destination"
                     value={travelPlan.basicInfo.destination}
                     onChange={(e) => handleBasicInfoChange('destination', e.target.value)}
                     className="w-full px-4 py-3 border border-[var(--line-strong)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent dark:bg-[var(--surface-2)] dark:text-[var(--fg)]"
-                    placeholder="Örn: İstanbul"
-                  />
+                  >
+                    <option value="">Seçin…</option>
+                    {SEHIRLER.filter((sehir) => sehir.ad !== travelPlan.basicInfo.origin).map((sehir) => (
+                      <option key={sehir.ad} value={sehir.ad}>{sehir.ad}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div>
@@ -1228,11 +1410,33 @@ export default function ManualPlannerPage() {
                 </div>
               </div>
 
-              {getTripDuration() > 0 && (
-                <div className="mt-6 p-4 bg-[var(--ok-soft)] rounded-lg">
-                  <p className="text-[var(--ok)]">
-                    <strong>Seyahat Süresi:</strong> {getTripDuration()} gün
-                  </p>
+              {/* Seçim yapılır yapılmaz mesafe görünüyor: kullanıcı ulaşım
+                  adımına geçmeden önce yolun ne kadar olduğunu biliyor. */}
+              {(getTripDuration() > 0 || onIzlemeRotasi) && (
+                <div className="mt-6 grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--line)] rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface-2)]">
+                  {getTripDuration() > 0 && (
+                    <Olcum
+                      etiket="Seyahat süresi"
+                      deger={`${getTripDuration()} gün`}
+                      ton="aksan"
+                      className="px-5 py-4"
+                    />
+                  )}
+                  {onIzlemeRotasi && (
+                    <>
+                      <Olcum
+                        etiket="Karayolu mesafesi"
+                        deger={`${onIzlemeRotasi.karayoluKm.toLocaleString('tr-TR')} km`}
+                        ton="rota"
+                        className="px-5 py-4"
+                      />
+                      <Olcum
+                        etiket="Kuş uçuşu"
+                        deger={`${onIzlemeRotasi.kusUcusuKm.toLocaleString('tr-TR')} km`}
+                        className="px-5 py-4"
+                      />
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -1265,7 +1469,7 @@ export default function ManualPlannerPage() {
               <div className="space-x-4">
                 <button
                   onClick={cancelPlan}
-                  className="px-6 py-3 bg-[var(--danger)] text-white rounded-lg hover:bg-[var(--danger-hover)]"
+                  className="px-6 py-3 bg-[var(--danger)] text-[var(--accent-contrast)] rounded-[var(--radius)] hover:bg-[var(--danger-hover)]"
                 >
                   İptal Et
                 </button>
@@ -1279,8 +1483,7 @@ export default function ManualPlannerPage() {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </SayfaKabugu>
   );
 }
 

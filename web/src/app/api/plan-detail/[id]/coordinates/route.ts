@@ -5,6 +5,11 @@ import { rateLimitAsync } from "@/lib/rate-limit";
 import { gunleriCoz } from "@/lib/plan-budget";
 import { geocodingYapilandirilmisMi, gunlereKoordinatEkle } from "@/lib/geocoding";
 import { logger } from "@/lib/logger";
+import {
+  gunAktivitelerineYaz,
+  iliskiselGunPlaniJson,
+  tasinmisTripId,
+} from "@/lib/iliskisel-plan-ozeti";
 
 /**
  * Mevcut bir planın aktivitelerine koordinat ekler (Faz D).
@@ -23,6 +28,10 @@ import { logger } from "@/lib/logger";
  * Geocoding) geliyor. İstemcinin gönderdiği koordinata güvenmek, bir
  * kullanıcının kendi planına rastgele noktalar yazabilmesi demekti;
  * ayrıca tarayıcı anahtarının Places kotasını harcamıyoruz.
+ *
+ * İKİ YOL (B4 · Adım 5): plan taşınmışsa günler `DailyPlan` satırlarından
+ * okunup oraya geri yazılıyor. `TripPlan.gun_plani` taşınmış planlarda
+ * SALT OKUNUR ARŞİV; oraya yazılan koordinat hiçbir ekranda görünmezdi.
  */
 
 /** Geocoding ücretli; kullanıcı başına saatlik üst sınır. */
@@ -60,20 +69,32 @@ export async function POST(
       );
     }
 
-    const plan = await prisma.tripPlan.findUnique({
-      where: { id: planId },
-      select: { userId: true, city: true, country: true, gun_plani: true },
+    // Sahiplik sorgunun içinde; "yok" ile "senin değil" ayrımı YAPILMIYOR
+    // (bkz. src/lib/trip-ownership.ts — 403 dönmek id'yi bilen birine
+    // planın var olduğunu doğrular).
+    const plan = await prisma.tripPlan.findFirst({
+      where: { id: planId, userId: auth.user.id },
+      select: {
+        city: true,
+        country: true,
+        gun_plani: true,
+        tripId: true,
+        migratedAt: true,
+      },
     });
 
     if (!plan) {
       return NextResponse.json({ error: "Plan bulunamadı" }, { status: 404 });
     }
 
-    if (plan.userId !== auth.user.id) {
-      return NextResponse.json({ error: "Bu plana erişim yetkiniz yok" }, { status: 403 });
-    }
+    const tripId = tasinmisTripId(plan);
 
-    const gunler = gunleriCoz(plan.gun_plani);
+    // Taşınmış planda gün planı ilişkisel satırlardan türetiliyor; satır
+    // yoksa arşive düşülüyor (taşımada boş gün kaydı üretilmemiş olabilir).
+    const iliskiselGunler = tripId ? await iliskiselGunPlaniJson(tripId) : null;
+    const hamGunler = iliskiselGunler ?? plan.gun_plani;
+
+    const gunler = gunleriCoz(hamGunler);
     if (!gunler) {
       // Eski markdown planlar; çözülecek yapılandırılmış aktivite yok.
       return NextResponse.json(
@@ -90,10 +111,19 @@ export async function POST(
     // Hiçbir yeni koordinat çözülemediyse yazma yapmıyoruz: gereksiz bir
     // UPDATE `updatedAt`i kaydırır ve planı "değişmiş" gösterirdi.
     if (sonuc.cozulen > 0) {
-      await prisma.tripPlan.update({
-        where: { id: planId },
-        data: { gun_plani: JSON.stringify(sonuc.gunler) },
-      });
+      // YAZILACAK YER, OKUNAN YER. Yalnızca taşınma damgasına bakmak
+      // yetmiyordu: satırı olmayan taşınmış bir planda günler arşivden
+      // okunuyor, sonuç ise ilişkisel tabloya yazılmaya çalışılıyor ve
+      // eşleşecek satır olmadığı için ÇÖZÜLEN KOORDİNATLAR SESSİZCE
+      // KAYBOLUYORDU.
+      if (tripId && iliskiselGunler) {
+        await gunAktivitelerineYaz(tripId, sonuc.gunler);
+      } else {
+        await prisma.tripPlan.update({
+          where: { id: planId },
+          data: { gun_plani: JSON.stringify(sonuc.gunler) },
+        });
+      }
     }
 
     logger.info("Plan koordinatları güncellendi", {
