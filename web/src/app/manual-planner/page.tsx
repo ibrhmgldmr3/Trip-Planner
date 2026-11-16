@@ -1,11 +1,47 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'react-hot-toast';
-import { useSession } from "next-auth/react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BedDouble,
+  Building2,
+  Bus,
+  CalendarDays,
+  Car,
+  Check,
+  Clock,
+  Hotel,
+  MapPin,
+  Minus,
+  MoonStar,
+  Plane,
+  Plus,
+  Save,
+  TentTree,
+  TrainFront,
+  Trash2,
+  Wallet,
+} from "lucide-react";
+import AuthGate from "@/components/AuthGate";
+import ChipGroup, { type ChipOption } from "@/components/ChipGroup";
+import DestinationPreview from "@/components/planner/DestinationPreview";
+import { Page, PageHeader } from "@/components/States";
+import {
+  addDays,
+  formatDateRange,
+  formatDayLong,
+  formatMoney,
+  todayISO,
+  tripDays,
+  tripNights,
+} from "@/lib/format";
+import { BUDGET_COLOR, BUDGET_LABEL, styleLabel, type BudgetCategory } from "@/lib/plan";
 
-// TypeScript interfaces
+/* ------------------------------ Tipler ------------------------------ */
+
 interface BasicInfo {
   destination: string;
   country: string;
@@ -15,26 +51,28 @@ interface BasicInfo {
   travelStyle: string;
 }
 
-interface TransportOption {
-  id: string;
+interface TransportDraft {
   type: string;
   provider: string;
-  price: number;
-  duration: string;
+  price: string;
   departure: string;
   arrival: string;
-  selected: boolean;
 }
 
-interface AccommodationOption {
+interface StayDraft {
+  type: string;
+  name: string;
+  price: string;
+  location: string;
+}
+
+interface Activity {
   id: string;
   name: string;
-  type: string;
-  rating: number;
-  price: number;
-  location: string;
-  amenities: string[];
-  selected: boolean;
+  startTime: string;
+  endTime: string;
+  cost: number;
+  description: string;
 }
 
 interface DayPlan {
@@ -44,1226 +82,1039 @@ interface DayPlan {
   isEmpty: boolean;
 }
 
-interface Activity {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  cost: number;
-  description?: string;
-}
+const STEPS = [
+  { id: 1, title: "Temel bilgiler", icon: <MapPin /> },
+  { id: 2, title: "Ulaşım", icon: <Plane /> },
+  { id: 3, title: "Konaklama", icon: <BedDouble /> },
+  { id: 4, title: "Günlük plan", icon: <CalendarDays /> },
+  { id: 5, title: "Bütçe", icon: <Wallet /> },
+  { id: 6, title: "Özet", icon: <Check /> },
+];
 
-interface BudgetAnalysis {
-  currentBudget: number;
-  estimatedTotal: number;
-  breakdown: {
-    transport: number;
-    accommodation: number;
-    activities: number;
-    food: number;
-    other: number;
-  };
-}
+const STYLE_OPTIONS: ChipOption[] = [
+  { value: "standard", label: "Standart" },
+  { value: "budget", label: "Ekonomik" },
+  { value: "luxury", label: "Lüks" },
+  { value: "adventure", label: "Macera" },
+  { value: "cultural", label: "Kültürel" },
+];
 
-interface TravelPlan {
-  basicInfo: BasicInfo;
-  transport: TransportOption | null;
-  accommodation: AccommodationOption | null;
-  dailyPlans: DayPlan[];
-  budget: BudgetAnalysis;
-}
+const TRANSPORT_TYPES = [
+  { value: "Uçak", icon: <Plane /> },
+  { value: "Otobüs", icon: <Bus /> },
+  { value: "Tren", icon: <TrainFront /> },
+  { value: "Kendi aracım", icon: <Car /> },
+];
 
-// DayPlanCard component
-interface DayPlanCardProps {
-  day: DayPlan;
-  dayIndex: number;
-  onPlanChange: (dayIndex: number, field: keyof DayPlan, value: string | boolean) => void;
-  onAddActivity: (dayIndex: number, activity: Activity) => void;
-  onRemoveActivity: (dayIndex: number, activityIndex: number) => void;
-}
+const STAY_TYPES = [
+  { value: "Otel", icon: <Hotel /> },
+  { value: "Butik otel", icon: <Building2 /> },
+  { value: "Hostel", icon: <BedDouble /> },
+  { value: "Apart / ev", icon: <Building2 /> },
+  { value: "Kamp", icon: <TentTree /> },
+];
 
-function DayPlanCard({ day, dayIndex, onPlanChange, onAddActivity, onRemoveActivity }: DayPlanCardProps) {
-  const [newActivity, setNewActivity] = useState({
-    name: '',
-    startTime: '',
-    endTime: '',
-    cost: 0,
-    description: ''
+const toAmount = (value: string) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+};
+
+/* ------------------------------ Sayfa ------------------------------- */
+
+function ManualPlanner() {
+  const router = useRouter();
+  const today = todayISO();
+
+  const [step, setStep] = useState(1);
+  const [maxStep, setMaxStep] = useState(1);
+  const [saving, setSaving] = useState(false);
+
+  const [basic, setBasic] = useState<BasicInfo>({
+    destination: "",
+    country: "",
+    startDate: "",
+    endDate: "",
+    travelers: 1,
+    travelStyle: "standard",
   });
-  const today = new Date().toISOString().split('T')[0];
+  const [transport, setTransport] = useState<TransportDraft>({
+    type: "",
+    provider: "",
+    price: "",
+    departure: "",
+    arrival: "",
+  });
+  const [stay, setStay] = useState<StayDraft>({ type: "", name: "", price: "", location: "" });
+  const [days, setDays] = useState<DayPlan[]>([]);
+  const [activeDay, setActiveDay] = useState(0);
+  const [foodPerDay, setFoodPerDay] = useState("");
+  const [otherCost, setOtherCost] = useState("");
+  const [targetBudget, setTargetBudget] = useState("");
 
-  const handleAddActivity = () => {
-    if (newActivity.name.trim() && newActivity.startTime && newActivity.endTime) {
-      const activity: Activity = {
-        id: Date.now().toString(),
-        name: newActivity.name.trim(),
-        startTime: newActivity.startTime,
-        endTime: newActivity.endTime,
-        cost: newActivity.cost,
-        description: newActivity.description
-      };
-      onAddActivity(dayIndex, activity);
-      setNewActivity({
-        name: '',
-        startTime: '',
-        endTime: '',
-        cost: 0,
-        description: ''
+  const dayCount = tripDays(basic.startDate, basic.endDate);
+  const nights = tripNights(basic.startDate, basic.endDate);
+
+  // Tarihler değişince gün listesini yeniden boyutlandır; yazılanlar korunur.
+  useEffect(() => {
+    setDays((prev) => {
+      if (prev.length === dayCount) return prev;
+      return Array.from({ length: dayCount }, (_, index) =>
+        prev[index] ?? { day: index + 1, activities: [], notes: "", isEmpty: false }
+      );
+    });
+    setActiveDay((current) => Math.min(current, Math.max(0, dayCount - 1)));
+  }, [dayCount]);
+
+  const breakdown = useMemo(() => {
+    const activities = days.reduce(
+      (sum, day) => (day.isEmpty ? sum : sum + day.activities.reduce((total, item) => total + item.cost, 0)),
+      0
+    );
+    return {
+      transport: transport.type ? toAmount(transport.price) : 0,
+      accommodation: stay.type ? toAmount(stay.price) * nights : 0,
+      activities,
+      food: toAmount(foodPerDay) * dayCount,
+      other: toAmount(otherCost),
+    };
+  }, [days, transport, stay, nights, foodPerDay, dayCount, otherCost]);
+
+  const total = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+  const target = toAmount(targetBudget);
+
+  const validateBasics = (): string | null => {
+    if (!basic.destination.trim()) return "Lütfen gidilecek şehri yaz.";
+    if (!basic.startDate || !basic.endDate) return "Lütfen gidiş ve dönüş tarihlerini seç.";
+    if (basic.startDate < today) return "Gidiş tarihi bugünden önce olamaz.";
+    if (basic.startDate > basic.endDate) return "Dönüş tarihi gidişten önce olamaz.";
+    return null;
+  };
+
+  const goTo = (next: number) => {
+    if (next > 1) {
+      const problem = validateBasics();
+      if (problem) {
+        toast.error(problem);
+        setStep(1);
+        return;
+      }
+    }
+    setStep(next);
+    setMaxStep((current) => Math.max(current, next));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const updateDay = (index: number, patch: Partial<DayPlan>) =>
+    setDays((prev) => prev.map((day, i) => (i === index ? { ...day, ...patch } : day)));
+
+  const savePlan = async () => {
+    const problem = validateBasics();
+    if (problem) {
+      toast.error(problem);
+      setStep(1);
+      return;
+    }
+
+    setSaving(true);
+    // Tutarlar sunucuda bu kalemlerden yeniden hesaplanır.
+    const payload = {
+      city: basic.destination.trim(),
+      country: basic.country.trim(),
+      startDate: basic.startDate,
+      endDate: basic.endDate,
+      travelers: basic.travelers,
+      travelStyle: basic.travelStyle,
+      transport: transport.type
+        ? {
+            type: transport.type,
+            provider: transport.provider.trim(),
+            price: toAmount(transport.price),
+            departure: transport.departure,
+            arrival: transport.arrival,
+          }
+        : null,
+      accommodation: stay.type
+        ? {
+            type: stay.type,
+            name: stay.name.trim(),
+            location: stay.location.trim(),
+            price: toAmount(stay.price),
+          }
+        : null,
+      days: days.map((day) => ({
+        notes: day.notes,
+        isFree: day.isEmpty,
+        stops: day.activities.map((activity) => ({
+          name: activity.name,
+          description: activity.description,
+          startTime: activity.startTime,
+          endTime: activity.endTime,
+          cost: activity.cost,
+        })),
+      })),
+      foodPerDay: toAmount(foodPerDay),
+      otherCost: toAmount(otherCost),
+      targetBudget: target > 0 ? target : undefined,
+    };
+
+    try {
+      const response = await fetch("/api/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Plan kaydedilirken bir hata oluştu");
+
+      toast.success("Planın kaydedildi!");
+      router.push(data.id ? `/plan-detail/${data.id}` : "/my-plans");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Plan kaydedilirken bir hata oluştu");
+      setSaving(false);
+    }
+  };
+
+  const cancel = () => {
+    if (confirm("Plandan çıkmak istediğine emin misin? Girdiğin bilgiler kaybolacak.")) {
+      router.push("/travel-mode");
     }
   };
 
   return (
-    <div className="p-6 border border-gray-200 dark:border-gray-600 rounded-xl">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-          {day.day}. Gün
-        </h3>
-        <label className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={day.isEmpty}
-            onChange={(e) => onPlanChange(dayIndex, 'isEmpty', e.target.checked)}
-            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-          />
-          <span className="text-sm text-gray-600 dark:text-gray-300">Boş gün</span>
-        </label>
-      </div>
+    <Page>
+      <PageHeader
+        eyebrow="Adım adım planla"
+        title="Planını kendin kur"
+        description="Her adım isteğe bağlı ayrıntılar içerir; boş bıraktıkların plana dahil edilmez."
+        actions={
+          <button type="button" className="btn btn-quiet" onClick={cancel}>
+            Vazgeç
+          </button>
+        }
+      />
 
-      {!day.isEmpty && (
-        <>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Aktiviteler
-            </label>
-            <div className="space-y-3 mb-4">
-              {day.activities.map((activity, actIndex) => (
-                <div key={activity.id} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-blue-800 dark:text-blue-200">{activity.name}</h4>
+      <Stepper step={step} maxStep={maxStep} onSelect={goTo} />
+
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_20rem]">
+        <section className="card p-5 sm:p-6 md:p-8" key={step}>
+          {step === 1 && (
+            <StepBody title="Nereye, ne zaman, kaç kişi?" lead="Planın iskeleti bu bilgilerden oluşur.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="destination" className="field-label">
+                    Şehir <span className="text-accent-2">*</span>
+                  </label>
+                  <input
+                    id="destination"
+                    className="input"
+                    placeholder="Örn. Kapadokya"
+                    value={basic.destination}
+                    onChange={(event) => setBasic({ ...basic, destination: event.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="country" className="field-label">
+                    Ülke
+                  </label>
+                  <input
+                    id="country"
+                    className="input"
+                    placeholder="Örn. Türkiye"
+                    value={basic.country}
+                    onChange={(event) => setBasic({ ...basic, country: event.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="startDate" className="field-label">
+                    Gidiş <span className="text-accent-2">*</span>
+                  </label>
+                  <input
+                    id="startDate"
+                    type="date"
+                    className="input"
+                    min={today}
+                    value={basic.startDate}
+                    onChange={(event) => {
+                      const startDate = event.target.value;
+                      setBasic({
+                        ...basic,
+                        startDate,
+                        endDate: basic.endDate && startDate > basic.endDate ? "" : basic.endDate,
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="endDate" className="field-label">
+                    Dönüş <span className="text-accent-2">*</span>
+                  </label>
+                  <input
+                    id="endDate"
+                    type="date"
+                    className="input"
+                    min={basic.startDate || today}
+                    value={basic.endDate}
+                    onChange={(event) => setBasic({ ...basic, endDate: event.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-6 sm:grid-cols-[auto_1fr]">
+                <div>
+                  <span className="field-label">Kişi sayısı</span>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-line-2 bg-surface p-1">
                     <button
-                      onClick={() => onRemoveActivity(dayIndex, actIndex)}
-                      className="text-red-500 hover:text-red-700 ml-2"
+                      type="button"
+                      className="btn btn-quiet btn-icon !h-9 !w-9"
+                      onClick={() => setBasic({ ...basic, travelers: Math.max(1, basic.travelers - 1) })}
+                      disabled={basic.travelers <= 1}
+                      aria-label="Kişi sayısını azalt"
                     >
-                      ✕
+                      <Minus />
+                    </button>
+                    <span className="tabular w-8 text-center text-base font-bold text-ink" aria-live="polite">
+                      {basic.travelers}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-quiet btn-icon !h-9 !w-9"
+                      onClick={() => setBasic({ ...basic, travelers: Math.min(10, basic.travelers + 1) })}
+                      disabled={basic.travelers >= 10}
+                      aria-label="Kişi sayısını artır"
+                    >
+                      <Plus />
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm text-blue-700 dark:text-blue-300">
-                    <div>
-                      <span className="font-medium">Saat:</span> {activity.startTime} - {activity.endTime}
-                    </div>
-                    <div>
-                      <span className="font-medium">Maliyet:</span> ₺{activity.cost}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs bg-blue-200 dark:bg-blue-800 px-2 py-1 rounded">
-                        {(() => {
-                          const start = new Date(`1970-01-01T${activity.startTime}:00`);
-                          const end = new Date(`1970-01-01T${activity.endTime}:00`);
-                          const diffMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-                          return `${Math.round(diffMinutes)} dk`;
-                        })()}
-                      </span>
-                    </div>
-                  </div>
-                  {activity.description && (
-                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 italic">
-                      {activity.description}
-                    </p>
-                  )}
                 </div>
-              ))}
-            </div>
-
-            {/* Aktivite Ekleme Formu */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-              <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3">Yeni Aktivite Ekle</h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Aktivite Adı *
-                  </label>
-                  <input
-                    type="text"
-                    value={newActivity.name}
-                    onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
-                    placeholder="Ör: Müze ziyareti"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Maliyet (₺) *
-                  </label>
-                  <input
-                    type="number"
-                    value={newActivity.cost}
-                    onChange={(e) => setNewActivity({...newActivity, cost: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Başlangıç Saati *
-                  </label>
-                  <input
-                    type="time"
-                    value={newActivity.startTime}
-                    onChange={(e) => setNewActivity({...newActivity, startTime: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Bitiş Saati *
-                  </label>
-                  <input
-                    type="time"
-                    value={newActivity.endTime}
-                    onChange={(e) => setNewActivity({...newActivity, endTime: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
-                  />
-                </div>
-              </div>
-              
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Açıklama (İsteğe bağlı)
-                </label>
-                <textarea
-                  value={newActivity.description}
-                  onChange={(e) => setNewActivity({...newActivity, description: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white text-sm"
-                  placeholder="Aktivite hakkında notlar..."
-                  rows={2}
+                <ChipGroup
+                  label="Seyahat tarzı"
+                  options={STYLE_OPTIONS}
+                  value={basic.travelStyle}
+                  onChange={(travelStyle) => setBasic({ ...basic, travelStyle })}
                 />
               </div>
-              
+            </StepBody>
+          )}
+
+          {step === 2 && (
+            <StepBody
+              title="Oraya nasıl gideceksin?"
+              lead="Biletini aldıysan ya da fiyatını biliyorsan gir; bütçene eklensin. Henüz belli değilse bu adımı geç."
+            >
+              <TypeCards
+                label="Ulaşım türü"
+                options={TRANSPORT_TYPES}
+                value={transport.type}
+                onChange={(type) => setTransport({ ...transport, type })}
+              />
+
+              {transport.type && (
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="provider" className="field-label">
+                      {transport.type === "Kendi aracım" ? "Not" : "Firma"}
+                    </label>
+                    <input
+                      id="provider"
+                      className="input"
+                      placeholder={transport.type === "Kendi aracım" ? "Örn. Otoyol üzerinden" : "Örn. firma adı"}
+                      value={transport.provider}
+                      onChange={(event) => setTransport({ ...transport, provider: event.target.value })}
+                    />
+                  </div>
+                  <MoneyField
+                    id="transportPrice"
+                    label={transport.type === "Kendi aracım" ? "Yakıt ve yol gideri (toplam)" : "Bilet tutarı (tüm yolcular)"}
+                    value={transport.price}
+                    onChange={(price) => setTransport({ ...transport, price })}
+                  />
+                  <div>
+                    <label htmlFor="departure" className="field-label">
+                      Kalkış saati
+                    </label>
+                    <input
+                      id="departure"
+                      type="time"
+                      className="input"
+                      value={transport.departure}
+                      onChange={(event) => setTransport({ ...transport, departure: event.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="arrival" className="field-label">
+                      Varış saati
+                    </label>
+                    <input
+                      id="arrival"
+                      type="time"
+                      className="input"
+                      value={transport.arrival}
+                      onChange={(event) => setTransport({ ...transport, arrival: event.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+            </StepBody>
+          )}
+
+          {step === 3 && (
+            <StepBody
+              title="Nerede kalacaksın?"
+              lead={
+                nights > 0
+                  ? `${nights} gece konaklama için gecelik fiyatı gir; toplam kendiliğinden hesaplanır.`
+                  : "Günübirlik bir gezi planlıyorsun; konaklama eklemeden devam edebilirsin."
+              }
+            >
+              <TypeCards
+                label="Konaklama türü"
+                options={STAY_TYPES}
+                value={stay.type}
+                onChange={(type) => setStay({ ...stay, type })}
+              />
+
+              {stay.type && (
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="stayName" className="field-label">
+                      Tesis adı
+                    </label>
+                    <input
+                      id="stayName"
+                      className="input"
+                      placeholder="Örn. kalacağın yerin adı"
+                      value={stay.name}
+                      onChange={(event) => setStay({ ...stay, name: event.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="stayLocation" className="field-label">
+                      Konum
+                    </label>
+                    <input
+                      id="stayLocation"
+                      className="input"
+                      placeholder="Örn. şehir merkezi"
+                      value={stay.location}
+                      onChange={(event) => setStay({ ...stay, location: event.target.value })}
+                    />
+                  </div>
+                  <MoneyField
+                    id="stayPrice"
+                    label="Gecelik fiyat (tüm grup)"
+                    value={stay.price}
+                    onChange={(price) => setStay({ ...stay, price })}
+                  />
+                  <div className="flex items-end">
+                    <p className="w-full rounded-2xl bg-canvas-2 px-4 py-3 text-sm text-ink-2">
+                      <span className="tabular font-semibold text-ink">
+                        {nights} gece × {formatMoney(toAmount(stay.price))}
+                      </span>
+                      <br />
+                      Toplam {formatMoney(breakdown.accommodation)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </StepBody>
+          )}
+
+          {step === 4 && (
+            <StepBody title="Günlerini doldur" lead="Her güne saatli aktiviteler ekle; maliyetler bütçene yansır.">
+              <div className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-2">
+                {days.map((day, index) => (
+                  <button
+                    key={day.day}
+                    type="button"
+                    onClick={() => setActiveDay(index)}
+                    aria-pressed={activeDay === index}
+                    className="chip !h-auto flex-none flex-col !items-start !gap-0.5 !rounded-2xl !px-4 !py-2.5"
+                  >
+                    <span className="text-xs font-semibold opacity-80">{day.day}. gün</span>
+                    <span className="tabular text-sm font-bold">
+                      {addDays(basic.startDate, index).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
+                      {day.isEmpty ? " · boş" : day.activities.length ? ` · ${day.activities.length}` : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {days[activeDay] && (
+                <DayEditor
+                  key={days[activeDay].day}
+                  day={days[activeDay]}
+                  date={addDays(basic.startDate, activeDay)}
+                  onChange={(patch) => updateDay(activeDay, patch)}
+                />
+              )}
+            </StepBody>
+          )}
+
+          {step === 5 && (
+            <StepBody
+              title="Bütçeni tamamla"
+              lead="Ulaşım, konaklama ve aktiviteler önceki adımlardan geldi. Kalan kalemleri sen belirle."
+            >
+              <div className="grid gap-4 sm:grid-cols-3">
+                <MoneyField
+                  id="foodPerDay"
+                  label="Günlük yeme-içme (tüm grup)"
+                  value={foodPerDay}
+                  onChange={setFoodPerDay}
+                />
+                <MoneyField id="otherCost" label="Diğer giderler" value={otherCost} onChange={setOtherCost} />
+                <MoneyField id="targetBudget" label="Hedef bütçen" value={targetBudget} onChange={setTargetBudget} />
+              </div>
+
+              <div className="mt-8">
+                <BudgetBars breakdown={breakdown} total={total} />
+              </div>
+
+              {target > 0 && <TargetCompare total={total} target={target} />}
+            </StepBody>
+          )}
+
+          {step === 6 && (
+            <StepBody title="Son bir bakış" lead="Her şey doğruysa planını kaydet; sonra Planlarım’dan açabilirsin.">
+              <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                <SummaryItem label="Rota">
+                  {basic.destination}
+                  {basic.country ? `, ${basic.country}` : ""}
+                </SummaryItem>
+                <SummaryItem label="Tarih">
+                  {formatDateRange(basic.startDate, basic.endDate)} · {dayCount} gün
+                </SummaryItem>
+                <SummaryItem label="Yolcular">
+                  {basic.travelers} kişi · {styleLabel(basic.travelStyle)}
+                </SummaryItem>
+                <SummaryItem label="Ulaşım">
+                  {transport.type
+                    ? `${transport.type}${transport.provider ? ` · ${transport.provider}` : ""} · ${formatMoney(breakdown.transport)}`
+                    : "Eklenmedi"}
+                </SummaryItem>
+                <SummaryItem label="Konaklama">
+                  {stay.type
+                    ? `${stay.name || stay.type} · ${nights} gece · ${formatMoney(breakdown.accommodation)}`
+                    : "Eklenmedi"}
+                </SummaryItem>
+                <SummaryItem label="Aktiviteler">
+                  {days.reduce((sum, day) => sum + (day.isEmpty ? 0 : day.activities.length), 0)} aktivite ·{" "}
+                  {formatMoney(breakdown.activities)}
+                </SummaryItem>
+              </dl>
+
+              <hr className="dash-rule my-7" />
+              <BudgetBars breakdown={breakdown} total={total} />
+              {target > 0 && <TargetCompare total={total} target={target} />}
+            </StepBody>
+          )}
+
+          <div className="mt-9 flex items-center justify-between gap-3 border-t border-line pt-6">
+            <button type="button" className="btn btn-outline" onClick={() => goTo(step - 1)} disabled={step === 1}>
+              <ArrowLeft />
+              Geri
+            </button>
+            {step < STEPS.length ? (
+              <button type="button" className="btn btn-primary" onClick={() => goTo(step + 1)}>
+                {step === 2 && !transport.type ? "Bu adımı geç" : step === 3 && !stay.type ? "Bu adımı geç" : "Devam et"}
+                <ArrowRight />
+              </button>
+            ) : (
+              <button type="button" className="btn btn-primary" onClick={savePlan} disabled={saving}>
+                {saving ? <span className="spinner" /> : <Save />}
+                {saving ? "Kaydediliyor…" : "Planı kaydet"}
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* Canlı özet */}
+        <aside className="card overflow-hidden shadow-lift lg:sticky lg:top-24">
+          <DestinationPreview
+            city={basic.destination}
+            country={basic.country}
+            eyebrow="Planın"
+            meta={basic.country.trim() || undefined}
+          />
+          <div className="p-6">
+            <dl className="space-y-3 text-sm">
+              <FactRow label="Tarihler" value={formatDateRange(basic.startDate || null, basic.endDate || null)} />
+              <FactRow
+                label="Süre"
+                value={dayCount > 0 ? `${dayCount} gün${nights > 0 ? ` · ${nights} gece` : ""}` : "—"}
+              />
+              <FactRow label="Yolcu" value={`${basic.travelers} kişi`} />
+              <FactRow label="Tarz" value={styleLabel(basic.travelStyle) ?? "—"} />
+              <FactRow label="Ulaşım" value={transport.type || "Eklenmedi"} />
+              <FactRow label="Konaklama" value={stay.type ? stay.name.trim() || stay.type : "Eklenmedi"} />
+            </dl>
+          </div>
+          <div className="border-t border-line p-6 pt-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-semibold text-ink-2">Tahmini toplam</p>
+              <p className="tabular font-display text-2xl font-extrabold text-ink">{formatMoney(total)}</p>
+            </div>
+            {target > 0 && (
+              <>
+                <TargetMeter total={total} target={target} className="mt-3" />
+                <p className="tabular mt-1.5 text-xs text-ink-3">Hedef: {formatMoney(target)}</p>
+              </>
+            )}
+            {dayCount > 0 && total > 0 && (
+              <p className="tabular mt-3 text-xs leading-relaxed text-ink-3">
+                Günlük ortalama {formatMoney(total / dayCount)}
+                {basic.travelers > 1 ? ` · kişi başı ${formatMoney(total / basic.travelers)}` : ""}
+              </p>
+            )}
+          </div>
+        </aside>
+      </div>
+    </Page>
+  );
+}
+
+/* --------------------------- Alt bileşenler -------------------------- */
+
+function Stepper({ step, maxStep, onSelect }: { step: number; maxStep: number; onSelect: (step: number) => void }) {
+  // Çizgi ilk ve son dairenin merkezleri arasında uzanır (her adım eşit genişlikte).
+  const edge = `${100 / (STEPS.length * 2)}%`;
+  return (
+    <nav aria-label="Planlama adımları" className="mb-8">
+      <div className="mb-4 md:hidden">
+        <p className="text-sm font-semibold text-ink">
+          <span className="tabular text-brand">
+            Adım {step}/{STEPS.length}
+          </span>{" "}
+          · {STEPS[step - 1].title}
+        </p>
+        <div className="meter mt-2" aria-hidden="true">
+          <span style={{ width: `${(step / STEPS.length) * 100}%` }} />
+        </div>
+      </div>
+      <ol className="relative flex items-start justify-between gap-1">
+        <span className="absolute top-5 h-0.5 rounded-full bg-line" style={{ left: edge, right: edge }} aria-hidden="true">
+          <span
+            className="block h-full rounded-full bg-brand transition-[width] duration-500"
+            style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }}
+          />
+        </span>
+        {STEPS.map((item) => {
+          const state = item.id === step ? "current" : item.id < step ? "done" : "todo";
+          const reachable = item.id <= maxStep;
+          return (
+            <li key={item.id} className="relative z-10 flex flex-1 flex-col items-center">
               <button
-                onClick={handleAddActivity}
-                disabled={!newActivity.name.trim() || !newActivity.startTime || !newActivity.endTime}
-                className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+                type="button"
+                onClick={() => reachable && onSelect(item.id)}
+                disabled={!reachable}
+                aria-current={state === "current" ? "step" : undefined}
+                aria-label={`${item.id}. adım: ${item.title}`}
+                className={`grid h-10 w-10 place-items-center rounded-full border-2 transition-colors [&_svg]:h-4 [&_svg]:w-4 ${
+                  state === "current"
+                    ? "border-brand bg-surface text-brand ring-4 ring-brand-soft"
+                    : state === "done"
+                      ? "border-brand bg-brand text-on-brand"
+                      : reachable
+                        ? "border-line-2 bg-surface text-ink-2 hover:border-brand hover:text-brand"
+                        : "border-line bg-surface text-ink-3"
+                } ${reachable ? "cursor-pointer" : "cursor-default"}`}
               >
-                Aktivite Ekle
+                {state === "done" ? <Check /> : item.icon}
+              </button>
+              <span
+                className={`mt-2 hidden text-center text-xs font-semibold md:block ${
+                  state === "todo" ? "text-ink-3" : state === "current" ? "text-brand" : "text-ink"
+                }`}
+              >
+                {item.title}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function StepBody({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
+  return (
+    <div className="rise">
+      <h2 className="font-display text-2xl font-extrabold text-ink">{title}</h2>
+      <p className="mb-7 mt-1.5 text-sm leading-relaxed text-ink-2">{lead}</p>
+      {children}
+    </div>
+  );
+}
+
+interface TypeCardsProps {
+  label: string;
+  options: Array<{ value: string; icon: React.ReactNode }>;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+/** Büyük ikonlu tür seçimi; seçili karta tekrar basmak seçimi kaldırır. */
+function TypeCards({ label, options, value, onChange }: TypeCardsProps) {
+  return (
+    <fieldset>
+      <legend className="field-label">{label}</legend>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {options.map((option) => {
+          const on = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange(on ? "" : option.value)}
+              className={`relative flex flex-col items-start gap-3 rounded-2xl border p-4 text-left text-sm font-semibold transition-colors ${
+                on
+                  ? "border-brand bg-brand-soft text-brand"
+                  : "border-line-2 bg-surface text-ink-2 hover:border-lav hover:text-ink"
+              }`}
+            >
+              <span
+                className={`grid h-10 w-10 place-items-center rounded-xl [&_svg]:h-5 [&_svg]:w-5 ${
+                  on ? "bg-brand text-on-brand" : "bg-canvas-2 text-ink-2"
+                }`}
+              >
+                {option.icon}
+              </span>
+              {option.value}
+              {on && (
+                <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-brand text-on-brand">
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function MoneyField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="field-label">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          className="input tabular pr-9"
+          placeholder="0"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-3">₺</span>
+      </div>
+    </div>
+  );
+}
+
+function DayEditor({ day, date, onChange }: { day: DayPlan; date: Date; onChange: (patch: Partial<DayPlan>) => void }) {
+  const [draft, setDraft] = useState({ name: "", startTime: "", endTime: "", cost: "", description: "" });
+  const sorted = [...day.activities].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const canAdd = draft.name.trim() !== "" && draft.startTime !== "";
+
+  const addActivity = () => {
+    if (!canAdd) return;
+    const activity: Activity = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: draft.name.trim(),
+      startTime: draft.startTime,
+      endTime: draft.endTime,
+      cost: toAmount(draft.cost),
+      description: draft.description.trim(),
+    };
+    onChange({ activities: [...day.activities, activity] });
+    setDraft({ name: "", startTime: "", endTime: "", cost: "", description: "" });
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-display text-xl font-extrabold text-ink">{day.day}. gün</p>
+          <p className="text-sm text-ink-2">{formatDayLong(date)}</p>
+        </div>
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={day.isEmpty}
+          onClick={() => onChange({ isEmpty: !day.isEmpty })}
+        >
+          <MoonStar />
+          Serbest gün
+        </button>
+      </div>
+
+      {day.isEmpty ? (
+        <p className="mt-5 rounded-2xl bg-canvas-2 px-5 py-8 text-center text-sm text-ink-2">
+          Bu gün serbest bırakıldı; plana aktivite eklenmeyecek.
+        </p>
+      ) : (
+        <>
+          {sorted.length > 0 && (
+            <ol className="mt-6 divide-y divide-line overflow-hidden rounded-2xl border border-line">
+              {sorted.map((activity) => (
+                <li key={activity.id} className="flex items-start gap-3 bg-surface px-4 py-3.5 sm:gap-4">
+                  <p className="tabular flex w-[4.5rem] flex-none items-center gap-1.5 pt-0.5 text-sm font-bold text-brand sm:w-28">
+                    <Clock className="hidden h-3.5 w-3.5 flex-none sm:block" />
+                    <span>
+                      {activity.startTime}
+                      {activity.endTime ? <span className="font-medium text-ink-3"> – {activity.endTime}</span> : null}
+                    </span>
+                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold text-ink">{activity.name}</p>
+                    {activity.description && (
+                      <p className="mt-0.5 break-words text-sm leading-relaxed text-ink-2">{activity.description}</p>
+                    )}
+                    {activity.cost > 0 && (
+                      <span className="tag tag-amber tabular mt-2 sm:hidden">{formatMoney(activity.cost)}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-none items-center gap-1">
+                    {activity.cost > 0 && (
+                      <span className="tag tag-amber tabular hidden sm:inline-flex">{formatMoney(activity.cost)}</span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-quiet btn-icon !h-8 !w-8 hover:!bg-rose-soft hover:!text-rose"
+                      onClick={() =>
+                        onChange({ activities: day.activities.filter((item) => item.id !== activity.id) })
+                      }
+                      aria-label={`${activity.name} aktivitesini kaldır`}
+                    >
+                      <Trash2 />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          <div className="mt-6 rounded-[1.25rem] bg-canvas-2 p-4 sm:p-5">
+            <p className="mb-4 flex items-center gap-2 font-display text-base font-bold text-ink">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-soft text-brand">
+                <Plus className="h-4 w-4" />
+              </span>
+              Aktivite ekle
+            </p>
+            <div className="grid gap-3 sm:grid-cols-[1.6fr_1fr_1fr_1fr]">
+              <div>
+                <label htmlFor="actName" className="field-label">
+                  Aktivite
+                </label>
+                <input
+                  id="actName"
+                  className="input"
+                  placeholder="Örn. Müze ziyareti"
+                  value={draft.name}
+                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addActivity();
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <label htmlFor="actStart" className="field-label">
+                  Başlangıç
+                </label>
+                <input
+                  id="actStart"
+                  type="time"
+                  className="input"
+                  value={draft.startTime}
+                  onChange={(event) => setDraft({ ...draft, startTime: event.target.value })}
+                />
+              </div>
+              <div>
+                <label htmlFor="actEnd" className="field-label">
+                  Bitiş
+                </label>
+                <input
+                  id="actEnd"
+                  type="time"
+                  className="input"
+                  value={draft.endTime}
+                  onChange={(event) => setDraft({ ...draft, endTime: event.target.value })}
+                />
+              </div>
+              <MoneyField
+                id="actCost"
+                label="Maliyet"
+                value={draft.cost}
+                onChange={(cost) => setDraft({ ...draft, cost })}
+              />
+            </div>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <label htmlFor="actDesc" className="field-label">
+                  Not (isteğe bağlı)
+                </label>
+                <input
+                  id="actDesc"
+                  className="input"
+                  placeholder="Bilet, adres, hatırlatma…"
+                  value={draft.description}
+                  onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                />
+              </div>
+              <button type="button" className="btn btn-primary" onClick={addActivity} disabled={!canAdd}>
+                <Plus />
+                Ekle
               </button>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Günlük Notlar
+          <div className="mt-5">
+            <label htmlFor="dayNotes" className="field-label">
+              Günün notları
             </label>
             <textarea
-              value={day.notes}
-              onChange={(e) => onPlanChange(dayIndex, 'notes', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              id="dayNotes"
+              className="input"
               rows={2}
-              placeholder="Bu güne ait özel notlarınız..."
+              placeholder="Bu güne dair aklında tutmak istediklerin…"
+              value={day.notes}
+              onChange={(event) => onChange({ notes: event.target.value })}
             />
           </div>
-
-          {/* Günlük Özet */}
-          {day.activities.length > 0 && (
-            <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-green-700 dark:text-green-300">
-                  <strong>Günlük Özet:</strong> {day.activities.length} aktivite
-                </span>
-                <span className="text-green-700 dark:text-green-300 font-bold">
-                  Toplam: ₺{day.activities.reduce((sum, act) => sum + act.cost, 0)}
-                </span>
-              </div>
-            </div>
-          )}
         </>
-      )}
-
-      {day.isEmpty && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <span className="text-4xl">😴</span>
-          <p className="mt-2">Bu gün dinlenme günü olarak ayarlandı</p>
-        </div>
       )}
     </div>
   );
 }
 
-export default function ManualPlannerPage() {
-  const router = useRouter();
-  const { data: session, status } = useSession();
-  const [currentStep, setCurrentStep] = useState(1);
-  
-  // Bugünün tarihini al (YYYY-MM-DD formatında)
-  const today = new Date().toISOString().split('T')[0];
-  
-  const [travelPlan, setTravelPlan] = useState<TravelPlan>({
-    basicInfo: {
-      destination: '',
-      country: '',
-      startDate: '',
-      endDate: '',
-      travelers: 1,
-      travelStyle: 'standard'
-    },
-    transport: null,
-    accommodation: null,
-    dailyPlans: [],
-    budget: {
-      currentBudget: 0,
-      estimatedTotal: 0,
-      breakdown: {
-        transport: 0,
-        accommodation: 0,
-        activities: 0,
-        food: 0,
-        other: 0,
-      }
-    }
-  });
+const BREAKDOWN_ROWS: Array<{ key: "transport" | "accommodation" | "activities" | "food" | "other"; category: BudgetCategory }> = [
+  { key: "transport", category: "TRANSPORT" },
+  { key: "accommodation", category: "ACCOMMODATION" },
+  { key: "activities", category: "ACTIVITIES" },
+  { key: "food", category: "FOOD" },
+  { key: "other", category: "OTHER" },
+];
 
-  // Mock data - gerçek uygulamada API'den gelecek
-  const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
-  const [accommodationOptions, setAccommodationOptions] = useState<AccommodationOption[]>([]);
-
-  const steps = [
-    { id: 1, title: 'Temel Bilgiler', icon: '📍' },
-    { id: 2, title: 'Ulaşım', icon: '✈️' },
-    { id: 3, title: 'Konaklama', icon: '🏨' },
-    { id: 4, title: 'Günlük Planlar', icon: '📅' },
-    { id: 5, title: 'Bütçe Analizi', icon: '💰' },
-    { id: 6, title: 'Özet & Kaydet', icon: '✅' }
-  ];
-
-  // Calculate trip duration
-  const getTripDuration = useCallback(() => {
-    if (!travelPlan.basicInfo.startDate || !travelPlan.basicInfo.endDate) return 0;
-    const start = new Date(travelPlan.basicInfo.startDate);
-    const end = new Date(travelPlan.basicInfo.endDate);
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  }, [travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate]);
-
-  // Initialize daily plans when dates change
-  useEffect(() => {
-    const duration = getTripDuration();
-    if (duration > 0 && duration !== travelPlan.dailyPlans.length) {
-      const newPlans: DayPlan[] = Array.from({ length: duration }, (_, index) => ({
-        day: index + 1,
-        activities: [],
-        notes: '',
-        isEmpty: false
-      }));
-      setTravelPlan(prev => ({ ...prev, dailyPlans: newPlans }));
-    }
-  }, [travelPlan.basicInfo.startDate, travelPlan.basicInfo.endDate, getTripDuration, travelPlan.dailyPlans.length]);
-
-  // Mock API calls - Fetch data when needed
-  const fetchTransportOptions = async () => {
-    // Simulated API call
-    const mockTransport: TransportOption[] = [
-      {
-        id: '1',
-        type: 'Uçak',
-        provider: 'Turkish Airlines',
-        price: 2500,
-        duration: '2 saat 30 dk',
-        departure: '10:00',
-        arrival: '12:30',
-        selected: false
-      },
-      {
-        id: '2',
-        type: 'Otobüs',
-        provider: 'Metro Turizm',
-        price: 150,
-        duration: '8 saat',
-        departure: '22:00',
-        arrival: '06:00',
-        selected: false
-      },
-      {
-        id: '3',
-        type: 'Kendi Aracı',
-        provider: 'Özel Araç',
-        price: 300,
-        duration: '6 saat',
-        departure: 'Esnek',
-        arrival: 'Esnek',
-        selected: false
-      }
-    ];
-    
-    // Mark selected transport if exists
-    const updatedOptions = mockTransport.map(option => ({
-      ...option,
-      selected: travelPlan.transport?.id === option.id
-    }));
-    
-    setTransportOptions(updatedOptions);
-  };
-
-  const fetchAccommodationOptions = async () => {
-    // Simulated API call
-    const mockAccommodation: AccommodationOption[] = [
-      {
-        id: '1',
-        name: 'Grand Hotel',
-        type: 'Otel',
-        rating: 5,
-        price: 800,
-        location: 'Şehir Merkezi',
-        amenities: ['WiFi', 'Kahvaltı', 'Spa', 'Havuz'],
-        selected: false
-      },
-      {
-        id: '2',
-        name: 'Boutique Inn',
-        type: 'Butik Otel',
-        rating: 4,
-        price: 450,
-        location: 'Tarihi Bölge',
-        amenities: ['WiFi', 'Kahvaltı', 'Restoran'],
-        selected: false
-      },
-      {
-        id: '3',
-        name: 'Budget Hostel',
-        type: 'Hostel',
-        rating: 3,
-        price: 120,
-        location: 'Genç Bölge',
-        amenities: ['WiFi', 'Ortak Mutfak'],
-        selected: false
-      }
-    ];
-    
-    // Mark selected accommodation if exists
-    const updatedOptions = mockAccommodation.map(option => ({
-      ...option,
-      selected: travelPlan.accommodation?.id === option.id
-    }));
-    
-    setAccommodationOptions(updatedOptions);
-  };
-
-  const handleBasicInfoChange = (field: keyof BasicInfo, value: string | number) => {
-    // Tarih validasyonu
-    if (field === 'startDate' || field === 'endDate') {
-      const dateValue = value as string;
-      const selectedDate = new Date(dateValue);
-      const todayDate = new Date(today);
-      
-      if (selectedDate < todayDate) {
-        toast.error(`${field === 'startDate' ? 'Başlangıç' : 'Bitiş'} tarihi bugünden önce olamaz`);
-        return;
-      }
-      
-      // Eğer bitiş tarihi seçiliyorsa ve başlangıç tarihinden önceyse
-      if (field === 'endDate' && travelPlan.basicInfo.startDate) {
-        const startDate = new Date(travelPlan.basicInfo.startDate);
-        if (selectedDate < startDate) {
-          toast.error('Bitiş tarihi başlangıç tarihinden önce olamaz');
-          return;
-        }
-      }
-      
-      // Eğer başlangıç tarihi seçiliyorsa ve bitiş tarihinden sonraysa
-      if (field === 'startDate' && travelPlan.basicInfo.endDate) {
-        const endDate = new Date(travelPlan.basicInfo.endDate);
-        if (selectedDate > endDate) {
-          toast.error('Başlangıç tarihi bitiş tarihinden sonra olamaz');
-          return;
-        }
-      }
-    }
-    
-    setTravelPlan(prev => ({
-      ...prev,
-      basicInfo: { ...prev.basicInfo, [field]: value }
-    }));
-  };
-
-  const handleTransportSelect = (transportId: string) => {
-    const selected = transportOptions.find(t => t.id === transportId);
-    if (selected) {
-      setTravelPlan(prev => ({
-        ...prev,
-        transport: { ...selected, selected: true },
-        budget: {
-          ...prev.budget,
-          breakdown: { ...prev.budget.breakdown, transport: selected.price }
-        }
-      }));
-    }
-  };
-
-  const handleAccommodationSelect = (accommodationId: string) => {
-    const selected = accommodationOptions.find(a => a.id === accommodationId);
-    if (selected) {
-      const totalNights = getTripDuration() - 1;
-      const totalPrice = selected.price * totalNights;
-      setTravelPlan(prev => ({
-        ...prev,
-        accommodation: { ...selected, selected: true },
-        budget: {
-          ...prev.budget,
-          breakdown: { ...prev.budget.breakdown, accommodation: totalPrice }
-        }
-      }));
-    }
-  };
-
-  const handleDayPlanChange = (dayIndex: number, field: keyof DayPlan, value: string | boolean) => {
-    setTravelPlan(prev => ({
-      ...prev,
-      dailyPlans: prev.dailyPlans.map((plan, index) =>
-        index === dayIndex ? { ...plan, [field]: value } : plan
-      )
-    }));
-  };
-
-  const addActivity = (dayIndex: number, activity: Activity) => {
-    setTravelPlan(prev => ({
-      ...prev,
-      dailyPlans: prev.dailyPlans.map((plan, index) =>
-        index === dayIndex
-          ? { ...plan, activities: [...plan.activities, activity] }
-          : plan
-      )
-    }));
-  };
-
-  const removeActivity = (dayIndex: number, activityIndex: number) => {
-    setTravelPlan(prev => ({
-      ...prev,
-      dailyPlans: prev.dailyPlans.map((plan, index) =>
-        index === dayIndex
-          ? {
-              ...plan,
-              activities: plan.activities.filter((_, i) => i !== activityIndex)
-            }
-          : plan
-      )
-    }));
-  };
-
-  const calculateBudget = () => {
-    const { transport, accommodation, dailyPlans } = travelPlan;
-    
-    // Gerçek aktivite maliyetlerini hesapla
-    const totalActivityCost = dailyPlans.reduce((total, day) => {
-      if (day.isEmpty) return total;
-      return total + day.activities.reduce((dayTotal, activity) => dayTotal + activity.cost, 0);
-    }, 0);
-    
-    // Konaklama maliyeti (gece sayısı × gecelik fiyat)
-    const nights = getTripDuration() - 1;
-    const accommodationCost = accommodation ? accommodation.price * nights : 0;
-    
-    const breakdown = {
-      transport: transport?.price || 0,
-      accommodation: accommodationCost,
-      activities: totalActivityCost,
-      food: dailyPlans.length * 150, // Günlük ortalama yemek maliyeti
-      other: 500 // Diğer masraflar
-    };
-
-    const estimatedTotal = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
-
-    setTravelPlan(prev => ({
-      ...prev,
-      budget: { ...prev.budget, breakdown, estimatedTotal }
-    }));
-  };
-
-  const nextStep = () => {
-    if (currentStep < steps.length) {
-      if (currentStep === 1) {
-        if (!travelPlan.basicInfo.destination) {
-          toast.error('Lütfen hedef şehri belirtin');
-          return;
-        }
-        
-        // Tarih validasyonları
-        if (travelPlan.basicInfo.startDate) {
-          const startDate = new Date(travelPlan.basicInfo.startDate);
-          const todayDate = new Date(today);
-          
-          if (startDate < todayDate) {
-            toast.error('Başlangıç tarihi bugünden önce olamaz');
-            return;
-          }
-        }
-        
-        if (travelPlan.basicInfo.endDate) {
-          const endDate = new Date(travelPlan.basicInfo.endDate);
-          const todayDate = new Date(today);
-          
-          if (endDate < todayDate) {
-            toast.error('Bitiş tarihi bugünden önce olamaz');
-            return;
-          }
-        }
-        
-        if (travelPlan.basicInfo.startDate && travelPlan.basicInfo.endDate) {
-          const startDate = new Date(travelPlan.basicInfo.startDate);
-          const endDate = new Date(travelPlan.basicInfo.endDate);
-          
-          if (startDate > endDate) {
-            toast.error('Başlangıç tarihi bitiş tarihinden sonra olamaz');
-            return;
-          }
-        }
-      }
-      
-      if (currentStep === 2) {
-        fetchTransportOptions();
-      }
-      if (currentStep === 3) {
-        fetchAccommodationOptions();
-      }
-      if (currentStep === 5) {
-        calculateBudget();
-      }
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      // Önceki adıma geçerken seçenekleri güncelle
-      if (currentStep === 3) {
-        // Ulaşım adımına geri dönüyoruz, seçenekleri güncelle
-        fetchTransportOptions();
-      }
-      if (currentStep === 4) {
-        // Konaklama adımına geri dönüyoruz, seçenekleri güncelle
-        fetchAccommodationOptions();
-      }
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const savePlan = async () => {
-    try {
-      // Session bilgisini de ekle
-      const requestBody = {
-        ...travelPlan,
-        userInfo: session ? {
-          id: session.user?.id,
-          email: session.user?.email,
-        } : null
-      };
-
-      const response = await fetch('/api/manual-travel-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (response.ok) {
-        toast.success('Seyahat planınız başarıyla kaydedildi!');
-        router.push('/my-plans');
-      } else {
-        toast.error('Plan kaydedilirken bir hata oluştu');
-      }
-    } catch (error) {
-      console.error('Save error:', error);
-      toast.error('Plan kaydedilirken bir hata oluştu');
-    }
-  };
-
-  const cancelPlan = () => {
-    if (confirm('Planınızı iptal etmek istediğinizden emin misiniz? Tüm veriler kaybolacak.')) {
-      router.push('/travel-mode');
-    }
-  };
-
-  // Session kontrol için UI
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-xl text-white">Oturum kontrol ediliyor...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-300 mb-6">
-            Manuel plan oluşturmak için önce giriş yapmanız gerekiyor.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mr-4"
-          >
-            Giriş Yap
-          </button>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600"
-          >
-            Ana Sayfaya Dön
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+function BudgetBars({ breakdown, total }: { breakdown: Record<string, number>; total: number }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-teal-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-            Adım Adım Seyahat Planlama
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
-            Seyahatinizi detaylıca planlayın ve bütçenizi kontrol edin
-          </p>
-        </div>
-
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex justify-center space-x-4 overflow-x-auto pb-4">
-            {steps.map((step, index) => (
-              <div
-                key={step.id}
-                className={`flex flex-col items-center min-w-0 ${
-                  currentStep >= step.id
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-gray-400 dark:text-gray-600'
-                }`}
-              >
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-xl mb-2 transition-all duration-300 ${
-                    currentStep >= step.id
-                      ? 'bg-green-100 dark:bg-green-900 border-2 border-green-500'
-                      : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600'
-                  }`}
-                >
-                  {step.icon}
-                </div>
-                <span className="text-sm font-medium text-center px-2">{step.title}</span>
-                {index < steps.length - 1 && (
-                  <div
-                    className={`hidden md:block absolute top-6 left-full w-16 h-0.5 ${
-                      currentStep > step.id ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                    style={{ marginLeft: '1rem' }}
+    <div>
+      <ul className="space-y-3.5">
+        {BREAKDOWN_ROWS.map(({ key, category }) => {
+          const amount = breakdown[key] ?? 0;
+          const share = total > 0 ? (amount / total) * 100 : 0;
+          return (
+            <li key={key}>
+              <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
+                <span className="flex items-center gap-2 font-medium text-ink">
+                  <span
+                    className="h-2.5 w-2.5 flex-none rounded-full"
+                    style={{ background: BUDGET_COLOR[category] }}
+                    aria-hidden="true"
                   />
-                )}
+                  {BUDGET_LABEL[category]}
+                </span>
+                <span className="tabular font-semibold text-ink-2">{formatMoney(amount)}</span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="max-w-4xl mx-auto">
-          {/* Step 2: Ulaşım */}
-          {currentStep === 2 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                ✈️ Ulaşım Seçenekleri
-              </h2>
-              
-              {/* Mevcut seçim göster */}
-              {travelPlan.transport && (
-                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✅ Seçili Ulaşım:</h3>
-                  <p className="text-green-700 dark:text-green-300">
-                    {travelPlan.transport.type} - {travelPlan.transport.provider} (₺{travelPlan.transport.price})
-                  </p>
-                </div>
-              )}
-              
-              <div className="space-y-4">
-                {transportOptions.map((option) => (
-                  <div
-                    key={option.id}
-                    onClick={() => handleTransportSelect(option.id)}
-                    className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                      travelPlan.transport?.id === option.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-2">
-                          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                            {option.type} - {option.provider}
-                          </h3>
-                          {travelPlan.transport?.id === option.id && (
-                            <span className="ml-3 px-2 py-1 bg-green-500 text-white text-xs rounded-full">
-                              Seçili
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-300">
-                          Süre: {option.duration} | {option.departure} - {option.arrival}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">
-                          ₺{option.price}
-                        </span>
-                        <p className="text-sm text-gray-500">kişi başı</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="meter">
+                <span style={{ width: `${share}%`, background: BUDGET_COLOR[category] }} />
               </div>
-            </div>
-          )}
-
-          {/* Step 3: Konaklama */}
-          {currentStep === 3 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                🏨 Konaklama Seçenekleri
-              </h2>
-              
-              {/* Mevcut seçim göster */}
-              {travelPlan.accommodation && (
-                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h3 className="text-green-800 dark:text-green-200 font-semibold mb-2">✅ Seçili Konaklama:</h3>
-                  <p className="text-green-700 dark:text-green-300">
-                    {travelPlan.accommodation.name} - {travelPlan.accommodation.type} (₺{travelPlan.accommodation.price}/gece)
-                  </p>
-                </div>
-              )}
-              
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {accommodationOptions.map((option) => (
-                  <div
-                    key={option.id}
-                    onClick={() => handleAccommodationSelect(option.id)}
-                    className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                      travelPlan.accommodation?.id === option.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                        {option.name}
-                      </h3>
-                      {travelPlan.accommodation?.id === option.id && (
-                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
-                          Seçili
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                      {option.type} • {option.location}
-                    </p>
-                    <div className="flex items-center mb-3">
-                      {[...Array(5)].map((_, i) => (
-                        <span
-                          key={i}
-                          className={`text-sm ${
-                            i < option.rating ? 'text-yellow-400' : 'text-gray-300'
-                          }`}
-                        >
-                          ⭐
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {option.amenities.map((amenity) => (
-                        <span
-                          key={amenity}
-                          className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded"
-                        >
-                          {amenity}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="text-center">
-                      <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                        ₺{option.price}
-                      </span>
-                      <p className="text-sm text-gray-500">gecelik</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Günlük Planlar */}
-          {currentStep === 4 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                📅 Günlük Planlar
-              </h2>
-              
-              <div className="space-y-6">
-                {travelPlan.dailyPlans.map((day, index) => (
-                  <DayPlanCard
-                    key={index}
-                    day={day}
-                    dayIndex={index}
-                    onPlanChange={handleDayPlanChange}
-                    onAddActivity={addActivity}
-                    onRemoveActivity={removeActivity}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 5: Bütçe Analizi */}
-          {currentStep === 5 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                💰 Bütçe Analizi
-              </h2>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Mevcut Bütçeniz (₺)
-                  </label>
-                  <input
-                    type="number"
-                    value={travelPlan.budget.currentBudget}
-                    onChange={(e) => setTravelPlan(prev => ({
-                      ...prev,
-                      budget: { ...prev.budget, currentBudget: parseFloat(e.target.value) || 0 }
-                    }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder="Örn: 10000"
-                  />
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                    Tahmini Harcama Dağılımı
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(travelPlan.budget.breakdown).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="capitalize text-gray-600 dark:text-gray-300">
-                          {key === 'transport' ? 'Ulaşım' :
-                           key === 'accommodation' ? 'Konaklama' :
-                           key === 'activities' ? 'Aktiviteler' :
-                           key === 'food' ? 'Yemek' : 'Diğer'}:
-                        </span>
-                        <span className="font-semibold">₺{value}</span>
-                      </div>
-                    ))}
-                    <hr className="my-2" />
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Toplam:</span>
-                      <span>₺{travelPlan.budget.estimatedTotal}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 rounded-lg">
-                {travelPlan.budget.currentBudget > travelPlan.budget.estimatedTotal ? (
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
-                    <h4 className="font-semibold">✅ Bütçeniz Yeterli!</h4>
-                    <p>Kalan tutar: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal}</p>
-                  </div>
-                ) : (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
-                    <h4 className="font-semibold">⚠️ Bütçe Aşımı!</h4>
-                    <p>Eksik tutar: ₺{travelPlan.budget.estimatedTotal - travelPlan.budget.currentBudget}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Step 6: Özet & Kaydet */}
-          {currentStep === 6 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                ✅ Plan Özeti
-              </h2>
-              
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Temel Bilgiler */}
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
-                      📍 Temel Bilgiler
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <p><strong>Hedef:</strong> {travelPlan.basicInfo.destination}, {travelPlan.basicInfo.country}</p>
-                      <p><strong>Tarih:</strong> {travelPlan.basicInfo.startDate} - {travelPlan.basicInfo.endDate}</p>
-                      <p><strong>Süre:</strong> {getTripDuration()} gün</p>
-                      <p><strong>Kişi:</strong> {travelPlan.basicInfo.travelers}</p>
-                      <p><strong>Tarz:</strong> {travelPlan.basicInfo.travelStyle}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Ulaşım Bilgileri */}
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
-                      ✈️ Seçilen Ulaşım
-                    </h3>
-                    {travelPlan.transport ? (
-                      <div className="space-y-2 text-sm">
-                        <p><strong>Tip:</strong> {travelPlan.transport.type}</p>
-                        <p><strong>Sağlayıcı:</strong> {travelPlan.transport.provider}</p>
-                        <p><strong>Süre:</strong> {travelPlan.transport.duration}</p>
-                        <p><strong>Saat:</strong> {travelPlan.transport.departure} - {travelPlan.transport.arrival}</p>
-                        <p><strong>Fiyat:</strong> ₺{travelPlan.transport.price} (kişi başı)</p>
-                        <p><strong>Toplam:</strong> ₺{travelPlan.transport.price * travelPlan.basicInfo.travelers}</p>
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 italic">Henüz ulaşım seçilmedi</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Konaklama Bilgileri */}
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
-                      🏨 Seçilen Konaklama
-                    </h3>
-                    {travelPlan.accommodation ? (
-                      <div className="space-y-2 text-sm">
-                        <p><strong>Otel:</strong> {travelPlan.accommodation.name}</p>
-                        <p><strong>Tip:</strong> {travelPlan.accommodation.type}</p>
-                        <p><strong>Konum:</strong> {travelPlan.accommodation.location}</p>
-                        <p><strong>Puan:</strong> {'⭐'.repeat(travelPlan.accommodation.rating)} ({travelPlan.accommodation.rating}/5)</p>
-                        <p><strong>Gecelik:</strong> ₺{travelPlan.accommodation.price}</p>
-                        <p><strong>Toplam ({getTripDuration() - 1} gece):</strong> ₺{travelPlan.accommodation.price * (getTripDuration() - 1)}</p>
-                        <div className="mt-2">
-                          <strong>Olanaklar:</strong>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {travelPlan.accommodation.amenities.map((amenity) => (
-                              <span
-                                key={amenity}
-                                className="px-2 py-1 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs rounded"
-                              >
-                                {amenity}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 italic">Henüz konaklama seçilmedi</p>
-                    )}
-                  </div>
-                  
-                  {/* Bütçe Özeti */}
-                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
-                      💰 Bütçe Özeti
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <p><strong>Mevcut Bütçe:</strong> ₺{travelPlan.budget.currentBudget}</p>
-                      <p><strong>Tahmini Toplam:</strong> ₺{travelPlan.budget.estimatedTotal}</p>
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-gray-600 dark:text-gray-400">Detaylı Dağılım:</p>
-                        <p className="text-xs">• Ulaşım: ₺{travelPlan.budget.breakdown.transport}</p>
-                        <p className="text-xs">• Konaklama: ₺{travelPlan.budget.breakdown.accommodation}</p>
-                        <p className="text-xs">• Aktiviteler: ₺{travelPlan.budget.breakdown.activities}</p>
-                        <p className="text-xs">• Yemek: ₺{travelPlan.budget.breakdown.food}</p>
-                        <p className="text-xs">• Diğer: ₺{travelPlan.budget.breakdown.other}</p>
-                      </div>
-                      <div className="pt-2 border-t">
-                        {travelPlan.budget.currentBudget >= travelPlan.budget.estimatedTotal ? (
-                          <p className="text-green-600 dark:text-green-400 font-semibold">
-                            ✅ Bütçe Yeterli! (Kalan: ₺{travelPlan.budget.currentBudget - travelPlan.budget.estimatedTotal})
-                          </p>
-                        ) : (
-                          <p className="text-red-600 dark:text-red-400 font-semibold">
-                            ⚠️ Bütçe Aşımı! (Eksik: ₺{travelPlan.budget.estimatedTotal - travelPlan.budget.currentBudget})
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Günlük Planlar Özeti */}
-                {travelPlan.dailyPlans.length > 0 && (
-                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
-                      📅 Günlük Planlar Özeti
-                    </h3>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {travelPlan.dailyPlans.map((day, index) => (
-                        <div key={index} className="p-3 bg-white dark:bg-gray-700 rounded border">
-                          <h4 className="font-medium text-sm">{day.day}. Gün</h4>
-                          {day.isEmpty ? (
-                            <p className="text-xs text-gray-500 italic">Dinlenme günü</p>
-                          ) : (
-                            <p className="text-xs text-gray-600 dark:text-gray-300">
-                              {day.activities.length} aktivite planlandı
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {currentStep === 1 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-                📍 Temel Bilgiler
-              </h2>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Hedef Şehir *
-                  </label>
-                  <input
-                    type="text"
-                    value={travelPlan.basicInfo.destination}
-                    onChange={(e) => handleBasicInfoChange('destination', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder="Örn: İstanbul"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Ülke
-                  </label>
-                  <input
-                    type="text"
-                    value={travelPlan.basicInfo.country}
-                    onChange={(e) => handleBasicInfoChange('country', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder="Örn: Türkiye"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Başlangıç Tarihi *
-                  </label>
-                  <input
-                    type="date"
-                    value={travelPlan.basicInfo.startDate}
-                    min={today}
-                    onChange={(e) => handleBasicInfoChange('startDate', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Bitiş Tarihi *
-                  </label>
-                  <input
-                    type="date"
-                    value={travelPlan.basicInfo.endDate}
-                    min={travelPlan.basicInfo.startDate || today}
-                    onChange={(e) => handleBasicInfoChange('endDate', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Kişi Sayısı
-                  </label>
-                  <select
-                    value={travelPlan.basicInfo.travelers}
-                    onChange={(e) => handleBasicInfoChange('travelers', parseInt(e.target.value))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  >
-                    {[1, 2, 3, 4, 5, 6].map(num => (
-                      <option key={num} value={num}>{num} kişi</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Seyahat Tarzı
-                  </label>
-                  <select
-                    value={travelPlan.basicInfo.travelStyle}
-                    onChange={(e) => handleBasicInfoChange('travelStyle', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="budget">Ekonomik</option>
-                    <option value="standard">Standart</option>
-                    <option value="luxury">Lüks</option>
-                    <option value="adventure">Macera</option>
-                    <option value="cultural">Kültürel</option>
-                  </select>
-                </div>
-              </div>
-
-              {getTripDuration() > 0 && (
-                <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-green-800 dark:text-green-200">
-                    <strong>Seyahat Süresi:</strong> {getTripDuration()} gün
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Navigation Buttons */}
-          <div className="mt-8 flex justify-between">
-            <button
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Önceki
-            </button>
-            
-            <div className="text-center">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {currentStep} / {steps.length}
-              </span>
-            </div>
-            
-            {currentStep < steps.length ? (
-              <button
-                onClick={nextStep}
-                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600"
-              >
-                Sonraki
-              </button>
-            ) : (
-              <div className="space-x-4">
-                <button
-                  onClick={cancelPlan}
-                  className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                >
-                  İptal Et
-                </button>
-                <button
-                  onClick={savePlan}
-                  className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600"
-                >
-                  Kaydet
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-5 flex items-baseline justify-between gap-3 border-t border-line pt-4">
+        <span className="text-sm font-semibold text-ink">Tahmini toplam</span>
+        <span className="tabular font-display text-2xl font-extrabold text-ink">{formatMoney(total)}</span>
       </div>
     </div>
+  );
+}
+
+function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-sm text-ink-3">{label}</dt>
+      <dd className="mt-0.5 break-words font-semibold text-ink">{children}</dd>
+    </div>
+  );
+}
+
+function FactRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="flex-none text-ink-3">{label}</dt>
+      <dd className="min-w-0 break-words text-right font-semibold text-ink">{value}</dd>
+    </div>
+  );
+}
+
+/** Toplamın hedef bütçeye oranı; %100'de durur, aşınca kırmızıya döner. */
+function TargetMeter({ total, target, className = "" }: { total: number; target: number; className?: string }) {
+  const share = Math.min(100, (total / target) * 100);
+  return (
+    <div
+      className={`meter ${className}`}
+      role="meter"
+      aria-label="Hedef bütçenin kullanılan kısmı"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(share)}
+    >
+      <span style={{ width: `${share}%`, ...(total > target ? { background: "var(--rose)" } : {}) }} />
+    </div>
+  );
+}
+
+/** Hedef bütçe karşılaştırması: çubuk + durum bildirimi. */
+function TargetCompare({ total, target }: { total: number; target: number }) {
+  const over = total > target;
+  return (
+    <div className="mt-6 rounded-2xl bg-canvas-2 p-4 sm:p-5">
+      <div className="mb-2 flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-semibold text-ink">Hedef bütçe</span>
+        <span className="tabular text-ink-2">
+          <span className="font-semibold text-ink">{formatMoney(total)}</span> / {formatMoney(target)}
+        </span>
+      </div>
+      <TargetMeter total={total} target={target} />
+      <div className={`notice mt-4 ${over ? "notice-error" : "notice-success"}`} role="status">
+        <Wallet />
+        <span>
+          {over
+            ? `Tahmini toplam, hedef bütçeni ${formatMoney(total - target)} aşıyor.`
+            : `Hedef bütçenin içindesin; ${formatMoney(target - total)} payın kalıyor.`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function ManualPlannerPage() {
+  return (
+    <AuthGate reason="Planını kaydedebilmek için hesabına giriş yapmalısın.">
+      <ManualPlanner />
+    </AuthGate>
   );
 }

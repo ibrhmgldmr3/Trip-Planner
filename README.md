@@ -1,329 +1,126 @@
-# 🌍 Trip Planner - AI Destekli Seyahat Planlama Platformu
+# Trip Planner
 
-<div align="center">
+Şehri ve tarihi söyle; gün gün gezi programın, haritada rotan ve bütçe tahminin hazır olsun.
 
-![Trip Planner Logo](https://img.shields.io/badge/Trip-Planner-blue?style=for-the-badge&logo=airplane&logoColor=white)
+Trip Planner; tarih, şehir, bütçe ve ilgi alanlarına göre seyahat planı oluşturan bir web uygulamasıdır. Plan ister yapay zekâya hazırlatılır, ister adım adım elle kurulur; iki yol da aynı yapıda kaydedilir.
 
-**Modern teknoloji ile seyahat deneyiminizi bir üst seviyeye taşıyın!**
+## Özellikler
 
-[![Next.js](https://img.shields.io/badge/Next.js-15.5.2-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.1.1-61DAFB?style=flat&logo=react&logoColor=black)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-6.15.0-2D3748?style=flat&logo=prisma&logoColor=white)](https://www.prisma.io/)
-[![NextAuth.js](https://img.shields.io/badge/NextAuth.js-Latest-purple?style=flat&logo=next.js&logoColor=white)](https://next-auth.js.org/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+- **AI ile plan:** Şehir (ve isteğe bağlı tarih, bütçe, tarz, ilgi alanları) girilir; model gün gün duraklardan, şehir/yeme-içme/pratik bilgi rehberlerinden ve bütçe kalemlerinden oluşan yapılandırılmış bir plan döndürür.
+- **Adım adım plan:** Ulaşım, konaklama, saatli aktiviteler ve bütçe altı adımda girilir; toplamlar sunucuda hesaplanır.
+- **Keşfet:** Elle seçilmiş destinasyonlar tür, süre ve bölgeye göre süzülür; seçilen şehir AI planlayıcıya taşınır.
+- **Şehir fotoğrafları:** Plan ve destinasyon kartlarında şehrin Wikipedia madde görseli gösterilir; bulunamazsa renk geçişine dönülür.
+- **Harita:** Konumu bilinen duraklar OpenStreetMap üzerinde gün gün, ziyaret sırasıyla gösterilir.
+- **Bütçe takibi:** Planın tahmini bütçe kabul edilir; gerçek harcamalar eklenip ödendi olarak işaretlenir.
+- **Plan durumları:** Planlandı → yolda → tarihi geçti (tarihten hesaplanır); iptal edildi / gerçekleşti (kullanıcı işaretler). Gerçekleşen planlar gezi defterinde toplanır.
+- **Hesap:** E-posta/şifre ile giriş, isteğe bağlı Google ile giriş, seyahat tercihleri.
+- Aydınlık/karanlık tema, mobil uyumlu arayüz.
 
-[🚀 Demo](#demo) • [📋 Özellikler](#özellikler) • [🛠️ Kurulum](#kurulum) • [📖 Kullanım](#kullanım) • [🤝 Katkıda Bulunma](#katkıda-bulunma)
+## Teknolojiler
 
-</div>
+Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Prisma 6 + PostgreSQL · NextAuth 4 · Zod 4 · Leaflet · Vitest
 
----
+Dış servisler: [OpenRouter](https://openrouter.ai/) (dil modeli), [Nominatim](https://nominatim.org/) (şehir koordinatı), OpenStreetMap (harita karoları), Wikipedia (şehir kapak fotoğrafları).
 
-## 🎯 Proje Hakkında
+## Kurulum
 
-**Trip Planner**, modern web teknolojileri ve yapay zeka desteği ile geliştirilmiş kapsamlı bir seyahat planlama platformudur. Kullanıcıların hayallerindeki seyahatleri kolayca planlamalarından, bütçe yönetimlerine kadar her aşamada yanlarında olan akıllı bir asistanıdır.
+Gereksinimler: Node.js 20+, PostgreSQL (ya da Docker).
 
-### ✨ Neden Trip Planner?
-
-- 🤖 **AI Destekli Planlama**: Gelişmiş yapay zeka algoritmaları ile kişiselleştirilmiş seyahat önerileri
-- 💰 **Akıllı Bütçe Yönetimi**: Detaylı bütçe takibi ve kategori bazlı harcama analizi
-- 📱 **Responsive Tasarım**: Her cihazda mükemmel kullanıcı deneyimi
-- 🔒 **Güvenli Authentication**: NextAuth.js ile güvenli kullanıcı yönetimi
-- 🌙 **Dark Mode Desteği**: Göz dostu karanlık tema seçeneği
-
----
-
-## 📋 Özellikler
-
-### 🎯 Seyahat Planlama
-- **AI Destekli Plan Oluşturma**: Destinasyon, tarih ve bütçe tercihleri ile otomatik plan üretimi
-- **Manuel Plan Editörü**: Detaylı özelleştirme imkanları
-- **Çoklu Seyahat Tarzı**: Backpacker, konforlu, lüks seyahat seçenekleri
-- **Günlük İtinerarylar**: Saatlik aktivite planlaması
-
-### 💳 Bütçe Yönetimi
-- **Kategorik Harcama Takibi**: Ulaşım, konaklama, yemek, aktiviteler
-- **Gerçek Zamanlı Bütçe Analizi**: Harcama oranları ve kalan bütçe
-- **Günlük Bütçe Hesaplaması**: Gün başına ortalama harcama limitleri
-- **Ödeme Durumu Takibi**: Ödenen/ödenmemiş kalemlerin takibi
-
-### 📊 Plan Yönetimi
-- **Dinamik Plan Durumları**: Planlanan, Aktif, Tamamlanan, İptal Edilmiş
-- **Plan Geçmişi**: Tüm seyahatlerin detaylı kayıtları
-- **Markdown Desteği**: Esnek plan formatları
-- **Çoklu Plan Yönetimi**: Aynı anda birden fazla seyahat planı
-
-### 🔐 Kullanıcı Deneyimi
-- **Güvenli Giriş Sistemi**: E-posta/şifre ile authentication
-- **Kişiselleştirilmiş Dashboard**: Kullanıcıya özel içerik
-- **Responsive Tasarım**: Mobil, tablet ve masaüstü uyumluluğu
-- **Çok Dilli Destek**: Türkçe ve İngilizce arayüz
-
----
-
-## 🛠️ Teknoloji Stack'i
-
-### Frontend
-- **Next.js 15.5.2**: Server-side rendering ve routing
-- **React 19.1.1**: Modern component-based UI
-- **TypeScript**: Type-safe development
-- **TailwindCSS**: Utility-first CSS framework
-- **React Hot Toast**: Kullanıcı bildirimleri
-
-### Backend & Database
-- **Next.js API Routes**: RESTful API endpoints
-- **Prisma 6.15.0**: Type-safe database ORM
-- **SQLite**: Lightweight database solution
-- **NextAuth.js**: Authentication ve session yönetimi
-
-### AI & External Services
-- **OpenRouter API**: AI-powered trip planning
-- **Advanced LLM Integration**: Gemini Flash model desteği
-
-### Development Tools
-- **ESLint**: Code quality assurance
-- **PostCSS**: CSS processing
-- **Git**: Version control
-- **VS Code**: Optimized development environment
-
----
-
-## 🚀 Kurulum
-
-### Gereksinimler
-- Node.js 18+ 
-- npm veya yarn
-- Git
-
-### Adım Adım Kurulum
-
-1. **Repository'yi klonlayın**
 ```bash
 git clone https://github.com/ibrhmgldmr3/Trip-Planner.git
 cd Trip-Planner/web
-```
-
-2. **Bağımlılıkları yükleyin**
-```bash
 npm install
-# veya
-yarn install
-```
 
-3. **Environment değişkenlerini ayarlayın**
-```bash
-cp .env.example .env.local
-```
+cp .env.example .env          # değerleri doldurun (aşağıya bakın)
+docker compose up -d          # yerel PostgreSQL (kendi veritabanınız varsa atlayın)
 
-`.env.local` dosyasını düzenleyin:
-```env
-# Database
-DATABASE_URL="file:./dev.db"
-
-# NextAuth.js
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-nextauth-secret"
-
-# OpenRouter AI API
-OPENROUTER_API_KEY="your-openrouter-api-key"
-```
-
-4. **Veritabanını hazırlayın**
-```bash
-npx prisma migrate dev
 npx prisma generate
+npm run db:migrate            # tabloları oluşturur
+npm run db:seed               # isteğe bağlı: demo kullanıcı ve örnek planlar
+npm run dev                   # http://localhost:3000
 ```
 
-5. **Geliştirme sunucusunu başlatın**
-```bash
-npm run dev
-# veya
-yarn dev
-```
+### Ortam değişkenleri
 
-6. **Uygulamayı açın**
-Tarayıcınızda [http://localhost:3000](http://localhost:3000) adresini ziyaret edin.
+| Değişken | Zorunlu | Açıklama |
+| --- | --- | --- |
+| `DATABASE_URL` | evet | PostgreSQL bağlantı adresi |
+| `NEXTAUTH_SECRET` | evet | Oturum imzalama anahtarı (`openssl rand -base64 32`) |
+| `NEXTAUTH_URL` | yayında | Uygulamanın adresi |
+| `OPENROUTER_API_KEY` | hayır | Yoksa yalnızca "AI ile planla" kapalı olur |
+| `OPENROUTER_MODEL` | hayır | Kullanılacak model; JSON çıktıyı güvenilir üreten bir model seçin |
+| `OPENROUTER_BASE_URL` | hayır | OpenAI uyumlu başka bir uç kullanmak için |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | hayır | İkisi de tanımlıysa Google ile giriş açılır |
+| `GEOCODER_USER_AGENT` | yayında | Nominatim ve Wikipedia isteklerinde gönderilen User-Agent |
 
----
+### Komutlar
 
-## 📖 Kullanım
+| Komut | İşlev |
+| --- | --- |
+| `npm run dev` / `build` / `start` | Geliştirme sunucusu / üretim derlemesi / üretim sunucusu |
+| `npm test` | Birim testleri (Vitest) |
+| `npm run typecheck` | TypeScript denetimi |
+| `npm run lint` | ESLint |
+| `npm run db:migrate` | Bekleyen migration'ları uygular |
+| `npm run db:seed` | Demo kullanıcı ve örnek planları yükler (üretimde çalışmaz) |
 
-### 🎯 İlk Adımlar
-
-1. **Hesap Oluşturma**: Ana sayfadan "Kayıt Ol" butonuna tıklayın
-2. **Giriş Yapma**: E-posta ve şifreniz ile giriş yapın
-3. **İlk Planınız**: "Yeni Plan Oluştur" ile seyahat planlamanıza başlayın
-
-### 🤖 AI Destekli Planlama
-
-```typescript
-// AI Planlama Parametreleri
-{
-  destination: "İstanbul, Türkiye",
-  startDate: "2025-06-15",
-  endDate: "2025-06-20",
-  budget: 5000,
-  travelStyle: "comfort",
-  interests: ["tarih", "yemek", "kültür"]
-}
-```
-
-### 💰 Bütçe Yönetimi
-
-```typescript
-// Bütçe Kategorileri
-const categories = {
-  ulaşım: "🚗 Ulaşım",
-  konaklama: "🏨 Konaklama", 
-  yemek: "🍽️ Yemek",
-  aktiviteler: "🎯 Aktiviteler",
-  alışveriş: "🛍️ Alışveriş",
-  eğlence: "🎉 Eğlence"
-}
-```
-
----
-
-## 🏗️ Proje Yapısı
+## Proje yapısı
 
 ```
-trip-planner/
-├── web/
-│   ├── src/
-│   │   ├── app/                  # Next.js App Router
-│   │   │   ├── api/             # API routes
-│   │   │   ├── ai-planner/      # AI seyahat planlayıcı
-│   │   │   ├── budget/          # Bütçe yönetimi
-│   │   │   ├── my-plans/        # Plan listesi
-│   │   │   ├── profile/         # Kullanıcı profili
-│   │   │   └── auth/            # Authentication
-│   │   ├── components/          # Reusable components
-│   │   ├── lib/                 # Utility functions
-│   │   ├── types/               # TypeScript types
-│   │   └── styles/              # Global styles
-│   ├── prisma/                  # Database schema
-│   ├── public/                  # Static assets
-│   └── package.json
-└── README.md
+web/
+├── prisma/
+│   ├── schema.prisma        # Plan, PlanDay, PlanStop, BudgetLine, GeoCache + NextAuth tabloları
+│   ├── migrations/
+│   └── seed.mjs
+└── src/
+    ├── app/                 # Sayfalar ve API rotaları
+    │   ├── api/
+    │   ├── ai-planner/      # AI ile planla
+    │   ├── manual-planner/  # Adım adım planla
+    │   ├── explore/         # Keşfet
+    │   ├── plan-detail/[id] # Plan: kapak, günlük plan + harita, bütçe
+    │   └── (panel)/         # Yan menülü hesap sayfaları
+    │       ├── my-plans/    # Planlarım
+    │       ├── my-trips/    # Gezi defteri
+    │       ├── budget/      # Harcama takibi
+    │       └── profile/
+    ├── components/          # Arayüz bileşenleri (PlanMap, PlanTicket, Markdown…)
+    ├── lib/                 # İstemci ve sunucunun ortak kullandığı saf yardımcılar
+    └── server/              # Yalnızca sunucu: auth, doğrulama, plan servisi, AI, konum
 ```
 
----
+## API
 
-## 🔧 API Endpoints
+Tüm uçlar (kayıt ve sağlık denetimi dışında) oturum ister; bir kullanıcı yalnızca kendi planlarına erişebilir. Hatalar `{ "error": "mesaj" }` biçiminde döner.
 
-### 🔐 Authentication
-```
-POST /api/auth/signin          # Kullanıcı girişi
-POST /api/auth/signup          # Kullanıcı kaydı
-POST /api/auth/signout         # Çıkış yapma
-```
+| Yöntem ve yol | İşlev |
+| --- | --- |
+| `GET /api/plans` | Planları listeler (`?status=PLANNED\|CANCELLED\|DONE`) |
+| `POST /api/plans` | Manuel plan kaydeder |
+| `POST /api/plans/generate` | AI ile plan üretir ve kaydeder (saatte 10 plan, en fazla 14 gün) |
+| `GET /api/plans/:id` | Plan ayrıntısı: günler, duraklar, tahminler, harcamalar |
+| `PATCH /api/plans/:id` | Durumu değiştirir (`{ "status": ... }`) |
+| `DELETE /api/plans/:id` | Planı siler |
+| `POST /api/plans/:id/expenses` | Harcama ekler |
+| `PATCH` / `DELETE /api/plans/:id/expenses/:expenseId` | Harcamayı günceller / siler |
+| `GET` / `PUT /api/profile` | Profil ve tercihleri okur / günceller |
+| `POST /api/register` | Hesap oluşturur |
+| `GET /api/covers?city=` | Şehrin kapak fotoğrafı (oturum istemez, önbellekli) |
+| `GET /api/health` | Uygulama ve veritabanı durumu |
 
-### 📋 Plan Management
-```
-GET    /api/my-plans           # Kullanıcı planları
-GET    /api/plan-detail/[id]   # Plan detayları
-POST   /api/create-plan        # Yeni plan oluşturma
-PUT    /api/trip-plans/[id]/status  # Plan durumu güncelleme
-```
+## Bilinen sınırlar
 
-### 🤖 AI Services
-```
-POST   /api/ai-trip-planner    # AI destekli plan oluşturma
-POST   /api/generate-itinerary # Günlük itinerary oluşturma
-```
+- **Durak konumları dil modelinden gelir.** Şehir merkezine 80 km'den uzak ya da geçersiz koordinatlar atılır, ama kalanlar da yaklaşık olabilir. Haritadaki çizgiler ziyaret sırasını gösterir; yol tarifi değildir.
+- **Şehir fotoğrafları Wikipedia'dan gelir.** Maddenin ana görseli kullanılır; uygun fotoğraf yoksa ya da Wikimedia hız sınırı devredeyse kart renk geçişiyle gösterilir. Wikimedia, kendini tanıtmayan istemcileri sıkı sınırlar: yayında `GEOCODER_USER_AGENT` değerine iletişim bilgisi ekleyin.
+- **Fiyatlar tahmindir.** Gerçek uçuş/otobüs ve konaklama fiyatı sorgulanmaz.
+- **Hız sınırı bellek içidir.** Giriş ve kayıt denemeleri tek sunucu örneğinde sayılır; birden çok örnekle yayına alınacaksa `src/server/rate-limit.ts` ortak bir depoya (ör. Redis) bağlanmalıdır. AI kotası veritabanından sayıldığı için bundan etkilenmez.
+- **AI üretimi tek istekte tamamlanır** ve bir-iki dakika sürebilir; barındırma platformunun istek süresi sınırı buna izin vermelidir.
 
----
+## Yayına alma notları
 
-## 🧪 Test Etme
+- Veritabanında `npm run db:migrate` çalıştırın. `20261112120000_unify_plan_model` migration'ı eski `Trip`/`TripPlan` tablolarını tek `Plan` modeline taşır ve eski tabloları siler; gerçek veri içeren bir veritabanında önce yedek alın.
+- `NEXTAUTH_SECRET`, `NEXTAUTH_URL` ve `GEOCODER_USER_AGENT` değerlerini ortamınıza göre ayarlayın.
 
-```bash
-# Unit testler
-npm run test
+## Geliştirici
 
-# E2E testler
-npm run test:e2e
-
-# Coverage raporu
-npm run test:coverage
-```
-
----
-
-## 🚀 Deployment
-
-### Vercel (Önerilen)
-```bash
-# Vercel CLI ile deploy
-npm i -g vercel
-vercel --prod
-```
-
-### Docker
-```bash
-# Docker image oluşturma
-docker build -t trip-planner .
-
-# Container çalıştırma
-docker run -p 3000:3000 trip-planner
-```
-
----
-
-## 🤝 Katkıda Bulunma
-
-Projeye katkıda bulunmak isterseniz:
-
-1. **Fork** edin
-2. **Feature branch** oluşturun (`git checkout -b feature/amazing-feature`)
-3. **Commit** edin (`git commit -m 'Add amazing feature'`)
-4. **Push** edin (`git push origin feature/amazing-feature`)
-5. **Pull Request** açın
-
-### 📝 Katkı Kuralları
-- TypeScript ve ESLint kurallarına uyun
-- Anlamlı commit mesajları yazın
-- Kod değişikliklerinizi test edin
-- Documentation güncellemelerini dahil edin
-
----
-
-## 📝 License
-
-Bu proje [MIT License](LICENSE) altında lisanslanmıştır.
-
----
-
-## 👨‍💻 Geliştirici
-
-**İbrahim Güldemir**
-- GitHub: [@ibrhmgldmr3](https://github.com/ibrhmgldmr3)
-- Email: ibrahimguldemir123@gmail.com
-
----
-
-## 🙏 Teşekkürler
-
-- [Next.js](https://nextjs.org/) - React framework
-- [Prisma](https://www.prisma.io/) - Database toolkit
-- [TailwindCSS](https://tailwindcss.com/) - CSS framework
-- [OpenRouter](https://openrouter.ai/) - AI API services
-- [Vercel](https://vercel.com/) - Deployment platform
-
----
-
-## 📈 Proje İstatistikleri
-
-![GitHub stars](https://img.shields.io/github/stars/ibrhmgldmr3/Trip-Planner?style=social)
-![GitHub forks](https://img.shields.io/github/forks/ibrhmgldmr3/Trip-Planner?style=social)
-![GitHub issues](https://img.shields.io/github/issues/ibrhmgldmr3/Trip-Planner)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/ibrhmgldmr3/Trip-Planner)
-
----
-
-<div align="center">
-
-**🌟 Projeyi beğendiyseniz star vermeyi unutmayın! 🌟**
-
-Made with ❤️ in Turkey 🇹🇷
-
-</div>
+**İbrahim Güldemir** — [@ibrhmgldmr3](https://github.com/ibrhmgldmr3)

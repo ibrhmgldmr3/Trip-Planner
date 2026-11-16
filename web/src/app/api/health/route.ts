@@ -1,30 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export interface HealthCheckResponse {
-    status: 'ok' | 'error';
-    timestamp: string;
-    version?: string;
-    environment?: string;
-}
+export const dynamic = "force-dynamic";
 
-// Bu fonksiyonu artık export etmiyoruz, sadece dahili olarak kullanıyoruz
-async function getHealthStatus(): Promise<HealthCheckResponse> {
-    return {
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
-        environment: process.env.NODE_ENV
-    };
-}
-
-// GET isteği işleyicisi
+/** Canlılık denetimi: uygulama ayakta mı ve veritabanına ulaşabiliyor mu? */
 export async function GET() {
-    const healthData = await getHealthStatus();
-    
-    return NextResponse.json(healthData, {
-        status: healthData.status === 'ok' ? 200 : 500,
-        headers: {
-            'Cache-Control': 'no-store, max-age=0',
-        },
-    });
+  let database: "ok" | "error" = "ok";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    database = "error";
+  }
+
+  return NextResponse.json(
+    { status: database === "ok" ? "ok" : "error", database, timestamp: new Date().toISOString() },
+    { status: database === "ok" ? 200 : 503, headers: { "Cache-Control": "no-store" } }
+  );
 }

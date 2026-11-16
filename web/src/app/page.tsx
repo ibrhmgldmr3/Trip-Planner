@@ -1,262 +1,377 @@
-'use client';
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { toast } from "react-hot-toast";
+import {
+  ArrowDown,
+  ArrowRight,
+  CalendarDays,
+  Map as MapIcon,
+  BookOpen,
+  Mouse,
+  PencilLine,
+  ReceiptText,
+  Sparkles,
+  Wallet,
+} from "lucide-react";
+import QuickPlanForm from "@/components/QuickPlanForm";
+import CityCover from "@/components/CityCover";
+import HeroRoute from "@/components/landing/HeroRoute";
+import { coverKey, getCityCovers, type CityCover as Cover } from "@/server/covers";
+import { coverRef, findDestination, formatDays, type Destination } from "@/lib/destinations";
 
-export default function Home() {
-  const router = useRouter();
-  const { data: session, status } = useSession();
+export const dynamic = "force-dynamic";
 
-  const handlePlanClick = (route: string) => {
-    if (status === 'unauthenticated') {
-      toast.error('Plan oluşturmak için önce giriş yapmanız gerekiyor');
-      router.push('/login');
-      return;
-    }
-    router.push(route);
-  };
+const HERO_CITY = "Kapadokya";
+const POPULAR = ["İstanbul", "İzmir", "Antalya", "Mardin"]
+  .map(findDestination)
+  .filter((destination): destination is Destination => Boolean(destination));
+
+const stagger = (i: number) => ({ "--i": i }) as React.CSSProperties;
+
+type Covers = Map<string, Cover>;
+
+async function loadCovers(): Promise<Covers> {
+  // Kapaklar yalnızca süs: veritabanı ya da Wikipedia yanıt vermezse renk geçişleri görünür.
+  try {
+    const hero = findDestination(HERO_CITY);
+    return await getCityCovers([hero ? coverRef(hero) : { city: HERO_CITY }, ...POPULAR.map(coverRef)]);
+  } catch (error) {
+    console.warn("[home] Kapaklar alınamadı:", error instanceof Error ? error.message : error);
+    return new Map();
+  }
+}
+
+const coverOf = (covers: Covers, city: string) => covers.get(coverKey(city)) ?? { imageUrl: null, pageUrl: null };
+
+export default async function Home() {
+  const covers = await loadCovers();
 
   return (
-    <main className="min-h-screen">
-      {/* Hero Section with enhanced animations */}
-      <section className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 py-16 md:py-24">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 text-gray-800 dark:text-gray-200">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="md:w-1/2">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900 dark:text-white mb-6 fade-in">
-                Hayalinizdeki Seyahati<br /><span className="animated-gradient">Kolay Planlayın</span>
-              </h1>
-              <p className="text-lg text-gray-800 dark:text-gray-200 font-medium mb-8 max-w-lg fade-in delay-100">
-                Tarih, şehir, bütçe ve ilgi alanlarınıza göre kişiselleştirilmiş 
-                seyahat planları oluşturun. Bütçenize uygun ulaşım, konaklama ve 
-                etkinlik önerileriyle eksiksiz bir gezi deneyimi planlayın.
-              </p>
-              
-              <div className="flex flex-wrap gap-4 fade-in delay-200">
-                <button 
-                  onClick={() => handlePlanClick('/travel-mode')}
-                  className="px-5 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-md hover:bg-blue-700 transition hover-lift"
-                >
-                  Planlamaya Başlayın
-                </button>
-                <button 
-                  onClick={() => handlePlanClick('/my-plans')}
-                  className="px-5 py-3 bg-green-600 text-white rounded-lg font-medium shadow-md hover:bg-green-700 transition hover-lift"
-                >
-                  Planlarım
-                </button>
-                <Link 
-                  href="/map" 
-                  className="px-5 py-3 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-gray-700 transition hover-scale"
-                >
-                  Rota Planlayıcı
-                </Link>
-              </div>
-            </div>
-            
-            <div className="md:w-1/2 relative fade-in delay-300">
-              <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-xl hover-lift">
-                <div 
-                  className="w-full h-64 bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-800 dark:to-indigo-900 rounded-lg flex items-center justify-center overflow-hidden"
-                >
-                  <div className="text-blue-600 dark:text-blue-300 relative">
-                    <div className="absolute w-24 h-24 bg-blue-200 dark:bg-blue-700 rounded-full -top-12 -left-12 opacity-50"></div>
-                    <div className="absolute w-16 h-16 bg-green-200 dark:bg-green-700 rounded-full -bottom-8 -right-8 opacity-50"></div>
-                    
-                    <div className="relative">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto pop-in" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      <p className="mt-2 text-center font-medium">Seyahat Planlama</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Decorative elements with animation */}
-              <div className="absolute -bottom-6 -left-6 bg-yellow-400 w-16 h-16 rounded-full opacity-80 hidden md:block bounce"></div>
-              <div className="absolute -top-6 -right-6 bg-blue-400 w-12 h-12 rounded-full opacity-80 hidden md:block bounce" style={{ animationDelay: "0.5s" }}></div>
-            </div>
-          </div>
-        </div>
-      </section>
+    <main>
+      <Hero cover={coverOf(covers, HERO_CITY)} />
+      <PopularRoutes covers={covers} />
+      <PlanContents />
+      <HowItWorks />
+      <Modes />
+      <ClosingCall />
+    </main>
+  );
+}
 
-      {/* Features Section with enhanced cards */}
-      <section className="py-16 bg-white dark:bg-gray-900">
-        <div className="max-w-6xl mx-auto px-4 md:px-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 fade-in text-gray-900 dark:text-white">Seyahat Planlayıcımızın Özellikleri</h2>
-          <p className="text-center text-gray-800 dark:text-gray-200 font-medium max-w-2xl mx-auto mb-12 fade-in delay-100">
-            Seyahatinizi A&apos;dan Z&apos;ye planlayın, her şeyi tek bir uygulamada organize edin.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="bg-blue-50 dark:bg-blue-900 rounded-xl p-6 transition-all hover-lift fade-in delay-100">
-              <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Akıllı Rota Planlama</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">En optimum rotaları hesaplayarak, zamanınızı verimli kullanmanızı sağlıyoruz.</p>
-              <Link href="/map" className="mt-4 inline-block text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium">
-                Rota Planlayıcıya Git →
-              </Link>
-            </div>
-            
-            {/* Feature 2 */}
-            <div className="bg-indigo-50 dark:bg-indigo-900 rounded-xl p-6 transition-all hover-lift fade-in delay-200">
-              <div className="bg-indigo-600 text-white rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Bütçe Analizi</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Ulaşım, konaklama ve aktivite maliyetlerini hesaplayarak seyahat bütçenizi kontrol edin.</p>
-              <Link href="/budget" className="mt-4 inline-block text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm font-medium">
-                Bütçe Planlayıcıya Git →
-              </Link>
-            </div>
-            
-            {/* Feature 3 */}
-            <div className="bg-green-50 dark:bg-green-900 rounded-xl p-6 transition-all hover-lift fade-in delay-300">
-              <div className="bg-green-600 text-white rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Günlük Planlama</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Sabah, öğlen ve akşam aktivitelerini içeren detaylı günlük gezi planları oluşturun.</p>
-              <Link href="/daily-planner" className="mt-4 inline-block text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-medium">
-                Günlük Planlamaya Git →
-              </Link>
-            </div>
-            
-            {/* Feature 4 */}
-            <div className="bg-red-50 dark:bg-red-900 rounded-xl p-6 transition-all hover-lift fade-in delay-200">
-              <div className="bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Mekan Önerileri</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">İlgi alanlarınıza göre kişiselleştirilmiş turistik mekan ve etkinlik önerileri.</p>
-              <button 
-                onClick={() => handlePlanClick('/ai-planner')}
-                className="mt-4 inline-block text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium cursor-pointer"
-              >
-                Planlayıcıya Git →
-              </button>
-            </div>
-            
-            {/* Feature 5 */}
-            <div className="bg-purple-50 dark:bg-purple-900 rounded-xl p-6 transition-all hover-lift fade-in delay-300">
-              <div className="bg-purple-600 text-white rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Uygun Ulaşım Seçenekleri</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Uçak, otobüs ve diğer ulaşım seçeneklerinin fiyat karşılaştırması ve rezervasyon bağlantıları.</p>
-              <Link href="/transportation" className="mt-4 inline-block text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 text-sm font-medium">
-                Ulaşım Seçeneklerine Git →
-              </Link>
-            </div>
-            
-            {/* Feature 6 */}
-            <div className="bg-yellow-50 dark:bg-yellow-900 rounded-xl p-6 transition-all hover-lift fade-in delay-400">
-              <div className="bg-yellow-600 text-white rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Konaklama Seçenekleri</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Bütçenize ve tercihlerinize göre en uygun konaklama seçeneklerini bulun ve rezervasyon yapın.</p>
-              <Link href="/accommodation" className="mt-4 inline-block text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 text-sm font-medium">
-                Konaklama Seçeneklerine Git →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+/* ------------------------------------------------------------------ */
 
-      {/* How It Works Section - New */}
-      <section className="py-16 bg-gray-50 dark:bg-gray-800">
-        <div className="max-w-6xl mx-auto px-4 md:px-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 fade-in text-gray-900 dark:text-white">Nasıl Çalışır?</h2>
-          <p className="text-center text-gray-800 dark:text-gray-200 font-medium max-w-2xl mx-auto mb-12 fade-in delay-100">
-            Birkaç basit adımda seyahat planınızı oluşturun ve seyahatinizi sorunsuz bir şekilde gerçekleştirin.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white dark:bg-gray-700 p-6 rounded-xl shadow-md hover-lift fade-in delay-100">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center mb-4 text-xl font-bold">1</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Seyahat Bilgilerinizi Girin</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Tarih, bütçe, konum ve tercihlerinizi belirterek size özel planlamayı başlatın.</p>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-700 p-6 rounded-xl shadow-md hover-lift fade-in delay-200">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center mb-4 text-xl font-bold">2</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Öneriler ve Seçenekler</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Ulaşım, konaklama ve aktivite önerilerini inceleyin ve size uygun olanları seçin.</p>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-700 p-6 rounded-xl shadow-md hover-lift fade-in delay-300">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center mb-4 text-xl font-bold">3</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Seyahat Planınızı Oluşturun</h3>
-              <p className="text-gray-800 dark:text-gray-200 font-medium">Tüm seçimlerinizi bir araya getirerek tam bir seyahat planı oluşturun ve kaydedin.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+function Hero({ cover }: { cover: Cover }) {
+  return (
+    // Yapışkan başlık (h-16) şeffaf olarak fotoğrafın üzerine biner: bölüm sayfanın en üstünden başlar.
+    <section className="-mt-16">
+      <CityCover
+        city={HERO_CITY}
+        src={cover.imageUrl}
+        pageUrl={cover.pageUrl}
+        eager
+        credit
+        className="min-h-[40rem] rounded-b-[1.75rem] text-white md:min-h-[88vh] md:rounded-b-[2.25rem]"
+      >
+        <div className="scrim-left absolute inset-0" aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-[rgb(15_14_31/0.55)] via-transparent to-[rgb(15_14_31/0.35)]"
+          aria-hidden="true"
+        />
 
-      {/* CTA Section with enhanced animation and design */}
-      <section className="py-16 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-800 dark:to-indigo-900 text-white relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full">
-          <svg className="absolute left-0 top-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 1440 560">
-            <path fill="rgba(255,255,255,0.05)" d="M0,0L48,37.3C96,75,192,149,288,165.3C384,181,480,139,576,144C672,149,768,203,864,208C960,213,1056,171,1152,144C1248,117,1344,107,1392,101.3L1440,96L1440,560L1392,560C1344,560,1248,560,1152,560C1056,560,960,560,864,560C768,560,672,560,576,560C480,560,384,560,288,560C192,560,96,560,48,560L0,560Z"></path>
-          </svg>
-        </div>
-        
-        <div className="max-w-6xl mx-auto px-4 md:px-8 text-center relative z-10">
-          <h2 className="text-2xl md:text-3xl font-bold mb-6 fade-in">Hayalinizdeki Tatili Planlamaya Başlayın</h2>
-          <p className="text-lg mb-8 max-w-2xl mx-auto fade-in delay-100">
-            Sadece birkaç tıklama ile kişiselleştirilmiş, bütçenize uygun ve zamanınızı en iyi şekilde değerlendireceğiniz bir seyahat planı oluşturun.
-          </p>
-          <button 
-            onClick={() => handlePlanClick('/ai-planner')}
-            className="px-6 py-3 bg-white text-blue-600 dark:bg-gray-800 dark:text-blue-400 rounded-lg font-medium shadow-md hover:bg-blue-50 dark:hover:bg-gray-700 transition inline-block hover-lift fade-in delay-200 cursor-pointer"
-          >
-            Ücretsiz Planlayıcıyı Kullanın
-          </button>
-        </div>
-      </section>
+        <HeroRoute />
 
-      {/* Footer with enhanced design */}
-      <footer className="py-8 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 md:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-            <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-4 md:mb-0">Trip Planner</div>
-            
-            <div className="flex space-x-6">
-              <Link href="/" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Ana Sayfa</Link>
-              <Link href="/map" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Rota Planlayıcı</Link>
-              <Link href="/daily-planner" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Günlük Plan</Link>
-              <Link href="/budget" className="text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition">Bütçe</Link>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-200 dark:border-gray-800 pt-6 text-center">
-            <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">
-              &copy; {new Date().getFullYear()} AnkaGeo Trip Planner - Tüm hakları saklıdır.
+        <div className="relative mx-auto flex min-h-[inherit] max-w-7xl flex-col justify-center px-5 pb-20 pt-28 md:px-8 md:pb-24 md:pt-36">
+          <div className="max-w-2xl">
+            <h1
+              className="rise font-display text-[2.6rem] font-extrabold leading-[1.05] sm:text-6xl lg:text-[4.4rem]"
+              style={stagger(0)}
+            >
+              Sıradaki <span className="text-lav">maceran</span>
+              <br />
+              seni bekliyor
+            </h1>
+            <p className="rise mt-5 max-w-xl text-lg leading-relaxed text-white/85" style={stagger(1)}>
+              Şehri ve tarihleri yaz; gün gün duraklar, harita ve bütçe tahmini içeren gezi planın hazırlansın.
             </p>
           </div>
+
+          <div className="rise mt-9 max-w-3xl" style={stagger(2)}>
+            <QuickPlanForm />
+          </div>
         </div>
-      </footer>
-    </main>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 hidden md:block">
+          <div className="mx-auto max-w-7xl px-8">
+            <a
+              href="#populer"
+              className="pointer-events-auto inline-flex items-center gap-2.5 text-sm font-medium text-white/80 transition-colors hover:text-white"
+            >
+              <Mouse className="h-5 w-5" aria-hidden="true" />
+              Keşfetmek için kaydır
+              <ArrowDown className="h-4 w-4" aria-hidden="true" />
+            </a>
+          </div>
+        </div>
+      </CityCover>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function SectionHeading({ eyebrow, title, lead }: { eyebrow: string; title: string; lead?: string }) {
+  return (
+    <div className="max-w-2xl">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-ink md:text-[2.5rem]">{title}</h2>
+      {lead && <p className="mt-3 text-[1.02rem] leading-relaxed text-ink-2">{lead}</p>}
+    </div>
+  );
+}
+
+function PopularRoutes({ covers }: { covers: Covers }) {
+  return (
+    <section id="populer" className="mx-auto w-full max-w-7xl scroll-mt-20 px-5 pt-20 md:px-8 md:pt-28">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <SectionHeading
+          eyebrow="İlham al"
+          title="Popüler rotalar"
+          lead="Birini seç, şehir hazır gelsin; tarihleri ve tercihlerini planlayıcıda eklersin."
+        />
+        <Link href="/explore" className="btn btn-outline shrink-0 self-start sm:self-auto">
+          Tümünü keşfet
+          <ArrowRight />
+        </Link>
+      </div>
+
+      <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {POPULAR.map((destination, index) => {
+          const cover = coverOf(covers, destination.name);
+          return (
+            <li key={destination.name} className="rise" style={stagger(index)}>
+              <Link
+                href={`/ai-planner?city=${encodeURIComponent(destination.name)}`}
+                className="card card-lift group block overflow-hidden"
+              >
+                <CityCover
+                  city={destination.name}
+                  src={cover.imageUrl}
+                  pageUrl={cover.pageUrl}
+                  imageClassName="zoom-img"
+                  className="h-60 rounded-t-[1.25rem]"
+                >
+                  <span className="glass absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold">
+                    {destination.region}
+                  </span>
+                </CityCover>
+                <div className="flex items-center gap-3 p-5">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-display text-lg font-bold text-ink">{destination.name}</h3>
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-2">
+                      <CalendarDays className="h-4 w-4 text-ink-3" aria-hidden="true" />
+                      <span className="tabular">{formatDays(destination.days)}</span>
+                    </p>
+                  </div>
+                  <span
+                    className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-soft text-brand transition-colors group-hover:bg-brand group-hover:text-on-brand"
+                    aria-hidden="true"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function PlanContents() {
+  const items = [
+    {
+      icon: <CalendarDays />,
+      title: "Gün gün duraklar",
+      text: "Her gün için sabah, öğle ve akşam durakları; ne kadar süreceği ve hangi sırayla gezileceği.",
+      wide: true,
+    },
+    {
+      icon: <MapIcon />,
+      title: "Harita",
+      text: "Durakların harita üzerinde gün gün işaretlenmiş hâli; rotayı bir bakışta görürsün.",
+      wide: true,
+    },
+    {
+      icon: <BookOpen />,
+      title: "Rehberler",
+      text: "Şehir rehberi, yeme-içme önerileri ve ulaşım, güvenlik gibi pratik bilgiler.",
+    },
+    {
+      icon: <Wallet />,
+      title: "Bütçe tahmini",
+      text: "Ulaşım, konaklama, yeme-içme ve giriş ücretleri kalem kalem; toplamıyla birlikte.",
+    },
+    {
+      icon: <ReceiptText />,
+      title: "Harcama takibi",
+      text: "Gezi sırasında yaptığın harcamaları ekle, tahminle karşılaştır.",
+    },
+  ];
+
+  return (
+    <section className="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
+      <SectionHeading
+        eyebrow="Tek girdi, tam plan"
+        title="Bir planın içinde neler var?"
+        lead="Oluşturduğun her plan hesabına kaydedilir; dilediğin zaman açar, düzenler ya da tamamlandı olarak işaretlersin."
+      />
+
+      <div className="mt-12 grid gap-5 md:grid-cols-6">
+        {items.map((item, index) => (
+          <article
+            key={item.title}
+            className={`card card-lift rise p-7 ${item.wide ? "md:col-span-3" : "md:col-span-2"}`}
+            style={stagger(index)}
+          >
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand [&_svg]:h-5 [&_svg]:w-5">
+              {item.icon}
+            </span>
+            <h3 className="mt-5 font-display text-xl font-bold text-ink">{item.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">{item.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    {
+      title: "Nereye, ne zaman?",
+      text: "Şehri ve tarihleri gir. İstersen bütçeni, seyahat tarzını ve ilgi alanlarını da ekle.",
+    },
+    {
+      title: "Planın oluşsun",
+      text: "Yapay zekâ gün gün programını çıkarsın ya da ulaşım, konaklama ve aktiviteleri kendin seç.",
+    },
+    {
+      title: "Kaydet, yolda takip et",
+      text: "Planın hesabında durur: yaklaşan, devam eden ve gerçekleşen gezilerini tek yerden izle.",
+    },
+  ];
+
+  return (
+    <section className="border-y border-line bg-canvas-2/60">
+      <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
+        <SectionHeading eyebrow="Nasıl çalışır?" title="Üç adımda plan" />
+
+        <ol className="relative mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+          <span
+            className="absolute left-6 right-[calc(33%-1.5rem)] top-6 hidden border-t-2 border-dashed border-line-2 md:block"
+            aria-hidden="true"
+          />
+          {steps.map((step, index) => (
+            <li key={step.title} className="relative">
+              <span className="tabular relative z-10 grid h-12 w-12 place-items-center rounded-full bg-brand font-display text-lg font-extrabold text-on-brand shadow-soft">
+                {index + 1}
+              </span>
+              <h3 className="mt-5 font-display text-xl font-bold text-ink">{step.title}</h3>
+              <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-2">{step.text}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+function Modes() {
+  return (
+    <section className="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
+      <SectionHeading
+        eyebrow="İki yol"
+        title="Hazırlatmak mı, kurmak mı?"
+        lead="Aynı yere iki yoldan varılır. Hangisini seçersen seç, planın aynı yerde saklanır."
+      />
+
+      <div className="mt-12 grid gap-5 md:grid-cols-2">
+        <article className="card card-lift glow overflow-hidden p-8">
+          <span className="tag tag-brand">
+            <Sparkles />
+            En hızlısı
+          </span>
+          <h3 className="mt-5 font-display text-2xl font-bold text-ink">AI ile planla</h3>
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-2">
+            Şehri, tarihleri ve tercihlerini yaz; şehir rehberinden bütçe tahminine kadar eksiksiz bir plan hazırlansın.
+          </p>
+          <ul className="mt-5 space-y-2 text-sm text-ink-2">
+            <Bullet>Sadece şehir girerek de çalışır</Bullet>
+            <Bullet>İlgi alanlarına göre kişiselleşir</Bullet>
+            <Bullet>Otomatik kaydedilir</Bullet>
+          </ul>
+          <Link href="/ai-planner" className="btn btn-primary mt-7">
+            AI ile başla
+            <ArrowRight />
+          </Link>
+        </article>
+
+        <article className="card card-lift overflow-hidden p-8">
+          <span className="tag tag-brand">
+            <PencilLine />
+            Tam kontrol
+          </span>
+          <h3 className="mt-5 font-display text-2xl font-bold text-ink">Adım adım kendin kur</h3>
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-2">
+            Ulaşımı ve konaklamayı seç, her güne saatli aktiviteler ekle; bütçen sen ilerledikçe kendiliğinden
+            hesaplansın.
+          </p>
+          <ul className="mt-5 space-y-2 text-sm text-ink-2">
+            <Bullet>Altı adımlı rehberli akış</Bullet>
+            <Bullet>Saat ve maliyetle aktivite ekleme</Bullet>
+            <Bullet>Hedef bütçeyle karşılaştırma</Bullet>
+          </ul>
+          <Link href="/manual-planner" className="btn btn-outline mt-7">
+            Kendim planlayacağım
+            <ArrowRight />
+          </Link>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function Bullet({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-center gap-2.5">
+      <span className="h-1.5 w-1.5 flex-none rounded-full bg-lav" />
+      {children}
+    </li>
+  );
+}
+
+function ClosingCall() {
+  return (
+    <section className="px-5 pb-20 md:px-8 md:pb-28">
+      <div className="glow relative mx-auto max-w-7xl overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-brand to-accent px-6 py-16 text-center text-on-brand shadow-lift md:px-12 md:py-20">
+        <h2 className="mx-auto max-w-2xl font-display text-4xl font-extrabold leading-tight md:text-5xl">
+          Bir sonraki rotan nereye?
+        </h2>
+        <p className="mx-auto mt-4 max-w-lg text-[1.02rem] leading-relaxed opacity-85">
+          Ücretsiz bir hesap aç, ilk planını birkaç dakikada oluştur.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/travel-mode" className="btn btn-white btn-lg">
+            Planlamaya başla
+            <ArrowRight />
+          </Link>
+          <Link
+            href="/register"
+            className="btn btn-lg border-on-brand/40 bg-transparent text-on-brand hover:bg-on-brand/10"
+          >
+            Hesap oluştur
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }

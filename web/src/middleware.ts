@@ -2,36 +2,25 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+// Hesaba özel sayfalar: oturum yoksa girişe yönlendirilir.
+// (API uçları kendi yetki denetimini yapar; burası yalnızca sayfalar içindir.)
 export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  
-  // Define protected routes
-  const protectedPaths = [
-    "/profile",
-    "/my-trips",
-  ];
+  if (token) return NextResponse.next();
 
-  const path = request.nextUrl.pathname;
-  
-  // Check if the current path is a protected path
-  const isProtectedPath = protectedPaths.some((protectedPath) => 
-    path === protectedPath || path.startsWith(`${protectedPath}/`)
-  );
-
-  if (isProtectedPath && !token) {
-    // Redirect unauthenticated users to login page
-    const url = new URL(`/login`, request.url);
-    url.searchParams.set("callbackUrl", encodeURI(request.url));
-    return NextResponse.redirect(url);
-  }
-
-  return NextResponse.next();
+  const login = new URL("/login", request.url);
+  login.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
+  return NextResponse.redirect(login);
 }
 
-// Only run middleware on specific paths
 export const config = {
   matcher: [
-    "/profile/:path*",
+    "/ai-planner/:path*",
+    "/manual-planner/:path*",
+    "/my-plans/:path*",
     "/my-trips/:path*",
+    "/plan-detail/:path*",
+    "/budget/:path*",
+    "/profile/:path*",
   ],
 };

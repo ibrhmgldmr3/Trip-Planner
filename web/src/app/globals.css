@@ -1,447 +1,1149 @@
 @import "tailwindcss";
 
+/* `dark:` yardımcıları sistem tercihine değil, <html data-theme> değerine bağlanır. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ------------------------------------------------------------------ */
+/* Tasarım belirteçleri                                                */
+/* Ana renk Soft Indigo, ikincil Lavender; açık ve ferah zemin.        */
+/* ------------------------------------------------------------------ */
 :root {
-  --primary: #3b82f6;
-  --primary-dark: #60a5fa;
-  --secondary: #10b981;
-  --secondary-dark: #34d399;
-  --accent: #f97316;
-  --danger: #ef4444;
-  --danger-dark: #f87171;
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #1e293b;
-  --card-foreground: #e2e8f0;
-  --border: #334155;
-  --input: #1e293b;
-  --radius: 0.5rem;
-  --gradient-from: #1e3a8a;
-  --gradient-to: #312e81;
+  color-scheme: light;
+
+  --canvas: #f7f7fc;
+  --canvas-2: #efeffa;
+  --surface: #ffffff;
+
+  --ink: #1c1b3a;
+  --ink-2: #55557a;
+  --ink-3: #6e6e92;
+
+  --line: #e8e8f4;
+  --line-2: #d5d5ea;
+
+  --brand: #6558e8;
+  --brand-2: #5446d8;
+  --brand-soft: #eceafe;
+  --on-brand: #ffffff;
+
+  /* Lavender: vurgu, gradient ve seçili alanlar */
+  --lav: #b9aeff;
+  --accent: #7c6cf2;
+  --accent-2: #5446d8;
+  --accent-soft: #f1eeff;
+  --on-accent: #ffffff;
+
+  --amber: #a86a0c;
+  --amber-soft: #fff3d6;
+  --star: #f5b83d;
+
+  --mint: #17806f;
+  --mint-soft: #dcf5ef;
+
+  --rose: #cf3f58;
+  --rose-soft: #fde8ec;
+
+  --elev-1: 0 1px 2px rgb(28 27 58 / 0.04), 0 4px 14px rgb(101 88 232 / 0.06);
+  --elev-2: 0 2px 6px rgb(28 27 58 / 0.05), 0 14px 36px rgb(101 88 232 / 0.12);
+  --elev-3: 0 6px 14px rgb(28 27 58 / 0.07), 0 30px 70px rgb(101 88 232 / 0.2);
+
+  --radius-card: 1.25rem;
+  --radius-field: 0.9rem;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0f0e1f;
+  --canvas-2: #0a0a17;
+  --surface: #1a1930;
+
+  --ink: #f1f0fa;
+  --ink-2: #b8b6d6;
+  --ink-3: #8c8ab0;
+
+  --line: #2a2946;
+  --line-2: #3b3a60;
+
+  --brand: #8f84fa;
+  --brand-2: #a9a0ff;
+  --brand-soft: #25234a;
+  --on-brand: #14132b;
+
+  --lav: #b9aeff;
+  --accent: #a195ff;
+  --accent-2: #b9aeff;
+  --accent-soft: #2a2752;
+  --on-accent: #14132b;
+
+  --amber: #f5c563;
+  --amber-soft: #3a2f14;
+  --star: #f5b83d;
+
+  --mint: #5fd1bd;
+  --mint-soft: #14332f;
+
+  --rose: #f58295;
+  --rose-soft: #3f1a24;
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --elev-2: 0 2px 6px rgb(0 0 0 / 0.3), 0 14px 36px rgb(0 0 0 / 0.4);
+  --elev-3: 0 6px 14px rgb(0 0 0 / 0.35), 0 30px 70px rgb(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+  --color-lav: var(--lav);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-star: var(--star);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Tutarlar ve saatler için ayrı bir tek aralıklı yazı tipi yok; hizalama için .tabular kullanılır. */
+  --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-soft: var(--elev-1);
+  --shadow-lift: var(--elev-2);
+  --shadow-float: var(--elev-3);
+
+  --radius-card: 1.25rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Temel                                                               */
+/* ------------------------------------------------------------------ */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), var(--font-roboto), Arial, sans-serif;
-}
-
-@import "leaflet/dist/leaflet.css";
-
-/* Leaflet Map Customizations */
-.leaflet-container {
-  border-radius: 0.5rem;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background-image: linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px), 
-                    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-  background-size: 50px 50px;
-}
-
-.leaflet-popup-content-wrapper {
-  border-radius: 0.375rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
-
-.leaflet-popup-content {
-  padding: 0.5rem;
-  margin: 0;
-  min-width: 150px;
-}
-
-.leaflet-popup-tip {
-  background: var(--card);
-}
-
-.leaflet-control-zoom {
-  border-color: var(--border);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-}
-
-.leaflet-control-zoom-in, 
-.leaflet-control-zoom-out {
-  background-color: var(--card);
-  color: var(--foreground);
-}
-
-.leaflet-control-zoom-in:hover, 
-.leaflet-control-zoom-out:hover {
-  background-color: var(--input);
-}
-
-.custom-marker-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  border: 2px solid white;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-/* Animated Route */
-.pulse-animation {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 0 0 rgba(239, 68, 68, 0.4);
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
-
-.route-dash-animation {
-  stroke-dasharray: 15, 15;
-  animation: dash 30s linear infinite;
-}
-
-@keyframes dash {
-  to {
-    stroke-dashoffset: 1000;
-  }
-}
-
-/* Özel Animasyonlar */
-.hover-scale {
-  transition: transform 0.3s ease;
-}
-
-.hover-scale:hover {
-  transform: scale(1.03);
-}
-
-.hover-lift {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.hover-glow {
-  transition: box-shadow 0.3s ease;
-}
-
-.hover-glow:hover {
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
-}
-
-/* Gradient Animasyonu */
-@keyframes gradient-shift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-.animated-gradient {
-  background: linear-gradient(270deg, #57d7f7, #10b981, #8549e7);
-  background-size: 600% 600%;
-  animation: gradient-shift 8s ease infinite;
-  display: inline-block;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Fade In Animasyonu */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.5s ease forwards;
-}
-
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
-.delay-500 { animation-delay: 0.5s; }
-
-/* Pop In Animasyonu */
-@keyframes popIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  70% {
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.pop-in {
-  animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Bounce Animasyonu */
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-20px);
-  }
-  60% {
-    transform: translateY(-10px);
-  }
-}
-
-.bounce {
-  animation: bounce 2s ease infinite;
-}
-
-.custom-route-marker .start-marker div {
-  background-color: var(--secondary);
-  animation: pulse-green 2s infinite;
-}
-
-.custom-route-marker .end-marker div {
-  background-color: var(--danger);
-  animation: pulse-red 2s infinite;
-}
-
-@keyframes pulse-green {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
-}
-
-@keyframes pulse-red {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
-
-/* Google Maps CSS Fixes */
-.gm-style {
-  font-family: var(--font-roboto), Arial, sans-serif !important;
-}
-
-.gm-style img {
-  max-width: none !important;
-}
-
-/* Route Stats */
-.route-stats-card {
-  background-color: var(--card);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  padding: 1rem;
-  margin-top: 1rem;
-  border: 1px solid var(--border);
-  transition: all 0.3s ease;
-}
-
-.route-stats-card:hover {
-  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
-  transform: translateY(-2px);
-}
-
-.route-stats-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--foreground);
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.route-complete-badge {
-  font-size: 0.7rem;
-  background-color: var(--secondary);
-  color: white;
-  padding: 0.2rem 0.5rem;
-  border-radius: 1rem;
-  display: flex;
-  align-items: center;
-}
-
-.route-stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.route-stat-item {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  background-color: rgba(0,0,0,0.02);
-  transition: all 0.2s ease;
-  position: relative;
 }
 
-.route-stat-item:hover {
-  background-color: rgba(59, 130, 246, 0.05);
+::selection {
+  background: var(--brand);
+  color: var(--on-brand);
 }
 
-.route-stat-icon {
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  background-color: rgba(59, 130, 246, 0.1);
-  border-radius: 9999px;
-  transition: all 0.2s ease;
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
-.route-stat-item:hover .route-stat-icon {
-  transform: scale(1.1);
-  background-color: rgba(59, 130, 246, 0.2);
-}
+/* Bileşen sınıfları bu katmanda durur; böylece Tailwind yardımcıları
+   (hidden, w-full, pl-10…) gerektiğinde bunları ezebilir. */
+@layer components {
+  .font-display {
+    letter-spacing: -0.022em;
+  }
 
-.route-stat-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--foreground);
-  margin-bottom: 0.25rem;
-  transition: all 0.2s ease;
-}
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
 
-.route-stat-item:hover .route-stat-value {
-  color: var(--primary);
-}
+  /* Sayılar, saatler, tutarlar hizalı dursun */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 
-.route-stat-label {
-  font-size: 0.75rem;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+  /* ---------------------------------------------------------------- */
+  /* Zeminler                                                          */
+  /* ---------------------------------------------------------------- */
 
-/* Custom Components */
-.trip-card {
-  background-color: var(--card);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  padding: 1.25rem;
-  margin-bottom: 1rem;
-}
+  /* Yumuşak lavanta ışıması: boş alanları ve başlık bantlarını ısıtır. */
+  .glow {
+    position: relative;
+    isolation: isolate;
+  }
 
-.trip-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.375rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
+  .glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 70% at 85% 0%, color-mix(in srgb, var(--lav) 38%, transparent), transparent 70%),
+      radial-gradient(50% 60% at 0% 100%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 70%);
+  }
 
-.trip-button-primary {
-  background-color: var(--primary);
-  color: white;
-}
+  /* Fotoğraf üzerindeki metinler için koyu geçiş */
+  .scrim {
+    background: linear-gradient(180deg, rgb(15 14 31 / 0) 30%, rgb(15 14 31 / 0.78) 100%);
+  }
 
-.trip-button-primary:hover {
-  background-color: var(--primary-dark);
-}
+  .scrim-left {
+    background: linear-gradient(90deg, rgb(20 18 48 / 0.82) 0%, rgb(20 18 48 / 0.5) 45%, rgb(20 18 48 / 0) 78%);
+  }
 
-.trip-button-secondary {
-  background-color: var(--secondary);
-  color: white;
-}
+  /* Buzlu cam: fotoğraf üzerindeki rozetler ve arama alanı */
+  .glass {
+    background: rgb(255 255 255 / 0.16);
+    border: 1px solid rgb(255 255 255 / 0.22);
+    color: #fff;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
 
-.trip-button-secondary:hover {
-  background-color: var(--secondary-dark);
-}
+  .glass-light {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border: 1px solid color-mix(in srgb, var(--surface) 60%, transparent);
+    color: var(--ink);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
 
-.trip-button-danger {
-  background-color: var(--danger);
-  color: white;
-}
+  /* Kesik çizgili rota (SVG path ve çizgiler için) */
+  .route-dash {
+    stroke-dasharray: 6 8;
+    stroke-linecap: round;
+  }
 
-.trip-button-danger:hover {
-  background-color: var(--danger-dark);
-}
+  .route-dash-flow {
+    stroke-dasharray: 6 8;
+    stroke-linecap: round;
+    animation: route-flow 1.4s linear infinite;
+  }
 
-.trip-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  @keyframes route-flow {
+    to {
+      stroke-dashoffset: -28;
+    }
+  }
 
-.trip-select {
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.75rem;
-  font-size: 0.875rem;
-  background-color: var(--background);
-  color: var(--foreground);
-}
+  /* İnce ayraç */
+  .dash-rule {
+    height: 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
 
-.trip-info {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
+  /* ---------------------------------------------------------------- */
+  /* Düğmeler                                                          */
+  /* ---------------------------------------------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.75rem;
+    padding: 0 1.25rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.925rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
 
-.trip-error {
-  background-color: #fef2f2;
-  border: 1px solid #fee2e2;
-  border-radius: 0.375rem;
-  padding: 0.75rem;
-  color: #b91c1c;
-  font-size: 0.875rem;
-}
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
 
-.loading-spinner {
-  display: inline-block;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 2px solid rgba(156, 163, 175, 0.3);
-  border-radius: 50%;
-  border-top-color: var(--primary);
-  animation: spin 1s linear infinite;
-}
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+  .btn svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex: none;
+  }
+
+  .btn-primary,
+  .btn-accent {
+    background: linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
+    color: var(--on-brand);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 32%, transparent);
+  }
+
+  .btn-primary:hover:not(:disabled),
+  .btn-accent:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--brand-2) 0%, var(--brand) 100%);
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--brand) 42%, transparent);
+  }
+
+  .btn-outline {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line-2);
+  }
+
+  .btn-outline:hover:not(:disabled) {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .btn-quiet {
+    background: transparent;
+    color: var(--ink-2);
+  }
+
+  .btn-quiet:hover:not(:disabled) {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--rose);
+    border-color: color-mix(in srgb, var(--rose) 35%, transparent);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: var(--rose-soft);
+  }
+
+  /* Fotoğraf ve koyu zemin üzerindeki düğmeler */
+  .btn-glass {
+    background: rgb(255 255 255 / 0.16);
+    border-color: rgb(255 255 255 / 0.26);
+    color: #fff;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .btn-glass:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.26);
+  }
+
+  .btn-white {
+    background: #fff;
+    color: #1c1b3a;
+  }
+
+  .btn-white:hover:not(:disabled) {
+    background: #f1eeff;
+  }
+
+  .btn-sm {
+    height: 2.25rem;
+    padding: 0 0.95rem;
+    font-size: 0.84rem;
+  }
+
+  .btn-lg {
+    height: 3.25rem;
+    padding: 0 1.7rem;
+    font-size: 1rem;
+  }
+
+  .btn-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Kartlar                                                           */
+  /* ---------------------------------------------------------------- */
+  .card,
+  .ticket {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--elev-1);
+  }
+
+  /* Hover: hafif yükselme; içindeki .zoom-img görseli yavaşça yakınlaşır. */
+  .card-lift {
+    transition:
+      transform 0.3s ease,
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--elev-2);
+  }
+
+  .zoom-img {
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .card-lift:hover .zoom-img,
+  .group:hover .zoom-img {
+    transform: scale(1.06);
+  }
+
+  /* Kart içi ayraç (eski "bilet" kesiği yerine düz çizgi) */
+  .ticket-cut {
+    height: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Form alanları                                                     */
+  /* ---------------------------------------------------------------- */
+  .field-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .field-hint {
+    margin-top: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--ink-3);
+  }
+
+  .input {
+    display: block;
+    width: 100%;
+    height: 2.9rem;
+    padding: 0 0.95rem;
+    border-radius: var(--radius-field);
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 0.95rem;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .input::placeholder {
+    color: var(--ink-3);
+    opacity: 0.85;
+  }
+
+  .input:hover {
+    border-color: var(--lav);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent);
+  }
+
+  textarea.input {
+    height: auto;
+    min-height: 5.5rem;
+    padding: 0.75rem 0.95rem;
+    line-height: 1.5;
+    resize: vertical;
+  }
+
+  select.input {
+    appearance: none;
+    padding-right: 2.4rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236e6e92' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+  }
+
+  /* Seçim çipleri */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 2.3rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: var(--canvas-2);
+    color: var(--ink-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .chip svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: none;
+  }
+
+  .chip:hover {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+
+  .chip[aria-pressed="true"],
+  .chip[aria-checked="true"],
+  .chip[data-on="true"] {
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+
+  /* Küçük etiketler */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 1.65rem;
+    padding: 0 0.65rem;
+    border-radius: 999px;
+    background: var(--canvas-2);
+    color: var(--ink-2);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .tag svg {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+
+  .tag-brand,
+  .tag-accent {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+
+  .tag-amber {
+    background: var(--amber-soft);
+    color: var(--amber);
+  }
+
+  .tag-mint {
+    background: var(--mint-soft);
+    color: var(--mint);
+  }
+
+  .tag-rose {
+    background: var(--rose-soft);
+    color: var(--rose);
+  }
+
+  /* Bölüm üstü küçük etiket */
+  .eyebrow {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--brand);
+  }
+
+  /* Plan durumu rozeti */
+  .stamp,
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 1.65rem;
+    padding: 0 0.7rem 0 0.6rem;
+    border-radius: 999px;
+    background: var(--canvas-2);
+    color: var(--ink-2);
+    font-size: 0.74rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .stamp::before,
+  .status::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .stamp[data-status="PLANNED"],
+  .status[data-status="PLANNED"] {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+
+  .stamp[data-status="ACTIVE"],
+  .status[data-status="ACTIVE"] {
+    background: var(--mint-soft);
+    color: var(--mint);
+  }
+
+  .stamp[data-status="COMPLETED"],
+  .status[data-status="COMPLETED"] {
+    background: var(--amber-soft);
+    color: var(--amber);
+  }
+
+  .stamp[data-status="DONE"],
+  .status[data-status="DONE"] {
+    background: var(--mint-soft);
+    color: var(--mint);
+  }
+
+  .stamp[data-status="CANCELLED"],
+  .status[data-status="CANCELLED"] {
+    background: var(--rose-soft);
+    color: var(--rose);
+  }
+
+  /* Fotoğraf üzerinde durum rozeti: beyaz zemin, okunaklı */
+  .status-on-photo {
+    background: rgb(255 255 255 / 0.92) !important;
+    box-shadow: 0 2px 8px rgb(15 14 31 / 0.18);
+  }
+
+  /* Bildirim kutuları */
+  .notice {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+    padding: 0.8rem 1rem;
+    border-radius: 0.9rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .notice svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0.1rem;
+    flex: none;
+  }
+
+  .notice-error {
+    background: var(--rose-soft);
+    color: var(--rose);
+  }
+
+  .notice-success {
+    background: var(--mint-soft);
+    color: var(--mint);
+  }
+
+  .notice-info {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+
+  /* İlerleme çubuğu: genişlik gerçek değere bağlanır, dolum animasyonludur. */
+  .meter {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--canvas-2);
+    overflow: hidden;
+  }
+
+  .meter > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--brand), var(--lav));
+    transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Kontrol listesi işareti (ulaşım, konaklama, aktiviteler…) */
+  .check {
+    display: grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: none;
+    border-radius: 50%;
+    border: 1.5px solid var(--line-2);
+    color: transparent;
+  }
+
+  .check svg {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+
+  .check[data-done="true"] {
+    border-color: var(--mint);
+    background: var(--mint);
+    color: var(--surface);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Markdown içerik (rehber metinleri)                                */
+  /* ---------------------------------------------------------------- */
+  .prose-plan {
+    color: var(--ink-2);
+    font-size: 0.98rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .prose-plan > :first-child {
+    margin-top: 0;
+  }
+
+  .prose-plan > :last-child {
+    margin-bottom: 0;
+  }
+
+  .prose-plan h1,
+  .prose-plan h2,
+  .prose-plan h3,
+  .prose-plan h4 {
+    font-family: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
+    letter-spacing: -0.018em;
+    line-height: 1.3;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .prose-plan h1 {
+    font-size: 1.6rem;
+    margin: 2rem 0 1rem;
+  }
+
+  .prose-plan h2 {
+    font-size: 1.3rem;
+    margin: 2rem 0 0.8rem;
+  }
+
+  .prose-plan h3 {
+    font-size: 1.08rem;
+    margin: 1.6rem 0 0.6rem;
+  }
+
+  .prose-plan h4 {
+    font-size: 0.98rem;
+    margin: 1.3rem 0 0.4rem;
+  }
+
+  .prose-plan p {
+    margin: 0.75rem 0;
+  }
+
+  .prose-plan strong {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .prose-plan a {
+    color: var(--brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .prose-plan ul,
+  .prose-plan ol {
+    margin: 0.75rem 0;
+    padding-left: 1.35rem;
+  }
+
+  .prose-plan ul {
+    list-style: none;
+  }
+
+  .prose-plan ul > li {
+    position: relative;
+  }
+
+  .prose-plan ul > li::before {
+    content: "";
+    position: absolute;
+    left: -1.05rem;
+    top: 0.68em;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: var(--lav);
+  }
+
+  .prose-plan ol {
+    list-style: decimal;
+  }
+
+  .prose-plan ol > li::marker {
+    font-weight: 700;
+    color: var(--brand);
+  }
+
+  .prose-plan li {
+    margin: 0.3rem 0;
+  }
+
+  .prose-plan li > ul,
+  .prose-plan li > ol {
+    margin: 0.25rem 0;
+  }
+
+  .prose-plan hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 1.75rem 0;
+  }
+
+  .prose-plan blockquote {
+    margin: 1rem 0;
+    padding: 0.8rem 1rem;
+    border-radius: 0.9rem;
+    background: var(--brand-soft);
+    color: var(--ink);
+  }
+
+  .prose-plan blockquote p {
+    margin: 0.25rem 0;
+  }
+
+  .prose-plan code {
+    font-size: 0.88em;
+    padding: 0.1em 0.4em;
+    border-radius: 0.4rem;
+    background: var(--canvas-2);
+  }
+
+  .prose-plan pre {
+    margin: 1rem 0;
+    padding: 1rem;
+    border-radius: 0.9rem;
+    background: var(--canvas-2);
+    overflow-x: auto;
+    font-size: 0.86rem;
+  }
+
+  .prose-plan pre code {
+    padding: 0;
+    background: transparent;
+  }
+
+  .prose-plan .table-wrap {
+    margin: 1.1rem 0;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+  }
+
+  .prose-plan table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .prose-plan th {
+    text-align: left;
+    padding: 0.65rem 0.9rem;
+    background: var(--canvas-2);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .prose-plan td {
+    padding: 0.65rem 0.9rem;
+    border-top: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Harita (Leaflet)                                                  */
+  /* ---------------------------------------------------------------- */
+  .plan-map {
+    width: 100%;
+    height: 100%;
+    min-height: 12rem;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--line);
+    background: var(--canvas-2);
+    font-family: inherit;
+  }
+
+  /* Gün renkleri: durak iğneleri ve rota çizgileri aynı sırayı kullanır. */
+  .map-pin {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2.5px solid #fff;
+    background: #6558e8;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    box-shadow: 0 3px 8px rgb(28 27 58 / 0.3);
+    /* Pinler sırayla belirir; gecikme iğnenin sırasına göre verilir. */
+    animation: pin-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 60ms);
+  }
+
+  .map-pin[data-color="1"],
+  .day-dot[data-color="1"] {
+    background: #1f9d8b;
+  }
+
+  .map-pin[data-color="2"],
+  .day-dot[data-color="2"] {
+    background: #e08a1e;
+  }
+
+  .map-pin[data-color="3"],
+  .day-dot[data-color="3"] {
+    background: #d6457a;
+  }
+
+  .map-pin[data-color="4"],
+  .day-dot[data-color="4"] {
+    background: #2d8fd6;
+  }
+
+  .day-dot {
+    background: #6558e8;
+    color: #fff;
+  }
+
+  .map-route {
+    fill: none;
+    stroke: #6558e8;
+    stroke-dasharray: 2 9;
+    stroke-linecap: round;
+  }
+
+  .map-route-1 {
+    stroke: #1f9d8b;
+  }
+
+  .map-route-2 {
+    stroke: #e08a1e;
+  }
+
+  .map-route-3 {
+    stroke: #d6457a;
+  }
+
+  .map-route-4 {
+    stroke: #2d8fd6;
+  }
+
+  @keyframes pin-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .plan-map .leaflet-tooltip {
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 0.78rem;
+    box-shadow: var(--elev-2);
+  }
+
+  .plan-map .leaflet-tooltip::before {
+    display: none;
+  }
+
+  .plan-map .leaflet-bar {
+    border: 0;
+    box-shadow: var(--elev-1);
+  }
+
+  .plan-map .leaflet-bar a {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+
+  .plan-map .leaflet-control-attribution {
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    color: var(--ink-3);
+    font-size: 0.65rem;
+  }
+
+  .plan-map .leaflet-control-attribution a {
+    color: var(--ink-2);
+  }
+
+  /* Karanlık temada açık renkli harita karolarını koyulaştır. */
+  [data-theme="dark"] .plan-map .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.6);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Hareket                                                           */
+  /* ---------------------------------------------------------------- */
+
+  /* Sayfa geçişi: fade + kısa slide (app/template.tsx) */
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .page-in {
+    animation: page-in 0.26s ease-out both;
+  }
+
+  /* Kademeli görünme: style={{ "--i": n }} ile sıra verilir. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .rise {
+    animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(min(var(--i, 0), 10) * 70ms);
+  }
+
+  /* Uçak rotası: çizgi yavaşça çizilir (pathLength="1" verilmiş path'lerde). */
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw 3.2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s both;
+  }
+
+  /* Uçak, rota boyunca çok yavaş süzülür (düşük dikkat dağıtan döngü). */
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(10px, -6px);
+    }
+  }
+
+  .drift {
+    animation: drift 9s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* Yükleme iskeleti */
+  @keyframes shimmer {
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .skeleton {
+    border-radius: 0.75rem;
+    background: linear-gradient(90deg, var(--canvas-2) 25%, var(--line) 37%, var(--canvas-2) 63%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+
+  /* İşletim sistemi "hareketi azalt" tercihine uy. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .page-in,
+    .rise,
+    .draw,
+    .drift,
+    .map-pin,
+    .route-dash-flow,
+    .skeleton {
+      animation: none;
+    }
+
+    .draw {
+      stroke-dasharray: none;
+      stroke-dashoffset: 0;
+    }
+
+    .card-lift:hover,
+    .card-lift:hover .zoom-img,
+    .group:hover .zoom-img {
+      transform: none;
+    }
+
+    .meter > span {
+      transition: none;
+    }
+  }
+} /* @layer components */
+
+/* Yazdırma: plan detayı kâğıda temiz çıksın */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .card,
+  .ticket {
+    box-shadow: none;
+    break-inside: avoid;
   }
 }

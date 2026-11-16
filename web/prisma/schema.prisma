@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// ------------------------------------------------------------------
+/// Kimlik (NextAuth)
+/// ------------------------------------------------------------------
+
 model User {
   id                 String    @id @default(cuid())
   name               String?
@@ -21,15 +25,9 @@ model User {
   interests          String?
   preferences        Json?
 
-  accounts           Account[]
-  sessions           Session[]
-  trips              Trip[]
-
-  // Back-relations (email üzerinden)
-  aiConversationsByEmail  AiConversation[] @relation("UserToAiConversationByEmail")
-  accommodationsByEmail   Accommodation[]  @relation("UserToAccommodationByEmail")
-  transportationsByEmail  Transportation[] @relation("UserToTransportationByEmail")
-  tripPlansByEmail        TripPlan[]       @relation("UserToTripPlanByEmail")
+  accounts Account[]
+  sessions Session[]
+  plans    Plan[]
 }
 
 model Account {
@@ -66,197 +64,165 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model Trip {
-  id              String           @id @default(cuid())
-  title           String
-  description     String?
-  startDate       DateTime
-  endDate         DateTime
-  budget          Float?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  userId          String
-  city            String
-  country         String?
-  notes           String?
-  status          TripStatus       @default(PLANNED)
+/// ------------------------------------------------------------------
+/// Seyahat planı
+/// ------------------------------------------------------------------
 
-  accommodations  Accommodation[]
-  activities      Activity[]
-  conversations   AiConversation[]
-  budgetItems     BudgetItem[]
-  dailyPlans      DailyPlan[]
-  transportations Transportation[]
-  tripPlans       TripPlan[]
-
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+enum PlanSource {
+  AI
+  MANUAL
 }
 
-model Activity {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  date        DateTime
-  time        String?
-  location    String?
-  cost        Float?
-  category    String?
-  tripId      String
-  placeId     String?
-  coordinates Json?
-  duration    Int?
-  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-}
-
-model AiConversation {
-  id         String   @id @default(cuid())
-  tripId     String
-  messages   Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  summary    String?
-  tags       String?
-
-  trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-
-  // Email ile User'a bağ
-  userEmail  String?
-  userByEmail User?   @relation("UserToAiConversationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([userEmail])
-}
-
-model Accommodation {
-  id            String   @id @default(cuid())
-  tripId        String
-  name          String
-  location      String?
-  checkIn       DateTime
-  checkOut      DateTime
-  price         Float
-  priceUnit     String   @default("total")
-  bookingUrl    String?
-  type          String?
-  amenities     String?
-  address       String?
-  coordinates   Json?
-  rating        Float?
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  status        String   @default("pending")
-  confirmation  String?
-
-  trip          Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-
-  // Email ile User'a bağ
-  userEmail     String?
-  userByEmail   User?    @relation("UserToAccommodationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([userEmail])
-}
-
-model Transportation {
-  id                 String   @id @default(cuid())
-  tripId             String
-  type               String
-  provider           String?
-  departureTime      DateTime
-  arrivalTime        DateTime
-  departureLocation  String
-  arrivalLocation    String
-  price              Float
-  bookingReference   String?
-  bookingUrl         String?
-  seats              String?
-  notes              String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  status             String   @default("pending")
-
-  trip               Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-
-  // Email ile User'a bağ
-  userEmail          String?
-  userByEmail        User?    @relation("UserToTransportationByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([userEmail])
-}
-
-model DailyPlan {
-  id         String   @id @default(cuid())
-  tripId     String
-  date       DateTime
-  title      String?
-  notes      String?
-  activities Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-}
-
-model BudgetItem {
-  id            String    @id @default(cuid())
-  tripId        String
-  category      String
-  description   String
-  amount        Float
-  currency      String    @default("TRY")
-  date          DateTime?
-  isEstimate    Boolean   @default(true)
-  isPaid        Boolean   @default(false)
-  paymentMethod String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  trip          Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-}
-
-model TripPlan {
-  id               String      @id @default(cuid())
-  tripId           String?
-  city             String
-  country          String?
-  startDate        DateTime?
-  endDate          DateTime?
-  duration         String?
-  sehir_bilgisi    String?
-  gun_plani        String?
-  yemek_rehberi    String?
-  pratik_bilgiler  String?
-  butce_tahmini    String?
-  raw_markdown     String?
-  raw_html         String?
-  ai_model         String?
-  generated_at     DateTime    @default(now())
-  user_id          String?
-  total_cost       Float?
-  daily_cost       Float?
-  interests        String?
-  budget_level     String?
-  travel_style     String?
-  accommodation    String?
-  transportation   String?
-  status           TripStatus  @default(PLANNED)
-  completedAt      DateTime?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-
-  trip             Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
-
-  // Email ile User'a bağ
-  userEmail        String?
-  userByEmail      User?     @relation("UserToTripPlanByEmail", fields: [userEmail], references: [email], onDelete: SetNull)
-
-  @@index([city, country])
-  @@index([generated_at])
-  @@index([user_id])
-  @@index([userEmail])
-}
-
-enum TripStatus {
+/// PLANNED/CANCELLED/DONE kullanıcı eylemiyle değişir. "Yolda" ve "tarihi geçti"
+/// durumları saklanmaz; tarihlerden hesaplanır (bkz. src/lib/plan.ts).
+enum PlanStatus {
   PLANNED
-  ACTIVE
-  COMPLETED
   CANCELLED
   DONE
+}
+
+enum DaySlot {
+  MORNING
+  NOON
+  EVENING
+}
+
+enum BudgetCategory {
+  TRANSPORT
+  ACCOMMODATION
+  FOOD
+  ACTIVITIES
+  SHOPPING
+  OTHER
+}
+
+enum BudgetKind {
+  /// Planın öngördüğü gider (AI tahmini ya da manuel planın hesabı)
+  ESTIMATE
+  /// Kullanıcının kaydettiği gerçek harcama
+  EXPENSE
+}
+
+model Plan {
+  id     String     @id @default(cuid())
+  userId String
+  source PlanSource
+  status PlanStatus @default(PLANNED)
+
+  // Rota
+  city      String
+  country   String?
+  latitude  Float?
+  longitude Float?
+  startDate DateTime? @db.Date
+  endDate   DateTime? @db.Date
+  travelers Int       @default(1)
+
+  // Tercihler
+  travelStyle     String?
+  budgetLevel     String?
+  interests       String[]
+  transportPrefs  String[]
+  stayPreference  String?
+  specialRequests String?
+
+  // Rehber metinleri (markdown)
+  cityGuide     String?
+  foodGuide     String?
+  practicalInfo String?
+
+  // Seçilen ulaşım / konaklama (manuel planlar)
+  transport     Json?
+  accommodation Json?
+
+  // Bütçe
+  currency     String @default("TRY")
+  totalCost    Float?
+  targetBudget Float?
+
+  // Üretim bilgisi
+  aiModel String?
+
+  // Yapılandırılmış veriye geçmeden önce üretilmiş planların metinleri.
+  // Yeni planlarda boştur; arayüz yalnızca `days` boşsa bunlara döner.
+  legacyDayPlan String?
+  legacyBudget  String?
+  legacyRaw     String?
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  days        PlanDay[]
+  budgetLines BudgetLine[]
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
+model PlanDay {
+  id        String  @id @default(cuid())
+  planId    String
+  dayNumber Int
+  title     String?
+  notes     String?
+  isFree    Boolean @default(false)
+
+  plan  Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stops PlanStop[]
+
+  @@unique([planId, dayNumber])
+}
+
+model PlanStop {
+  id          String   @id @default(cuid())
+  dayId       String
+  position    Int
+  name        String
+  description String?
+  slot        DaySlot?
+  startTime   String?
+  endTime     String?
+  cost        Float?
+  category    String?
+  latitude    Float?
+  longitude   Float?
+
+  day PlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@index([dayId, position])
+}
+
+model BudgetLine {
+  id          String         @id @default(cuid())
+  planId      String
+  kind        BudgetKind
+  category    BudgetCategory
+  description String
+  amount      Float
+  isPaid      Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, kind])
+}
+
+/// Şehir kapak fotoğrafı önbelleği (Wikipedia). Bulunamayanlar da boş olarak
+/// kaydedilir ki her istekte yeniden sorulmasın.
+model CityCover {
+  query     String   @id
+  imageUrl  String?
+  pageUrl   String?
+  createdAt DateTime @default(now())
+}
+
+/// Şehir koordinatları önbelleği: aynı şehir için dış servise tekrar gidilmez.
+model GeoCache {
+  query     String   @id
+  name      String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
 }

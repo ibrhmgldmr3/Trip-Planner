@@ -1,0 +1,21 @@
+# Yerel geliştirme veritabanı:  docker compose up -d
+services:
+  db:
+    image: postgres:18
+    container_name: trip-planner-db
+    environment:
+      POSTGRES_USER: trip
+      POSTGRES_PASSWORD: trip
+      POSTGRES_DB: tripplanner
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - trip-planner-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trip -d tripplanner"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  trip-planner-db:
