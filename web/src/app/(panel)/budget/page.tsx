@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type FormEvent,
@@ -79,20 +80,26 @@ function Budget() {
   }, []);
 
   // Seçili planın tahmini kalemlerini ve kayıtlı harcamalarını getir.
+  const latestPlan = useRef<string | null>(null);
   const loadPlan = useCallback(async (planId: string) => {
+    latestPlan.current = planId;
+    // Plan hızlı değiştirilirse eski isteğin yanıtı sonradan gelebilir; yok sayılır.
+    const stale = () => latestPlan.current !== planId;
     setLinesLoading(true);
     try {
       const response = await fetch(`/api/plans/${planId}`);
       if (!response.ok) throw new Error();
       const plan: PlanDetail = (await response.json()).plan;
+      if (stale()) return;
       setPlanLines(plan.estimates.length > 0 ? plan.estimates : parseLegacyBudget(plan.legacy?.budget));
       setExpenses(plan.expenses);
     } catch {
+      if (stale()) return;
       setPlanLines([]);
       setExpenses([]);
       toast.error("Planın bütçesi yüklenemedi");
     } finally {
-      setLinesLoading(false);
+      if (!stale()) setLinesLoading(false);
     }
   }, []);
 

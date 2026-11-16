@@ -28,7 +28,10 @@ const providers: NextAuthOptions["providers"] = [
 
       const ip = clientIp((request?.headers ?? {}) as Record<string, string | string[] | undefined>);
       const limited = rateLimit(`login:${ip}:${email}`, 10, 15 * 60 * 1000);
-      if (!limited.ok) {
+      // x-forwarded-for istemci tarafından yazılabilir; IP değiştirerek tek hesaba
+      // sınırsız şifre denenmesin diye hesap başına da bir üst sınır vardır.
+      const perAccount = rateLimit(`login:${email}`, 30, 15 * 60 * 1000);
+      if (!limited.ok || !perAccount.ok) {
         throw new Error("Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar dene.");
       }
 

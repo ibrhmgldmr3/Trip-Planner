@@ -43,15 +43,20 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   return { ok: true, retryAfter: 0 };
 }
 
-/** İstemci IP'si; ters vekil arkasında x-forwarded-for'un ilk değeri. */
+/**
+ * İstemci IP'si: x-forwarded-for'un SON değeri. İlk değerleri istemci kendisi yazabilir;
+ * sonuncuyu uygulamanın önündeki vekil (nginx, Vercel…) ekler. Uygulamanın önünde art arda
+ * iki vekil varsa (ör. Cloudflare + nginx) son değer dıştaki vekilin adresi olur ve herkes
+ * aynı sayaca düşer; o kurulumda bu işlev vekil sayısına göre uyarlanmalıdır.
+ */
 export function clientIp(headers: Headers | Record<string, string | string[] | undefined>): string {
   const read = (name: string): string | undefined => {
     if (headers instanceof Headers) return headers.get(name) ?? undefined;
     const value = headers[name];
     return Array.isArray(value) ? value[0] : value;
   };
-  const forwarded = read("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || read("x-real-ip") || "bilinmiyor";
+  const forwarded = read("x-forwarded-for")?.split(",").pop()?.trim();
+  return forwarded || read("x-real-ip")?.trim() || "bilinmiyor";
 }
 
 /** Testler için sayaçları sıfırlar. */

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { isPhotoUrl } from "./covers";
 import { distanceKm, sanitizeStopCoordinates } from "./geo";
-import { manualBudget } from "./plans";
+import { manualBudget } from "@/lib/plan";
 import { rateLimit, resetRateLimits } from "./rate-limit";
 import { generatePlanSchema, manualPlanSchema } from "./validation";
 
@@ -113,5 +114,17 @@ describe("hız sınırı", () => {
     expect(third.ok).toBe(false);
     expect(third.retryAfter).toBeGreaterThan(0);
     expect(rateLimit("baska-anahtar", 2, 60_000).ok).toBe(true);
+  });
+});
+
+describe("kapak fotoğrafı süzgeci", () => {
+  it("harita, bayrak ve armayı eler ama adı benzeyen şehirleri elemez", () => {
+    const url = (file: string) => `https://upload.wikimedia.org/thumb/a/ab/${file}/1280px-${file}`;
+    for (const file of ["Marmaris_harbour.jpg", "Parma_Duomo.jpg", "Flagstaff_downtown.jpg", "Bayrami%C3%A7_meydan.jpg"]) {
+      expect(isPhotoUrl(url(file)), file).toBe(true);
+    }
+    for (const file of ["Flag_of_Turkey.svg", "Izmir_location_map.png", "Ankara_arması.png", "İzmir_haritası.jpg", "Coat_of_arms_of_Paris.jpg"]) {
+      expect(isPhotoUrl(url(file)), file).toBe(false);
+    }
   });
 });

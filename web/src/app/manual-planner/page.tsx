@@ -38,7 +38,7 @@ import {
   tripDays,
   tripNights,
 } from "@/lib/format";
-import { BUDGET_COLOR, BUDGET_LABEL, styleLabel, type BudgetCategory } from "@/lib/plan";
+import { BUDGET_COLOR, BUDGET_LABEL, manualBudget, styleLabel, type BudgetCategory } from "@/lib/plan";
 
 /* ------------------------------ Tipler ------------------------------ */
 
@@ -165,21 +165,30 @@ function ManualPlanner() {
     setActiveDay((current) => Math.min(current, Math.max(0, dayCount - 1)));
   }, [dayCount]);
 
-  const breakdown = useMemo(() => {
-    const activities = days.reduce(
-      (sum, day) => (day.isEmpty ? sum : sum + day.activities.reduce((total, item) => total + item.cost, 0)),
-      0
-    );
+  // Sunucunun kaydederken kullandığı hesabın aynısı (bkz. manualBudget).
+  const { breakdown, total } = useMemo(() => {
+    const { lines, total } = manualBudget({
+      startDate: basic.startDate,
+      endDate: basic.endDate,
+      transport: transport.type ? { price: toAmount(transport.price) } : null,
+      accommodation: stay.type ? { price: toAmount(stay.price) } : null,
+      days: days.map((day) => ({ isFree: day.isEmpty, stops: day.activities })),
+      foodPerDay: toAmount(foodPerDay),
+      otherCost: toAmount(otherCost),
+    });
+    const amount = (category: string) => lines.find((line) => line.category === category)?.amount ?? 0;
     return {
-      transport: transport.type ? toAmount(transport.price) : 0,
-      accommodation: stay.type ? toAmount(stay.price) * nights : 0,
-      activities,
-      food: toAmount(foodPerDay) * dayCount,
-      other: toAmount(otherCost),
+      breakdown: {
+        transport: amount("TRANSPORT"),
+        accommodation: amount("ACCOMMODATION"),
+        activities: amount("ACTIVITIES"),
+        food: amount("FOOD"),
+        other: amount("OTHER"),
+      },
+      total,
     };
-  }, [days, transport, stay, nights, foodPerDay, dayCount, otherCost]);
+  }, [basic.startDate, basic.endDate, days, transport, stay, foodPerDay, otherCost]);
 
-  const total = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
   const target = toAmount(targetBudget);
 
   const validateBasics = (): string | null => {

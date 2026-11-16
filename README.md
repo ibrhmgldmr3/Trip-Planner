@@ -10,7 +10,7 @@ Trip Planner; tarih, şehir, bütçe ve ilgi alanlarına göre seyahat planı ol
 - **Adım adım plan:** Ulaşım, konaklama, saatli aktiviteler ve bütçe altı adımda girilir; toplamlar sunucuda hesaplanır.
 - **Keşfet:** Elle seçilmiş destinasyonlar tür, süre ve bölgeye göre süzülür; seçilen şehir AI planlayıcıya taşınır.
 - **Şehir fotoğrafları:** Plan ve destinasyon kartlarında şehrin Wikipedia madde görseli gösterilir; bulunamazsa renk geçişine dönülür.
-- **Harita:** Konumu bilinen duraklar OpenStreetMap üzerinde gün gün, ziyaret sırasıyla gösterilir.
+- **Harita:** Konumu bilinen duraklar OpenStreetMap üzerinde gün gün gösterilir; duraklar ziyaret sırasıyla yol ağı üzerinden bağlanır, günün toplam mesafesi ve süresi yazılır.
 - **Bütçe takibi:** Planın tahmini bütçe kabul edilir; gerçek harcamalar eklenip ödendi olarak işaretlenir.
 - **Plan durumları:** Planlandı → yolda → tarihi geçti (tarihten hesaplanır); iptal edildi / gerçekleşti (kullanıcı işaretler). Gerçekleşen planlar gezi defterinde toplanır.
 - **Hesap:** E-posta/şifre ile giriş, isteğe bağlı Google ile giriş, seyahat tercihleri.
@@ -20,7 +20,7 @@ Trip Planner; tarih, şehir, bütçe ve ilgi alanlarına göre seyahat planı ol
 
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Prisma 6 + PostgreSQL · NextAuth 4 · Zod 4 · Leaflet · Vitest
 
-Dış servisler: [OpenRouter](https://openrouter.ai/) (dil modeli), [Nominatim](https://nominatim.org/) (şehir koordinatı), OpenStreetMap (harita karoları), Wikipedia (şehir kapak fotoğrafları).
+Dış servisler: [OpenRouter](https://openrouter.ai/) (dil modeli), [Nominatim](https://nominatim.org/) (şehir koordinatı), OpenStreetMap (harita karoları), [routing.openstreetmap.de](https://routing.openstreetmap.de/) (duraklar arası rota), Wikipedia (şehir kapak fotoğrafları).
 
 ## Kurulum
 
@@ -84,7 +84,7 @@ web/
     │       ├── my-trips/    # Gezi defteri
     │       ├── budget/      # Harcama takibi
     │       └── profile/
-    ├── components/          # Arayüz bileşenleri (PlanMap, PlanTicket, Markdown…)
+    ├── components/          # Arayüz bileşenleri (PlanMap, CityCover, Markdown…)
     ├── lib/                 # İstemci ve sunucunun ortak kullandığı saf yardımcılar
     └── server/              # Yalnızca sunucu: auth, doğrulama, plan servisi, AI, konum
 ```
@@ -110,10 +110,12 @@ Tüm uçlar (kayıt ve sağlık denetimi dışında) oturum ister; bir kullanıc
 
 ## Bilinen sınırlar
 
-- **Durak konumları dil modelinden gelir.** Şehir merkezine 80 km'den uzak ya da geçersiz koordinatlar atılır, ama kalanlar da yaklaşık olabilir. Haritadaki çizgiler ziyaret sırasını gösterir; yol tarifi değildir.
+- **Durak konumları dil modelinden gelir.** Şehir merkezine 80 km'den uzak ya da geçersiz koordinatlar atılır, ama kalanlar da yaklaşık olabilir.
+- **Rota herkese açık bir OSRM sunucusundan gelir.** İstek tarayıcıdan gider ve yalnızca durak koordinatlarını içerir. Durakların sırası değiştirilmez; günün durakları kuş uçuşu 5 km'yi geçmiyorsa yürüyüş, geçiyorsa araç rotası hesaplanır. Sunucu yanıt vermezse harita duraklar arasında kesikli düz çizgi gösterir. Yoğun kullanımda kendi OSRM sunucunuza geçin (`src/lib/route.ts`).
 - **Şehir fotoğrafları Wikipedia'dan gelir.** Maddenin ana görseli kullanılır; uygun fotoğraf yoksa ya da Wikimedia hız sınırı devredeyse kart renk geçişiyle gösterilir. Wikimedia, kendini tanıtmayan istemcileri sıkı sınırlar: yayında `GEOCODER_USER_AGENT` değerine iletişim bilgisi ekleyin.
 - **Fiyatlar tahmindir.** Gerçek uçuş/otobüs ve konaklama fiyatı sorgulanmaz.
-- **Hız sınırı bellek içidir.** Giriş ve kayıt denemeleri tek sunucu örneğinde sayılır; birden çok örnekle yayına alınacaksa `src/server/rate-limit.ts` ortak bir depoya (ör. Redis) bağlanmalıdır. AI kotası veritabanından sayıldığı için bundan etkilenmez.
+- **Hız sınırı bellek içidir.** Giriş ve kayıt denemeleri tek sunucu örneğinde sayılır; birden çok örnekle yayına alınacaksa `src/server/rate-limit.ts` ortak bir depoya (ör. Redis) bağlanmalıdır. Saatlik AI plan kotası veritabanından sayılır ve bundan etkilenmez; başarısız AI denemeleri ile manuel plan sınırı ise bellektedir.
+- **İstemci IP'si `x-forwarded-for` başlığının son değerinden okunur** (uygulamanın önündeki vekilin eklediği değer). Tek vekil (nginx, Vercel) için doğrudur; art arda iki vekil varsa `clientIp` işlevini vekil sayısına göre uyarlayın. Vekilsiz, doğrudan internete açık çalıştırmayın: başlığı istemci yazabilir.
 - **AI üretimi tek istekte tamamlanır** ve bir-iki dakika sürebilir; barındırma platformunun istek süresi sınırı buna izin vermelidir.
 
 ## Yayına alma notları

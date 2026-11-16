@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { tripDays, tripNights } from "@/lib/format";
+import { tripDays } from "@/lib/format";
+import { manualBudget } from "@/lib/plan";
 import type {
   AccommodationChoice,
   BudgetLine,
@@ -12,6 +13,7 @@ import type {
 import { ApiError } from "./api";
 import { DEFAULT_AI_DAYS, generatePlan } from "./ai/generate";
 import { geocodeCity, sanitizeStopCoordinates } from "./geo";
+import { rateLimit } from "./rate-limit";
 import { MAX_AI_DAYS, MAX_PLAN_DAYS, type GeneratePlanInput, type ManualPlanInput } from "./validation";
 
 /* --------------------------- Dönüştürme ---------------------------- */
@@ -167,6 +169,9 @@ async function assertOwner(userId: string, planId: string) {
 /* ---------------------------- AI planı ----------------------------- */
 
 const AI_PLANS_PER_HOUR = 10;
+// Kota yalnızca kaydedilen planları sayar; başarısız üretimler de modele istek
+// (ve ücret) demek olduğu için denemeler ayrıca sınırlanır.
+const AI_ATTEMPTS_PER_HOUR = 20;
 const generating = new Set<string>();
 
 export async function createAiPlan(userId: string, input: GeneratePlanInput): Promise<string> {
@@ -179,7 +184,7 @@ export async function createAiPlan(userId: string, input: GeneratePlanInput): Pr
   const recent = await prisma.plan.count({
     where: { userId, source: "AI", createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
   });
-  if (recent >= AI_PLANS_PER_HOUR) {
+  if (recent >= AI_PLANS_PER_HOUR || !rateLimit(`ai:${userId}`, AI_ATTEMPTS_PER_HOUR, 60 * 60 * 1000).ok) {
     throw new ApiError(429, "Bir saat içinde çok fazla plan oluşturdun. Lütfen biraz sonra tekrar dene.", {
       "Retry-After": "900",
     });
@@ -280,37 +285,18 @@ function travelDuration(departure?: string, arrival?: string): string | undefine
   return rest === 0 ? `${hours} sa` : `${hours} sa ${rest} dk`;
 }
 
-/**
- * Manuel planın bütçe dökümü. Tutarlar istemciden alınmaz; girilen kalemlerden
- * sunucuda hesaplanır.
- */
-export function manualBudget(input: ManualPlanInput) {
-  const dayCount = tripDays(input.startDate, input.endDate);
-  const nights = tripNights(input.startDate, input.endDate);
-  const activities = input.days.reduce(
-    (sum, day) => (day.isFree ? sum : sum + day.stops.reduce((total, stop) => total + stop.cost, 0)),
-    0
-  );
-
-  const lines = [
-    { category: "TRANSPORT" as const, description: "Ulaşım", amount: input.transport?.price ?? 0 },
-    {
-      category: "ACCOMMODATION" as const,
-      description: nights > 0 ? `Konaklama (${nights} gece)` : "Konaklama",
-      amount: (input.accommodation?.price ?? 0) * nights,
-    },
-    { category: "ACTIVITIES" as const, description: "Aktiviteler", amount: activities },
-    { category: "FOOD" as const, description: `Yeme-içme (${dayCount} gün)`, amount: input.foodPerDay * dayCount },
-    { category: "OTHER" as const, description: "Diğer giderler", amount: input.otherCost },
-  ].filter((line) => line.amount > 0);
-
-  return { lines, total: lines.reduce((sum, line) => sum + line.amount, 0), dayCount };
-}
+const MANUAL_PLANS_PER_HOUR = 30;
 
 export async function createManualPlan(userId: string, input: ManualPlanInput): Promise<string> {
   const { lines, total, dayCount } = manualBudget(input);
   if (dayCount > MAX_PLAN_DAYS) {
     throw new ApiError(400, `Bir plan en fazla ${MAX_PLAN_DAYS} gün olabilir.`);
+  }
+
+  if (!rateLimit(`manual:${userId}`, MANUAL_PLANS_PER_HOUR, 60 * 60 * 1000).ok) {
+    throw new ApiError(429, "Bir saat içinde çok fazla plan kaydettin. Lütfen biraz sonra tekrar dene.", {
+      "Retry-After": "900",
+    });
   }
 
   const center = await geocodeCity(input.city, input.country);

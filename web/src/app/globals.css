@@ -933,6 +933,13 @@ body {
     stroke-linecap: round;
   }
 
+  /* Yol ağı üzerinden hesaplanmış rota: kesiksiz. */
+  .map-route-road {
+    stroke-dasharray: none;
+    stroke-linejoin: round;
+    stroke-opacity: 0.85;
+  }
+
   .map-route-1 {
     stroke: #1f9d8b;
   }

@@ -27,6 +27,6 @@ export const GET = route(async (request) => {
 
   const cover = await getCityCover(city, country);
   return NextResponse.json(cover, {
-    headers: { "Cache-Control": cover.imageUrl ? "public, max-age=86400" : "public, max-age=3600" },
+    headers: { "Cache-Control": cover.imageUrl ? "public, max-age=86400" : "public, max-age=300" },
   });
 });

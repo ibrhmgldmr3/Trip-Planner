@@ -359,7 +359,7 @@ function PlanDetailView() {
                     ))}
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-ink-3">
-                    Çizgiler durakların ziyaret sırasını gösterir, yol tarifi değildir.
+                    Rota, durakları ziyaret sırasıyla yol üzerinden en kısa şekilde bağlar; hesaplanamazsa kesikli düz çizgi görünür.
                     {!view.manual && " Konumlar yapay zekâ tahminidir; yola çıkmadan önce doğrula."}
                   </p>
                 </aside>

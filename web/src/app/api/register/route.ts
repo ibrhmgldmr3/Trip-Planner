@@ -23,10 +23,16 @@ export const POST = route(async (request) => {
     throw new ApiError(409, "Bu e-posta adresi zaten kullanılıyor.");
   }
 
-  const user = await prisma.user.create({
-    data: { name, email, password: await bcrypt.hash(password, 12) },
-    select: { id: true, name: true, email: true },
-  });
+  const user = await prisma.user
+    .create({
+      data: { name, email, password: await bcrypt.hash(password, 12) },
+      select: { id: true, name: true, email: true },
+    })
+    .catch((error: unknown) => {
+      // Aynı e-postayla eşzamanlı iki kayıt: ikincisi benzersizlik kısıtına takılır.
+      if ((error as { code?: string })?.code === "P2002") throw new ApiError(409, "Bu e-posta adresi zaten kullanılıyor.");
+      throw error;
+    });
 
   return NextResponse.json({ user }, { status: 201 });
 });

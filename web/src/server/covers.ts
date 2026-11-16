@@ -29,7 +29,13 @@ const RETRY_MISSING_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 export const coverKey = (city: string, _country?: string | null) => city.trim().toLocaleLowerCase("tr-TR");
 
 // Madde görseli fotoğraf yerine harita, bayrak, arma ya da kolaj olabilir; bunlar kapak olmaz.
-const NOT_A_PHOTO = /\.svg|locator|map_|_map|harita|konum|flag|bayra|coat_of_arms|arma|logo|seal|montage|collage|kolaj/i;
+// Sözcükler dosya adında ayrı bir parça olarak aranır; yoksa "arma" Marmaris'i, "flag"
+// Flagstaff'ı eler ve o şehirler hiç fotoğraf alamaz.
+const NOT_A_PHOTO =
+  /\.svg|(?<![a-zçğıöşü])(?:(?:locator|maps?|flags?|logos?|seals?|montage|collage|coat_of_arms|arma(?:s[ıi])?)(?![a-zçğıöşü])|harita|konum|bayra[kğ]|kolaj)/i;
+
+/** Wikipedia madde görseli kapak olarak kullanılabilecek bir fotoğraf mı? */
+export const isPhotoUrl = (source: string) => !NOT_A_PHOTO.test(decodeURIComponent(source));
 
 /* ----------------------------- Wikipedia ---------------------------- */
 
@@ -89,7 +95,7 @@ async function wikiCovers(lang: "tr" | "en", titles: string[]): Promise<Map<stri
     // Yer maddelerinin koordinatı olur; koordinatsız madde aynı adı taşıyan başka bir
     // şey olabilir (ör. "Kaş" maddesi ilçeyi değil kaşı anlatır) ve kapak olarak kullanılmaz.
     if (!page.coordinates?.length) continue;
-    if (!source || NOT_A_PHOTO.test(decodeURIComponent(source))) continue;
+    if (!source || !isPhotoUrl(source)) continue;
     found.set(title, { imageUrl: source, pageUrl: page.fullurl ?? null });
   }
   return found;
@@ -102,6 +108,10 @@ async function wikiCovers(lang: "tr" | "en", titles: string[]): Promise<Map<stri
 const SPACING_MS = 1200;
 const COOLDOWN_MS = 3 * 60 * 1000;
 const BATCH = 40;
+// Bu uç oturum istemez: sıra sınırsız uzarsa bir kişinin art arda sorduğu uydurma
+// şehirler herkesin kapak isteğini dakikalarca bekletir. Sıra doluysa beklenmez.
+const MAX_WAITING = 8;
+let waiting = 0;
 
 let queue: Promise<unknown> = Promise.resolve();
 let cooldownUntil = 0;
@@ -146,12 +156,14 @@ export async function getCityCovers(refs: CityRef[]): Promise<Map<string, CityCo
   if (wanted.size === 0) return new Map();
 
   const result = await readCache([...wanted.keys()]);
-  if ([...wanted.keys()].every((key) => result.has(key)) || Date.now() < cooldownUntil) {
+  if ([...wanted.keys()].every((key) => result.has(key)) || Date.now() < cooldownUntil || waiting >= MAX_WAITING) {
     for (const key of wanted.keys()) if (!result.has(key)) result.set(key, NONE);
     return result;
   }
 
+  waiting++;
   await enqueue(async () => {
+    waiting--;
     // Sırada beklerken başka bir istek aynı şehirleri doldurmuş olabilir.
     for (const [key, cover] of await readCache([...wanted.keys()])) result.set(key, cover);
     const missing = [...wanted].filter(([key]) => !result.has(key));

@@ -1,6 +1,8 @@
 // Plan veri tipleri ve arayüz yardımcıları. Sunucu da istemci de kullanır;
 // bu yüzden Prisma ya da sunucuya özel hiçbir şey içe aktarmaz.
 
+import { tripDays, tripNights } from "./format";
+
 /* ------------------------------ Tipler ------------------------------ */
 
 export type PlanSource = "AI" | "MANUAL";
@@ -183,8 +185,6 @@ export const SLOT_LABEL: Record<DaySlot, string> = {
   EVENING: "Akşam",
 };
 
-export const SLOT_ORDER: DaySlot[] = ["MORNING", "NOON", "EVENING"];
-
 /* ------------------------------ Bütçe ------------------------------ */
 
 export const BUDGET_CATEGORIES: BudgetCategory[] = [
@@ -229,6 +229,45 @@ export function sumByCategory(
 }
 
 export const sumAmounts = (lines: Array<{ amount: number }>) => lines.reduce((sum, line) => sum + line.amount, 0);
+
+/** Manuel planın bütçesini hesaplamak için gereken alanlar (form taslağı ve doğrulanmış istek ikisi de uyar). */
+export interface ManualBudgetInput {
+  startDate: string;
+  endDate: string;
+  transport?: { price: number } | null;
+  /** `price` gecelik fiyattır. */
+  accommodation?: { price: number } | null;
+  days: Array<{ isFree: boolean; stops: Array<{ cost: number }> }>;
+  foodPerDay: number;
+  otherCost: number;
+}
+
+/**
+ * Manuel planın bütçe dökümü. Planlayıcıdaki önizleme de, sunucudaki kayıt da bu
+ * işlevi kullanır; kullanıcının gördüğü toplam ile kaydedilen toplam ayrışamaz.
+ */
+export function manualBudget(input: ManualBudgetInput) {
+  const dayCount = tripDays(input.startDate, input.endDate);
+  const nights = tripNights(input.startDate, input.endDate);
+  const activities = input.days.reduce(
+    (sum, day) => (day.isFree ? sum : sum + day.stops.reduce((total, stop) => total + stop.cost, 0)),
+    0
+  );
+
+  const lines: Array<{ category: BudgetCategory; description: string; amount: number }> = [
+    { category: "TRANSPORT" as const, description: "Ulaşım", amount: input.transport?.price ?? 0 },
+    {
+      category: "ACCOMMODATION" as const,
+      description: nights > 0 ? `Konaklama (${nights} gece)` : "Konaklama",
+      amount: (input.accommodation?.price ?? 0) * nights,
+    },
+    { category: "ACTIVITIES" as const, description: "Aktiviteler", amount: activities },
+    { category: "FOOD" as const, description: `Yeme-içme (${dayCount} gün)`, amount: input.foodPerDay * dayCount },
+    { category: "OTHER" as const, description: "Diğer giderler", amount: input.otherCost },
+  ].filter((line) => line.amount > 0);
+
+  return { lines, total: lines.reduce((sum, line) => sum + line.amount, 0), dayCount };
+}
 
 /* --------------------- Eski (metin tabanlı) planlar ------------------- */
 // Yapılandırılmış veriye geçmeden önce üretilen AI planları serbest metin olarak

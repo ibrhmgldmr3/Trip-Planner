@@ -71,7 +71,11 @@ interface ChatResult {
   content: string | null;
 }
 
-async function callModel(messages: Array<{ role: string; content: string }>, jsonMode: boolean): Promise<ChatResult> {
+async function callModel(
+  messages: Array<{ role: string; content: string }>,
+  jsonMode: boolean,
+  signal: AbortSignal
+): Promise<ChatResult> {
   const response = await fetch(`${env.OPENROUTER_BASE_URL.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
@@ -86,7 +90,7 @@ async function callModel(messages: Array<{ role: string; content: string }>, jso
       max_tokens: 8000,
       ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     }),
-    signal: AbortSignal.timeout(100_000),
+    signal,
   });
 
   if (!response.ok) {
@@ -118,20 +122,27 @@ export async function generatePlan(input: GeneratePlanInput, dayCount: number): 
     { role: "user", content: buildUserPrompt(input, dayCount) },
   ];
 
+  // Bütün denemeler tek süreyi paylaşır: rota 120 sn ile sınırlı (bkz. api/plans/generate),
+  // ikinci deneme yarıda kesilip anlamsız bir hataya dönüşmesin.
+  const deadline = AbortSignal.timeout(110_000);
   let jsonMode = true;
   let lastProblem = "";
+  // İstenenden az gün içeren ama geçerli plan: daha iyisi gelmezse bu kullanılır.
+  let shortPlan: AiPlan | null = null;
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     let result: ChatResult;
     try {
-      result = await callModel(messages, jsonMode);
+      result = await callModel(messages, jsonMode, deadline);
       // Bazı modeller response_format parametresini desteklemez.
       if (!result.ok && result.status === 400 && jsonMode) {
         jsonMode = false;
-        result = await callModel(messages, jsonMode);
+        result = await callModel(messages, jsonMode, deadline);
       }
     } catch (error) {
       const timedOut = error instanceof Error && error.name === "TimeoutError";
+      // Süre dolduysa ama elde eksik günlü geçerli bir plan varsa o kullanılır.
+      if (timedOut && shortPlan) break;
       console.error("[ai] İstek başarısız:", error instanceof Error ? error.message : error);
       throw new ApiError(
         timedOut ? 504 : 502,
@@ -150,24 +161,28 @@ export async function generatePlan(input: GeneratePlanInput, dayCount: number): 
     }
 
     if (result.content) {
+      let complaint = "Yanıtın istenen JSON şemasına uymuyor.";
       try {
-        return { plan: parseAiPlan(result.content), model: env.OPENROUTER_MODEL };
+        const plan = parseAiPlan(result.content);
+        if (plan.days.length >= dayCount) return { plan, model: env.OPENROUTER_MODEL };
+        // Model bazen gezinin yalnızca ilk günlerini yazar; eksik plan sessizce kaydedilmesin.
+        if (!shortPlan || plan.days.length > shortPlan.days.length) shortPlan = plan;
+        lastProblem = `${plan.days.length}/${dayCount} gün`;
+        complaint = `Plan ${dayCount} gün olmalıydı ama yalnızca ${plan.days.length} gün yazdın.`;
       } catch (error) {
         lastProblem = error instanceof Error ? error.message : "geçersiz yanıt";
-        console.warn(`[ai] ${attempt}. deneme şemaya uymadı: ${lastProblem.slice(0, 300)}`);
-        messages.push(
-          { role: "assistant", content: result.content.slice(0, 4000) },
-          {
-            role: "user",
-            content:
-              "Yanıtın istenen JSON şemasına uymuyor. Yalnızca şemaya uygun tek bir JSON nesnesi döndür; başka metin yazma.",
-          }
-        );
-        continue;
       }
+      console.warn(`[ai] ${attempt}. deneme reddedildi: ${lastProblem.slice(0, 300)}`);
+      messages.push(
+        { role: "assistant", content: result.content.slice(0, 4000) },
+        { role: "user", content: `${complaint} Yalnızca şemaya uygun tek bir JSON nesnesi döndür; başka metin yazma.` }
+      );
+      continue;
     }
     lastProblem = "boş yanıt";
   }
+
+  if (shortPlan) return { plan: shortPlan, model: env.OPENROUTER_MODEL };
 
   throw new ApiError(502, "AI geçerli bir plan üretemedi. Lütfen tekrar dene ya da tercihlerini sadeleştir.");
 }
